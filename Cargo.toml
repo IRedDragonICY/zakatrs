@@ -4,6 +4,11 @@ version = "0.1.0"
 edition = "2024"
 license = "MIT"
 authors = ["Mohammad Farid Hendianto (IRedDragonICY)"]
+description = "A type-safe, comprehensive, and Fiqh-compliant Zakat calculation library. Supports Gold, Silver, Business, Agriculture, Livestock, Professional Income, and Modern Assets (Crypto/Stocks)."
+readme = "README.md"
+repository = "https://github.com/IRedDragonICY/zakatrs"
+keywords = ["zakat", "islamic-finance", "fiqh", "finance", "halal"]
+categories = ["algorithms", "mathematics", "science"]
 
 [dependencies]
 rust_decimal = "1.39"

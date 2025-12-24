@@ -2,6 +2,8 @@
 name = "zakat"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+authors = ["Mohammad Farid Hendianto (IRedDragonICY)"]
 
 [dependencies]
 rust_decimal = "1.39"

@@ -32,16 +32,21 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - **Input Sanitization** (Rejects negative values)
 - **Flexible Configuration** (Env Vars, JSON, Fluent Builder)
 - **Fiqh Compliance** (Jewelry exemptions, Madhab-specific rules)
+- **Async Support** (Integration with `tokio` and `async-trait`)
+- **Live Pricing Interface** (e.g. for API integration)
 - **Detailed Reporting** (Livestock in-kind details, metadata support)
 
 ## Install
 
 ```toml
 [dependencies]
-zakat = "0.4.0"
+[dependencies]
+zakat = "0.4.1"
 rust_decimal = "1.39"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+tokio = { version = "1", features = ["full"] } # Optional: for async support
+async-trait = "0.1"
 ```
 
 ## Usage
@@ -128,6 +133,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### Async & Live Pricing
+
+For applications requiring live data fetching or async flows:
+
+```rust
+use zakat::prelude::*;
+use zakat::pricing::{PriceProvider, Prices};
+
+struct MockApi;
+
+#[async_trait::async_trait]
+impl PriceProvider for MockApi {
+    async fn get_prices(&self) -> Result<Prices, ZakatError> {
+        // Simulate API call
+        Ok(Prices::new(90.0, 1.2)?)
+    }
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let api = MockApi;
+    // Initialize config from provider
+    let config = ZakatConfig::from_provider(&api).await?;
+    
+    let portfolio = AsyncZakatPortfolio::new()
+        .add(BusinessZakat::builder()
+            .cash(10_000)
+            .build()?);
+            
+    let result = portfolio.calculate_total_async(&config).await;
+    println!("Total Due: {}", result.total_zakat_due);
+    Ok(())
+}
+```
+
+### Configuration
+
 ### Configuration
 
 ```rust
@@ -150,7 +192,7 @@ let config = ZakatConfig::builder()
 ### Advanced Assets (Jewelry & Livestock)
 
 ```rust
-use zakat::maal::precious_metals::{PreciousMetal, JewelryUsage};
+use zakat::maal::precious_metals::{PreciousMetals, JewelryUsage};
 use zakat::maal::livestock::{LivestockAssets, LivestockType, LivestockPrices};
 
 // Personal Jewelry (Exempt in Shafi/Maliki, Payable in Hanafi)

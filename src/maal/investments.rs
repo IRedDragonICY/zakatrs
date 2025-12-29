@@ -13,7 +13,7 @@ pub enum InvestmentType {
 pub struct InvestmentAssets {
     pub market_value: Decimal,
     pub investment_type: InvestmentType,
-    pub deductible_liabilities: Decimal,
+    pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
 }
@@ -32,14 +32,14 @@ impl InvestmentAssets {
         Ok(Self {
             market_value: value,
             investment_type,
-            deductible_liabilities: Decimal::ZERO,
+            liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
         })
     }
 
-    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
-        self.deductible_liabilities = debt.into();
+    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
+        self.liabilities_due_now = debt.into();
         self
     }
 
@@ -80,7 +80,7 @@ impl CalculateZakat for InvestmentAssets {
         // Stocks: Market Value * 2.5% (Zakah on Principal + Profit).
         
         let total_assets = self.market_value;
-        let liabilities = self.deductible_liabilities;
+        let liabilities = self.liabilities_due_now;
         let rate = dec!(0.025);
 
         Ok(ZakatDetails::new(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Investment)

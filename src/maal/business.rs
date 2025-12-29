@@ -51,7 +51,7 @@ impl CalculateZakat for BusinessAssets {
 // The Trait is fine, but the struct needs the context.
 pub struct BusinessZakatCalculator {
     assets: BusinessAssets,
-    deductible_liabilities: Decimal,
+    liabilities_due_now: Decimal,
     hawl_satisfied: bool,
     label: Option<String>,
 }
@@ -60,14 +60,14 @@ impl BusinessZakatCalculator {
     pub fn new(assets: BusinessAssets) -> Self {
         Self {
             assets,
-            deductible_liabilities: Decimal::ZERO,
+            liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
         }
     }
 
-    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
-        self.deductible_liabilities = debt.into();
+    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
+        self.liabilities_due_now = debt.into();
         self
     }
 
@@ -109,7 +109,7 @@ impl CalculateZakat for BusinessZakatCalculator {
         let total_assets = gross_assets;
         
         // Sum internal short term liabilities with any extra deductible liabilities set via builder
-        let total_liabilities = business_debt + self.deductible_liabilities;
+        let total_liabilities = business_debt + self.liabilities_due_now;
 
         let rate = dec!(0.025);
 

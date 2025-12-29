@@ -14,7 +14,7 @@ pub struct AgricultureAssets {
     pub harvest_weight_kg: Decimal,
     pub price_per_kg: Decimal,
     pub irrigation: IrrigationMethod,
-    pub deductible_liabilities: Decimal,
+    pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
 }
@@ -36,14 +36,14 @@ impl AgricultureAssets {
             harvest_weight_kg: weight,
             price_per_kg: price,
             irrigation,
-            deductible_liabilities: Decimal::ZERO,
+            liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
         })
     }
 
-    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
-        self.deductible_liabilities = debt.into();
+    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
+        self.liabilities_due_now = debt.into();
         self
     }
 
@@ -71,7 +71,7 @@ impl CalculateZakat for AgricultureAssets {
         let total_value = self.harvest_weight_kg * self.price_per_kg;
         let nisab_value = nisab_threshold_kg * self.price_per_kg; 
         
-        let liabilities = self.deductible_liabilities;
+        let liabilities = self.liabilities_due_now;
         
         // ZakatDetails logic overrides 'is_payable' based on net_assets usually, but here Nisab is on Quantity.
         // We need to be careful. If Quantity > Nisab, then we pay rate on Total.
@@ -91,7 +91,7 @@ impl CalculateZakat for AgricultureAssets {
 
         Ok(ZakatDetails {
             total_assets: total_value,
-            deductible_liabilities: liabilities,
+            liabilities_due_now: liabilities,
             net_assets: net_value,
             nisab_threshold: nisab_value,
             is_payable,

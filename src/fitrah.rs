@@ -40,7 +40,7 @@ pub fn calculate_fitrah(
     
     Ok(ZakatDetails {
         total_assets: total_value,
-        deductible_liabilities: Decimal::ZERO,
+        liabilities_due_now: Decimal::ZERO,
         net_assets: total_value,
         nisab_threshold: Decimal::ZERO, // Fitrah is obligatory, no wealth nisab in the same sense as Maal
         is_payable: true,

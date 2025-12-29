@@ -13,7 +13,7 @@ pub struct IncomeZakatCalculator {
     total_income: Decimal,
     basic_expenses: Decimal,
     method: IncomeCalculationMethod,
-    deductible_liabilities: Decimal,
+    liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
 }
@@ -35,14 +35,14 @@ impl IncomeZakatCalculator {
             total_income: income,
             basic_expenses: expenses,
             method,
-            deductible_liabilities: Decimal::ZERO,
+            liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
         })
     }
 
-    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
-        self.deductible_liabilities = debt.into();
+    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
+        self.liabilities_due_now = debt.into();
         self
     }
 
@@ -82,7 +82,7 @@ impl CalculateZakat for IncomeZakatCalculator {
         }
 
         let rate = dec!(0.025);
-        let external_debt = self.deductible_liabilities;
+        let external_debt = self.liabilities_due_now;
 
         let (total_assets, liabilities) = match self.method {
             IncomeCalculationMethod::Gross => {

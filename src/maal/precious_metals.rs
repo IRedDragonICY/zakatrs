@@ -7,7 +7,8 @@ use crate::config::ZakatConfig;
 pub struct PreciousMetal {
     pub weight_grams: Decimal,
     pub metal_type: WealthType, // Gold or Silver
-    pub deductible_liabilities: Decimal,
+    pub purity: u32, // Karat for Gold (e.g. 24, 21, 18). Ignored for Silver (assumed pure).
+    pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
 }
@@ -27,19 +28,25 @@ impl PreciousMetal {
         Ok(Self {
             weight_grams: weight,
             metal_type,
-            deductible_liabilities: Decimal::ZERO,
+            purity: 24, // Default to 24K (Pure)
+            liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
         })
     }
 
-    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
-        self.deductible_liabilities = debt.into();
+    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
+        self.liabilities_due_now = debt.into();
         self
     }
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
         self.hawl_satisfied = satisfied;
+        self
+    }
+
+    pub fn with_purity(mut self, karat: u32) -> Self {
+        self.purity = karat;
         self
     }
 
@@ -66,8 +73,17 @@ impl CalculateZakat for PreciousMetal {
             return Ok(ZakatDetails::not_payable(nisab_value, self.metal_type, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
-        let total_value = self.weight_grams * price_per_gram;
-        let liabilities = self.deductible_liabilities;
+
+        // Normalize weight if it's Gold and not 24K
+        let effective_weight = if self.metal_type == WealthType::Gold && self.purity < 24 {
+            // formula: weight * (karat / 24)
+            self.weight_grams * (Decimal::from(self.purity) / Decimal::from(24))
+        } else {
+            self.weight_grams
+        };
+
+        let total_value = effective_weight * price_per_gram;
+        let liabilities = self.liabilities_due_now;
 
         let rate = dec!(0.025); // 2.5%
 
@@ -112,9 +128,34 @@ mod tests {
         // Net ($8,000) < Nisab ($8,500) -> Not Payable.
         
         let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap();
-        let zakat = metal.with_debt(dec!(2000.0)).with_hawl(true).calculate_zakat(&config).unwrap();
+        let zakat = metal.with_debt_due_now(dec!(2000.0)).with_hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(!zakat.is_payable);
         assert_eq!(zakat.zakat_due, Decimal::ZERO);
+    }
+
+    #[test]
+    fn test_gold_purity_18k() {
+        let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
+        
+        // 100g of 18K Gold.
+        // Effective Weight = 100 * (18/24) = 75g.
+        // Nisab = 85g.
+        // 75g < 85g -> Not Payable.
+        // If it were treated as 24K, it would be payable.
+        
+        let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap()
+            .with_purity(18);
+            
+        let zakat = metal.with_hawl(true).calculate_zakat(&config).unwrap();
+        
+        assert!(!zakat.is_payable);
+        assert_eq!(zakat.zakat_due, Decimal::ZERO);
+        
+        // Test 24K explicit
+        let metal24 = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap()
+            .with_purity(24);
+        let zakat24 = metal24.with_hawl(true).calculate_zakat(&config).unwrap();
+        assert!(zakat24.is_payable);
     }
 }

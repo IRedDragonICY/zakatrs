@@ -14,7 +14,7 @@ pub enum MiningType {
 pub struct MiningAssets {
     pub value: Decimal,
     pub mining_type: MiningType,
-    pub deductible_liabilities: Decimal,
+    pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
 }
@@ -33,14 +33,14 @@ impl MiningAssets {
         Ok(Self {
             value: val,
             mining_type,
-            deductible_liabilities: Decimal::ZERO,
+            liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
         })
     }
 
-    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
-        self.deductible_liabilities = debt.into();
+    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
+        self.liabilities_due_now = debt.into();
         self
     }
 
@@ -80,7 +80,7 @@ impl CalculateZakat for MiningAssets {
                         .with_label(self.label.clone().unwrap_or_default()));
                 }
                 let rate = dec!(0.025);
-                let liabilities = self.deductible_liabilities;
+                let liabilities = self.liabilities_due_now;
                 
                 Ok(ZakatDetails::new(self.value, liabilities, nisab_threshold, rate, crate::types::WealthType::Mining)
                     .with_label(self.label.clone().unwrap_or_default()))
@@ -101,7 +101,7 @@ mod tests {
         // Usually Rikaz is on gross, but let's see implementation.
         // Implementation: (value - debt) * 0.20
         
-        let res = mining.with_debt(dec!(500.0)).with_hawl(false).calculate_zakat(&config).unwrap();
+        let res = mining.with_debt_due_now(dec!(500.0)).with_hawl(false).calculate_zakat(&config).unwrap();
         // (1000 - 500) * 0.20 = 500 * 0.2 = 100. -> NO, Debt is ignored!
         // 1000 * 0.20 = 200.
         

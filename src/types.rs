@@ -7,9 +7,9 @@ use thiserror::Error;
 pub struct ZakatDetails {
     /// Total assets subject to Zakat calculation.
     pub total_assets: Decimal,
-    /// Liabilities that can be deducted from the total assets.
-    pub deductible_liabilities: Decimal,
-    /// Net assets after deducting liabilities (total_assets - deductible_liabilities).
+    /// Liabilities that can be deducted from the total assets (Only debts due immediately).
+    pub liabilities_due_now: Decimal,
+    /// Net assets after deducting liabilities (total_assets - liabilities_due_now).
     pub net_assets: Decimal,
     /// The Nisab threshold applicable for this type of wealth.
     pub nisab_threshold: Decimal,
@@ -28,12 +28,12 @@ pub struct ZakatDetails {
 impl ZakatDetails {
     pub fn new(
         total_assets: Decimal,
-        deductible_liabilities: Decimal,
+        liabilities_due_now: Decimal,
         nisab_threshold: Decimal,
         rate: Decimal,
         wealth_type: WealthType,
     ) -> Self {
-        let net_assets = total_assets - deductible_liabilities;
+        let net_assets = total_assets - liabilities_due_now;
         // Business rule: If net assets are negative, they are treated as zero for logic,
         // but it's good to preserve the actual value if needed.
         // For Nisab check: net_assets >= nisab_threshold
@@ -47,7 +47,7 @@ impl ZakatDetails {
 
         ZakatDetails {
             total_assets,
-            deductible_liabilities,
+            liabilities_due_now,
             net_assets,
             nisab_threshold,
             is_payable,
@@ -62,7 +62,7 @@ impl ZakatDetails {
     pub fn not_payable(nisab_threshold: Decimal, wealth_type: WealthType, reason: &str) -> Self {
         ZakatDetails {
             total_assets: Decimal::ZERO,
-            deductible_liabilities: Decimal::ZERO,
+            liabilities_due_now: Decimal::ZERO,
             net_assets: Decimal::ZERO,
             nisab_threshold,
             is_payable: false,

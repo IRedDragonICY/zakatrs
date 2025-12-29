@@ -9,12 +9,19 @@ pub enum LivestockType {
     Sheep, // Includes Goats
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GrazingMethod {
+    Saimah,   // Naturally grazed for majority of the year
+    Maalufah, // Fed/Fodder provided
+}
+
 pub struct LivestockAssets {
     pub count: u32,
     pub animal_type: LivestockType,
     pub prices: LivestockPrices,
-    pub deductible_liabilities: Decimal,
+    pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
+    pub grazing_method: GrazingMethod,
     pub label: Option<String>,
 }
 
@@ -57,19 +64,25 @@ impl LivestockAssets {
             count,
             animal_type,
             prices,
-            deductible_liabilities: Decimal::ZERO,
+            liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
+            grazing_method: GrazingMethod::Saimah, // Default to Zakatable state (Saimah)
             label: None,
         }
     }
 
-    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
-        self.deductible_liabilities = debt.into();
+    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
+        self.liabilities_due_now = debt.into();
         self
     }
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
         self.hawl_satisfied = satisfied;
+        self
+    }
+
+    pub fn with_grazing_method(mut self, method: GrazingMethod) -> Self {
+        self.grazing_method = method;
         self
     }
 
@@ -83,14 +96,25 @@ use crate::config::ZakatConfig;
 
 impl CalculateZakat for LivestockAssets {
     fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        // Calculate Nisab Count Value for reporting consistency even if not payable
+        let single_price = match self.animal_type {
+            LivestockType::Sheep => self.prices.sheep_price,
+            LivestockType::Cow => self.prices.cow_price,
+            LivestockType::Camel => self.prices.camel_price,
+        };
+        
+        let nisab_count_val = match self.animal_type {
+            LivestockType::Sheep => Decimal::from(40) * single_price,
+            LivestockType::Cow => Decimal::from(30) * single_price,
+            LivestockType::Camel => Decimal::from(5) * single_price,
+        };
+
+        if self.grazing_method != GrazingMethod::Saimah {
+             return Ok(ZakatDetails::not_payable(nisab_count_val, crate::types::WealthType::Livestock, "Not Sa'imah (naturally grazed)")
+                .with_label(self.label.clone().unwrap_or_default()));
+        }
+
         if !self.hawl_satisfied {
-             // For Livestock, Nisab is count-based, but we need a value for not_payable.
-             // We can calculate the value of "Nisab Count" for the type.
-             let nisab_count_val = match self.animal_type {
-                LivestockType::Sheep => Decimal::from(40) * self.prices.sheep_price,
-                LivestockType::Cow => Decimal::from(30) * self.prices.cow_price,
-                LivestockType::Camel => Decimal::from(5) * self.prices.camel_price,
-             };
              return Ok(ZakatDetails::not_payable(nisab_count_val, crate::types::WealthType::Livestock, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
@@ -108,18 +132,13 @@ impl CalculateZakat for LivestockAssets {
 
         // We construct ZakatDetails.
         // Total Assets = Count * Price (Approx value of herd)
-        let single_price = match self.animal_type {
-            LivestockType::Sheep => self.prices.sheep_price,
-            LivestockType::Cow => self.prices.cow_price,
-            LivestockType::Camel => self.prices.camel_price,
-        };
         
         let total_value = Decimal::from(self.count) * single_price;
         let is_payable = zakat_value > Decimal::ZERO;
 
         Ok(ZakatDetails {
             total_assets: total_value,
-            deductible_liabilities: self.deductible_liabilities,
+            liabilities_due_now: self.liabilities_due_now,
             net_assets: total_value, 
             nisab_threshold: Decimal::from(nisab_count) * single_price, 
             is_payable,
@@ -349,5 +368,17 @@ mod tests {
          let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
          assert!(res.is_payable);
          assert_eq!(res.zakat_due, dec!(350.0)); // 1 Tabi (0.7x cow_price)
+    }
+
+    #[test]
+    fn test_maalufah_not_payable() {
+        let prices = LivestockPrices { sheep_price: dec!(100.0), ..Default::default() };
+        // 50 Sheep (usually payable) but Feed-lot (Maalufah)
+        let stock = LivestockAssets::new(50, LivestockType::Sheep, prices)
+            .with_grazing_method(GrazingMethod::Maalufah);
+            
+        let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+        assert!(!res.is_payable);
+        assert_eq!(res.status_reason, Some("Not Sa'imah (naturally grazed)".to_string()));
     }
 }

@@ -26,13 +26,19 @@ fn test_portfolio_partial_failure() {
     let report = portfolio.calculate_total(&config);
     
     // Check successful results
-    assert_eq!(report.details.len(), 1);
-    assert_eq!(report.details[0].wealth_type, WealthType::Gold);
-    assert!(report.details[0].is_payable);
+    let successes = report.successes();
+    assert_eq!(successes.len(), 1);
+    assert_eq!(successes[0].wealth_type, WealthType::Gold);
+    assert!(successes[0].is_payable);
     
     // Check errors
-    assert_eq!(report.errors.len(), 1);
-    assert!(report.errors[0].contains("Intentional Failure"));
+    let failures = report.failures();
+    assert_eq!(failures.len(), 1);
+    if let PortfolioItemResult::Failure { error, .. } = failures[0] {
+        assert!(error.to_string().contains("Intentional Failure"));
+    } else {
+        panic!("Expected failure variant");
+    }
     
     // Check totals (should include valid assets)
     // 100g Gold * $100 = $10,000

@@ -84,7 +84,28 @@ impl CalculateZakat for InvestmentAssets {
         let liabilities = self.liabilities_due_now;
         let rate = dec!(0.025);
 
-        Ok(ZakatDetails::new(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Investment)
+        // Build calculation trace
+        let type_desc = match self.investment_type {
+            InvestmentType::Stock => "Stocks",
+            InvestmentType::Crypto => "Crypto",
+            InvestmentType::MutualFund => "Mutual Fund",
+        };
+
+        let mut trace = Vec::new();
+        trace.push(crate::types::CalculationStep::initial(format!("Market Value ({})", type_desc), total_assets));
+        trace.push(crate::types::CalculationStep::subtract("Debts Due Now", liabilities));
+        
+        let net_assets = total_assets - liabilities;
+        trace.push(crate::types::CalculationStep::result("Net Investment Assets", net_assets));
+        trace.push(crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value));
+        
+        if net_assets >= nisab_threshold_value && net_assets > Decimal::ZERO {
+            trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
+        } else {
+             trace.push(crate::types::CalculationStep::info("Net Assets below Nisab - No Zakat Due"));
+        }
+
+        Ok(ZakatDetails::with_trace(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Investment, trace)
             .with_label(self.label.clone().unwrap_or_default()))
     }
 

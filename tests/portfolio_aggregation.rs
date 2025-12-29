@@ -38,7 +38,7 @@ fn test_portfolio_aggregation_mix_gold_and_cash() {
         .add(cash_calculator);
 
     let result = portfolio.calculate_total(&config);
-    assert!(result.errors.is_empty(), "Result should not have errors");
+    assert!(result.is_clean(), "Result should not have errors");
 
     // Verify Total Assets
     // Gold: 50 * 100 = 5000
@@ -51,9 +51,9 @@ fn test_portfolio_aggregation_mix_gold_and_cash() {
     assert_eq!(result.total_zakat_due, dec!(225.0), "Total zakat should be calculated on aggregated sum");
 
     // Verify Individual Details updated
-    for detail in result.details {
+    for detail in result.successes() {
         assert!(detail.is_payable, "Component {:?} should be marked payable due to aggregation", detail.wealth_type);
-        if let Some(reason) = detail.status_reason {
+        if let Some(reason) = &detail.status_reason {
             assert!(reason.contains("Aggregation"), "Reason should mention aggregation");
         }
     }
@@ -81,12 +81,12 @@ fn test_portfolio_no_aggregation_if_total_below_nisab() {
         .add(cash_calculator);
 
     let result = portfolio.calculate_total(&config);
-    assert!(result.errors.is_empty());
+    assert!(result.is_clean());
 
     assert_eq!(result.total_assets, dec!(5000.0));
     assert_eq!(result.total_zakat_due, dec!(0.0));
     
-    for detail in result.details {
+    for detail in result.successes() {
         assert!(!detail.is_payable);
     }
 }

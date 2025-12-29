@@ -1,5 +1,5 @@
 use rust_decimal_macros::dec;
-use zakat::{ZakatConfig, CalculateZakat, WealthType};
+use zakat::{ZakatConfig, CalculateZakat, WealthType, AssetBuilder};
 use zakat::maal::business::{BusinessAssets, BusinessZakatCalculator};
 use zakat::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
 use zakat::maal::investments::{InvestmentAssets, InvestmentType};

@@ -38,7 +38,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 
 ```toml
 [dependencies]
-zakat = "0.2.0"
+zakat = "0.3.0"
 rust_decimal = "1.39"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -51,23 +51,23 @@ serde_json = "1.0"
 > **Note:** You can pass standard Rust types (`i32`, `f64`, `&str`) directly to all constructors. There is no need to manually convert to `Decimal` or use the `dec!()` macro anymore.
 
 ```rust
-use zakat::{ZakatConfig, CalculateZakat};
+use zakat::{ZakatConfig, CalculateZakat, AssetBuilder};
 use zakat::maal::business::{BusinessAssets, BusinessZakatCalculator};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = ZakatConfig::new(65, 1); // gold $65/g, silver $1/g
+    let config = ZakatConfig::new(65, 1)?; // gold $65/g, silver $1/g
 
-    let assets = BusinessAssets::new(
-        50000, // cash
-        20000, // inventory
-        5000,  // receivables
-        1000   // debt
-    )?;
+    // Use Builder Pattern for clearer asset definition
+    let assets = BusinessAssets::builder()
+        .cash(50000)
+        .inventory(20000)
+        .receivables(5000)
+        .liabilities(1000) // Deductible short-term debts
+        .build()?;
 
     let calc = BusinessZakatCalculator::new(assets, &config)?
                      .with_label("Main Store")
-                     .with_hawl(true)
-                     .with_debt(1000); // Additional debts
+                     .with_hawl(true);
 
     let result = calc.calculate_zakat()?;
 
@@ -104,9 +104,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = portfolio.calculate_total(&config)?;
     println!("Total Zakat Due: ${}", result.total_zakat_due);
     
-    // Iterate details to see labels
-    for detail in result.details {
-        if let Some(label) = detail.label {
+    // Check for partial failures
+    if !result.is_clean() {
+        println!("Warning: {} items failed to calculate", result.failures().len());
+    }
+
+    // Iterate successful details
+    for detail in result.successes() {
+        if let Some(label) = &detail.label {
             println!(" - {}: ${}", label, detail.zakat_due);
         }
     }
@@ -117,7 +122,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 ### Configuration
 
 ```rust
-use zakat::{ZakatConfig, Madhab};
+use zakat::{ZakatConfig, Madhab, AssetBuilder};
 
 // Load from Environment Variables (ZAKAT_GOLD_PRICE, etc.)
 let config = ZakatConfig::from_env()?;
@@ -125,9 +130,12 @@ let config = ZakatConfig::from_env()?;
 // Or load from JSON
 let config = ZakatConfig::try_from_json("config.json")?;
 
-// Or fluent builder
-let config = ZakatConfig::new(100.0, 1.0)?
-    .with_madhab(Madhab::Hanafi); // Sets Nisab standard automatically (LowerOfTwo)
+// Or using Value Builder
+let config = ZakatConfig::builder()
+    .gold_price(100.0)
+    .silver_price(1.0)
+    .madhab(Madhab::Hanafi)
+    .build()?;
 ```
 
 ### Advanced Assets (Jewelry & Livestock)
@@ -142,7 +150,11 @@ let necklace = PreciousMetals::new(100.0, WealthType::Gold)?
     .with_label("Wife's Wedding Necklace");
 
 // Livestock Reporting
-let prices = LivestockPrices::new(200, 1500, 3000)?;
+let prices = LivestockPrices::builder()
+    .sheep_price(200)
+    .cow_price(1500)
+    .camel_price(3000)
+    .build()?;
 let camels = LivestockAssets::new(30, LivestockType::Camel, prices);
 
 let result = camels.calculate_zakat(&config)?;

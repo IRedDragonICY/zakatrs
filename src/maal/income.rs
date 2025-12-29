@@ -102,7 +102,32 @@ impl CalculateZakat for IncomeZakatCalculator {
             }
         };
 
-        Ok(ZakatDetails::new(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Income)
+        // Build calculation trace
+        let mut trace = Vec::new();
+        trace.push(crate::types::CalculationStep::initial("Total Income", self.total_income));
+        
+        match self.method {
+            IncomeCalculationMethod::Net => {
+                trace.push(crate::types::CalculationStep::subtract("Basic Living Expenses", self.basic_expenses));
+            }
+            IncomeCalculationMethod::Gross => {
+                trace.push(crate::types::CalculationStep::info("Gross Method used (Expenses not deducted)"));
+            }
+        }
+
+        trace.push(crate::types::CalculationStep::subtract("Debts Due Now", external_debt));
+        let net_income = total_assets - liabilities;
+        trace.push(crate::types::CalculationStep::result("Net Zakatable Income", net_income));
+        
+        trace.push(crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value));
+        
+        if net_income >= nisab_threshold_value && net_income > Decimal::ZERO {
+            trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
+        } else {
+            trace.push(crate::types::CalculationStep::info("Net Income below Nisab - No Zakat Due"));
+        }
+
+        Ok(ZakatDetails::with_trace(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Income, trace)
             .with_label(self.label.clone().unwrap_or_default()))
     }
 

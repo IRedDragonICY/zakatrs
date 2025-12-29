@@ -46,8 +46,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         
     let result = portfolio.calculate_total(&config);
     
-    if !result.errors.is_empty() {
-        println!("Likely Errors: {:?}", result.errors);
+    if !result.is_clean() {
+        println!("Likely Errors: {:?}", result.failures());
     }
     
     println!("\n--- Portfolio Result ---");
@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Total Zakat Due: ${}", result.total_zakat_due);
     
     println!("\n--- Breakdown ---");
-    for detail in &result.details {
+    for detail in result.successes() {
         print!("Asset: {:<20} | Type: {:<12}", detail.label.as_deref().unwrap_or("Unknown"), format!("{:?}", detail.wealth_type));
         println!(" | Net: ${:<10} | Zakat: ${}", detail.net_assets, detail.zakat_due);
     }

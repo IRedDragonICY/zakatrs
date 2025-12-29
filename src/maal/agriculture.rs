@@ -111,6 +111,29 @@ impl CalculateZakat for AgricultureAssets {
 
         let is_payable = zakat_due > Decimal::ZERO;
 
+        // Build calculation trace
+        let irrigation_desc = match self.irrigation {
+            IrrigationMethod::Rain => "Rain-fed (10%)",
+            IrrigationMethod::Irrigated => "Irrigated (5%)",
+            IrrigationMethod::Mixed => "Mixed irrigation (7.5%)",
+        };
+        
+        let mut trace = vec![
+            crate::types::CalculationStep::initial("Harvest Weight (kg)", self.harvest_weight_kg),
+            crate::types::CalculationStep::initial("Price per kg", self.price_per_kg),
+            crate::types::CalculationStep::result("Total Harvest Value", total_value),
+            crate::types::CalculationStep::subtract("Liabilities Due Now", liabilities),
+            crate::types::CalculationStep::result("Net Harvest Value", net_value),
+            crate::types::CalculationStep::compare("Nisab Threshold (653kg value)", nisab_value),
+        ];
+        if is_payable {
+            trace.push(crate::types::CalculationStep::info(format!("Irrigation Method: {}", irrigation_desc)));
+            trace.push(crate::types::CalculationStep::rate("Applied Rate", rate));
+            trace.push(crate::types::CalculationStep::result("Zakat Due", zakat_due));
+        } else {
+            trace.push(crate::types::CalculationStep::info("Net Value below Nisab - No Zakat Due"));
+        }
+
         Ok(ZakatDetails {
             total_assets: total_value,
             liabilities_due_now: liabilities,
@@ -122,6 +145,7 @@ impl CalculateZakat for AgricultureAssets {
             status_reason: None,
             label: self.label.clone(),
             payload: crate::types::PaymentPayload::Monetary(zakat_due),
+            calculation_trace: trace,
         })
     }
 

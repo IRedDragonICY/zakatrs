@@ -53,6 +53,15 @@ impl CalculateZakat for FitrahCalculator {
             .and_then(|v| v.checked_mul(self.price_per_unit))
             .ok_or(ZakatError::CalculationError("Overflow calculating Fitrah total".to_string(), None))?;
 
+        // Build calculation trace
+        let trace = vec![
+            crate::types::CalculationStep::initial("Person Count", total_people_decimal),
+            crate::types::CalculationStep::initial("Amount per Person (kg)", self.unit_amount),
+            crate::types::CalculationStep::initial("Price per kg", self.price_per_unit),
+            crate::types::CalculationStep::info("Fitrah is obligatory - no Nisab threshold"),
+            crate::types::CalculationStep::result("Total Fitrah Due", total_value),
+        ];
+
         Ok(ZakatDetails {
             total_assets: total_value,
             liabilities_due_now: Decimal::ZERO,
@@ -64,6 +73,7 @@ impl CalculateZakat for FitrahCalculator {
             status_reason: None,
             label: self.label.clone(),
             payload: crate::types::PaymentPayload::Monetary(total_value),
+            calculation_trace: trace,
         })
     }
 

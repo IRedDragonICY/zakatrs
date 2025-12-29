@@ -28,8 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     println!("\n--- Day 1 (Gold ${}/g) ---", config_day1.gold_price_per_gram);
     let result_day1 = portfolio.calculate_total(&config_day1);
-    if !result_day1.errors.is_empty() {
-        eprintln!("Errors: {:?}", result_day1.errors);
+    if !result_day1.is_clean() {
+        eprintln!("Errors: {:?}", result_day1.failures());
         return Err("Calculation failed".into());
     }
     print_summary("Day 1", &result_day1);
@@ -41,8 +41,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("\n--- Day 2 (Gold ${}/g) ---", config_day2.gold_price_per_gram);
     let result_day2 = portfolio.calculate_total(&config_day2);
-    if !result_day2.errors.is_empty() {
-         eprintln!("Errors: {:?}", result_day2.errors);
+    if !result_day2.is_clean() {
+         eprintln!("Errors: {:?}", result_day2.failures());
          return Err("Calculation failed".into());
     }
     print_summary("Day 2", &result_day2);
@@ -54,7 +54,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn print_summary(day: &str, result: &PortfolioReport) {
+fn print_summary(day: &str, result: &PortfolioResult) {
     println!("{} Summary:", day);
     println!("Total Assets : ${}", result.total_assets);
     // Portfolio doesn't have a single Nisab threshold, it's per asset type.

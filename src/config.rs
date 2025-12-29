@@ -4,6 +4,7 @@ use std::env;
 use std::fs;
 use crate::types::ZakatError;
 use crate::inputs::IntoZakatDecimal;
+
 use crate::madhab::{Madhab, NisabStandard};
 
 
@@ -156,25 +157,6 @@ impl ZakatConfig {
         Ok(self)
     }
 
-    /// Configures Nisab standard based on Islamic school of thought (Madhab).
-    /// 
-    /// # Fiqh Basis (verified via web search, 2025-12-29):
-    /// - **Hanafi**: Uses LowerOfTwo - "Ahwat" (more beneficial for the poor, dominant opinion)
-    /// - **Shafi'i**: Uses Gold standard (traditional position)
-    /// - **Maliki**: Uses Gold standard
-    /// - **Hanbali**: Uses LowerOfTwo (explicitly prefers benefit for the poor)
-    /// 
-    /// # Example
-    /// ```
-    /// use zakat::config::ZakatConfig;
-    /// use zakat::madhab::{Madhab, NisabStandard};
-    /// use rust_decimal_macros::dec;
-    /// 
-    /// use zakat::prelude::*;
-    /// 
-    /// let config = ZakatConfig::new(dec!(100.0), dec!(1.0)).unwrap()
-    ///     .with_madhab(Madhab::Hanafi);
-    /// 
     /// assert_eq!(config.cash_nisab_standard, NisabStandard::LowerOfTwo);
     /// ```
     pub fn with_madhab(mut self, madhab: Madhab) -> Self {

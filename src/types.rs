@@ -18,6 +18,78 @@ pub enum PaymentPayload {
     },
 }
 
+/// Represents a single step in the Zakat calculation process.
+///
+/// This struct provides transparency into how the final Zakat amount was derived,
+/// enabling users to understand and verify each step of the calculation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CalculationStep {
+    /// Human-readable description of what this step does.
+    pub description: String,
+    /// The value at this step (if applicable).
+    pub amount: Option<Decimal>,
+    /// The operation type: "Initial", "Add", "Subtract", "Compare", "Rate", "Result"
+    pub operation: String,
+}
+
+impl CalculationStep {
+    pub fn initial(description: impl Into<String>, amount: Decimal) -> Self {
+        Self {
+            description: description.into(),
+            amount: Some(amount),
+            operation: "Initial".to_string(),
+        }
+    }
+
+    pub fn add(description: impl Into<String>, amount: Decimal) -> Self {
+        Self {
+            description: description.into(),
+            amount: Some(amount),
+            operation: "Add".to_string(),
+        }
+    }
+
+    pub fn subtract(description: impl Into<String>, amount: Decimal) -> Self {
+        Self {
+            description: description.into(),
+            amount: Some(amount),
+            operation: "Subtract".to_string(),
+        }
+    }
+
+    pub fn compare(description: impl Into<String>, amount: Decimal) -> Self {
+        Self {
+            description: description.into(),
+            amount: Some(amount),
+            operation: "compare".to_string(),
+        }
+    }
+
+    pub fn rate(description: impl Into<String>, rate: Decimal) -> Self {
+        CalculationStep {
+            description: description.into(),
+            amount: Some(rate),
+            operation: "rate".to_string(),
+        }
+    }
+
+    pub fn result(description: impl Into<String>, amount: Decimal) -> Self {
+        CalculationStep {
+            description: description.into(),
+            amount: Some(amount),
+            operation: "result".to_string(),
+        }
+    }
+
+    pub fn info(description: impl Into<String>) -> Self {
+        CalculationStep {
+            description: description.into(),
+            amount: None,
+            operation: "info".to_string(),
+        }
+    }
+}
+
 /// Represents the detailed breakdown of the Zakat calculation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ZakatDetails {
@@ -41,6 +113,8 @@ pub struct ZakatDetails {
     pub label: Option<String>,
     /// Detailed payment payload (Monetary amount or specific assets like Livestock heads).
     pub payload: PaymentPayload,
+    /// Step-by-step trace of how this calculation was derived.
+    pub calculation_trace: Vec<CalculationStep>,
 }
 
 impl ZakatDetails {
@@ -63,6 +137,20 @@ impl ZakatDetails {
             Decimal::ZERO
         };
 
+        // Build default calculation trace
+        let mut trace = vec![
+            CalculationStep::initial("Total Assets", total_assets),
+            CalculationStep::subtract("Liabilities Due Now", liabilities_due_now),
+            CalculationStep::result("Net Assets", net_assets),
+            CalculationStep::compare("Nisab Threshold", nisab_threshold),
+        ];
+        if is_payable {
+            trace.push(CalculationStep::rate("Applied Rate", rate));
+            trace.push(CalculationStep::result("Zakat Due", zakat_due));
+        } else {
+            trace.push(CalculationStep::info("Net Assets below Nisab - No Zakat Due"));
+        }
+
         ZakatDetails {
             total_assets,
             liabilities_due_now,
@@ -74,11 +162,50 @@ impl ZakatDetails {
             status_reason: None,
             label: None,
             payload: PaymentPayload::Monetary(zakat_due),
+            calculation_trace: trace,
+        }
+    }
+
+    /// Creates ZakatDetails with a custom calculation trace.
+    /// Used by calculators that need more detailed step logging.
+    pub fn with_trace(
+        total_assets: Decimal,
+        liabilities_due_now: Decimal,
+        nisab_threshold: Decimal,
+        rate: Decimal,
+        wealth_type: WealthType,
+        trace: Vec<CalculationStep>,
+    ) -> Self {
+        let net_assets = total_assets - liabilities_due_now;
+        let is_payable = net_assets >= nisab_threshold && net_assets > Decimal::ZERO;
+        
+        let zakat_due = if is_payable {
+            net_assets * rate
+        } else {
+            Decimal::ZERO
+        };
+
+        ZakatDetails {
+            total_assets,
+            liabilities_due_now,
+            net_assets,
+            nisab_threshold,
+            is_payable,
+            zakat_due,
+            wealth_type,
+            status_reason: None,
+            label: None,
+            payload: PaymentPayload::Monetary(zakat_due),
+            calculation_trace: trace,
         }
     }
 
     /// Helper to create a non-payable ZakatDetail because it is below the threshold.
     pub fn below_threshold(nisab_threshold: Decimal, wealth_type: WealthType, reason: &str) -> Self {
+        let trace = vec![
+            CalculationStep::info(reason.to_string()),
+        ];
+        
         ZakatDetails {
             total_assets: Decimal::ZERO,
             liabilities_due_now: Decimal::ZERO,
@@ -90,6 +217,7 @@ impl ZakatDetails {
             status_reason: Some(reason.to_string()),
             label: None,
             payload: PaymentPayload::Monetary(Decimal::ZERO),
+            calculation_trace: trace,
         }
     }
 

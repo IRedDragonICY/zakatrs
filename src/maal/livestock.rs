@@ -3,6 +3,7 @@ use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::inputs::IntoZakatDecimal;
+use crate::builder::AssetBuilder;
 
 pub enum LivestockType {
     Camel,
@@ -91,24 +92,26 @@ impl LivestockPricesBuilder {
         }
         self
     }
+}
 
-    pub fn build(self) -> Result<LivestockPrices, ZakatError> {
+impl AssetBuilder<LivestockPrices> for LivestockPricesBuilder {
+    fn build(self) -> Result<LivestockPrices, ZakatError> {
         // We require at least one price to be set or explicit 0.
         // But for safety, let's just ensure if they ARE set, they are non-negative.
         // If not set, they default to 0, which is technically safer than "Random Default" but user should set them.
         
         let s = self.sheep_price.unwrap_or(Decimal::ZERO);
         let c = self.cow_price.unwrap_or(Decimal::ZERO);
-        let ca = self.camel_price.unwrap_or(Decimal::ZERO);
+        let m = self.camel_price.unwrap_or(Decimal::ZERO); // m for camel (ibl)
 
-        if s < Decimal::ZERO || c < Decimal::ZERO || ca < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput("Livestock prices must be non-negative".to_string(), None));
+        if s < Decimal::ZERO || c < Decimal::ZERO || m < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Livestock prices must be non-negative".to_string(), None));
         }
 
         Ok(LivestockPrices {
             sheep_price: s,
             cow_price: c,
-            camel_price: ca,
+            camel_price: m,
         })
     }
 }
@@ -191,6 +194,7 @@ impl CalculateZakat for LivestockAssets {
         
         let total_value = Decimal::from(self.count).checked_mul(single_price).ok_or(ZakatError::CalculationError("Total asset value overflow".to_string(), None))?;
         let is_payable = zakat_value > Decimal::ZERO;
+        let nisab_threshold = Decimal::from(nisab_count).checked_mul(single_price).unwrap_or(Decimal::MAX);
 
         // Generate description string from heads_due
         let description_parts: Vec<String> = heads_due.iter()
@@ -198,11 +202,29 @@ impl CalculateZakat for LivestockAssets {
             .collect();
         let description = description_parts.join(", ");
 
+        // Build calculation trace
+        let animal_type_str = match self.animal_type {
+            LivestockType::Sheep => "Sheep/Goat",
+            LivestockType::Cow => "Cattle",
+            LivestockType::Camel => "Camel",
+        };
+        
+        let mut trace = Vec::new();
+        trace.push(crate::types::CalculationStep::initial(format!("{} Count", animal_type_str), Decimal::from(self.count)));
+        trace.push(crate::types::CalculationStep::info(format!("Animal Type: {}", animal_type_str)));
+        trace.push(crate::types::CalculationStep::compare(format!("Nisab Count ({} head)", nisab_count), nisab_threshold));
+        if is_payable {
+            trace.push(crate::types::CalculationStep::result("Herd Value", total_value));
+            trace.push(crate::types::CalculationStep::result(format!("Zakat Due: {}", description), zakat_value));
+        } else {
+            trace.push(crate::types::CalculationStep::info("Count below Nisab - No Zakat Due"));
+        }
+
         Ok(ZakatDetails {
             total_assets: total_value,
             liabilities_due_now: self.liabilities_due_now,
             net_assets: total_value, 
-            nisab_threshold: Decimal::from(nisab_count).checked_mul(single_price).unwrap_or(Decimal::MAX), 
+            nisab_threshold, 
             is_payable,
             zakat_due: zakat_value,
             wealth_type: crate::types::WealthType::Livestock,
@@ -212,6 +234,7 @@ impl CalculateZakat for LivestockAssets {
                 description: description.clone(), 
                 heads_due 
             },
+            calculation_trace: trace,
         })
     }
 
@@ -243,6 +266,8 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(Stri
     (zakat_value, nisab, vec![("Sheep".to_string(), sheep_due)])
 }
 
+#[allow(clippy::type_complexity)]
+#[allow(clippy::manual_is_multiple_of)]
 fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
     let nisab = 30;
     if count < 30 {
@@ -319,6 +344,8 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<
     Ok((total_zakat_val, nisab, parts))
 }
 
+#[allow(clippy::type_complexity)]
+#[allow(clippy::manual_is_multiple_of)]
 fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
     let nisab = 5;
     if count < 5 {

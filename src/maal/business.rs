@@ -4,6 +4,7 @@ use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
+use crate::builder::AssetBuilder;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BusinessAssets {
@@ -71,8 +72,10 @@ impl BusinessAssetsBuilder {
         }
         self
     }
+}
 
-    pub fn build(self) -> Result<BusinessAssets, ZakatError> {
+impl AssetBuilder<BusinessAssets> for BusinessAssetsBuilder {
+    fn build(self) -> Result<BusinessAssets, ZakatError> {
         let cash = self.cash_on_hand.unwrap_or(Decimal::ZERO);
         let inventory = self.inventory_value.unwrap_or(Decimal::ZERO);
         let receivables = self.receivables.unwrap_or(Decimal::ZERO);
@@ -85,7 +88,7 @@ impl BusinessAssetsBuilder {
         Ok(BusinessAssets {
             cash_on_hand: cash,
             inventory_value: inventory,
-            receivables: receivables,
+            receivables,
             short_term_liabilities: liabilities,
         })
     }
@@ -174,7 +177,29 @@ impl CalculateZakat for BusinessZakatCalculator {
 
         let rate = dec!(0.025);
 
-        Ok(ZakatDetails::new(total_assets, total_liabilities, nisab_threshold_value, rate, crate::types::WealthType::Business)
+        // Build calculation trace
+        let net_assets = total_assets - total_liabilities;
+        let mut trace = vec![
+            crate::types::CalculationStep::initial("Cash on Hand", self.assets.cash_on_hand),
+            crate::types::CalculationStep::add("Inventory Value", self.assets.inventory_value),
+            crate::types::CalculationStep::add("Receivables", self.assets.receivables),
+            crate::types::CalculationStep::result("Gross Assets", gross_assets),
+            crate::types::CalculationStep::subtract("Short-term Liabilities", self.assets.short_term_liabilities),
+            crate::types::CalculationStep::subtract("Debts Due Now", self.liabilities_due_now),
+            crate::types::CalculationStep::result("Net Business Assets", net_assets),
+            crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value),
+        ];
+        
+        // Check if payable manually to log correct trace info if needed, though with_trace logic handles the boolean.
+        // We rely on with_trace to set is_payable, but we can add conditional steps:
+        let net_final = total_assets - total_liabilities;
+        if net_final >= nisab_threshold_value && net_final > Decimal::ZERO {
+            trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
+        } else {
+             trace.push(crate::types::CalculationStep::info("Net Assets below Nisab - No Zakat Due"));
+        }
+
+        Ok(ZakatDetails::with_trace(total_assets, total_liabilities, nisab_threshold_value, rate, crate::types::WealthType::Business, trace)
             .with_label(self.label.clone().unwrap_or_default()))
     }
 

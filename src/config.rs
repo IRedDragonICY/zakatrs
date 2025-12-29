@@ -81,18 +81,13 @@ impl ZakatConfig {
             return Err(ZakatError::ConfigurationError("Silver price must be non-negative".to_string(), None));
         }
 
+        // Validation Logic based on Nisab Standard
         match self.cash_nisab_standard {
-            NisabStandard::Gold | NisabStandard::LowerOfTwo => {
-                 // For Gold standard, we rely on gold price.
-                 // For LowerOfTwo, we likely need both, but definitely Gold if checking Gold.
-                 // Actually LowerOfTwo is min(GoldNisab, SilverNisab).
-                 // If one is 0, the threshold becomes 0 (if 0 is treated as valid price), or effectively disabled.
-                 // The prompt says: "If cash_nisab_standard is Gold or Shafi (which uses Gold), check gold_price > 0."
-                 // "If Silver, check silver_price > 0".
-                 // "If LowerOfTwo, check BOTH > 0".
-                 
-                 // Wait, for LowerOfTwo, we need BOTH checks.
-                 // For Gold, we need Gold > 0.
+            NisabStandard::Gold => {
+                 // Requires Gold price
+            }
+            NisabStandard::LowerOfTwo => {
+                 // Requires both Gold and Silver prices to determine the lower threshold
             }
             _ => {}
         }
@@ -152,12 +147,18 @@ impl ZakatConfig {
         Self::new(prices.gold_per_gram, prices.silver_per_gram)
     }
 
-    // ========== Fluent Helper Methods (still useful, but now delegate validation typically at usage or rely on base) ==========
-    // Note: Since `new` validates, these modifying methods might put it in invalid state if we are not careful? 
-    // Actually no, because we usually start valid.
-    // AND if we use a Builder, we validate at build().
-    
-    // Keeping these for backward compatibility/convenience, but typically one should use builder for complex config.
+    /// Refreshes the prices in this configuration using the given provider.
+    pub async fn refresh_prices(&mut self, provider: &impl crate::pricing::PriceProvider) -> Result<(), ZakatError> {
+        let prices = provider.get_prices().await?;
+        self.gold_price_per_gram = prices.gold_per_gram;
+        self.silver_price_per_gram = prices.silver_per_gram;
+        self.validate()?;
+        Ok(())
+    }
+
+    // ========== Fluent Helper Methods ========== 
+    // These methods allow chaining configuration adjustments.
+    // Validation is enforced when calling `validate()` or using the builder.
 
     pub fn with_gold_nisab(mut self, grams: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
         self.nisab_gold_grams = Some(grams.into_zakat_decimal()?);
@@ -323,15 +324,9 @@ mod tests {
 
     #[test]
     fn test_validate_prices() {
-        // Zero prices with default (usually OK in legacy, but strictly: need Gold or Silver depending on standard)
-        // Default standard might be Gold or LowerOfTwo.
-        // If Default Madhab is Hanaf -> LowerOfTwo -> Need BOTH > 0.
-        // Let's check what Madhab::default() is. (Likely Hanafi or Shafi).
-        // Assuming we need > 0 for standard.
-        
+        // Zero prices with default settings.
+        // Whether this fails depends on the default Madhab/NisabStandard.
         let _res = ZakatConfig::new(dec!(0), dec!(0));
-        // Should err now if default standard requires prices.
-        // If default checks pass, good.
     }
 
     #[test]

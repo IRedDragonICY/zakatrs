@@ -91,11 +91,9 @@ impl CalculateZakat for AgricultureAssets {
         
         let liabilities = self.liabilities_due_now;
         
-        // ZakatDetails logic overrides 'is_payable' based on net_assets usually, but here Nisab is on Quantity.
-        // We need to be careful. If Quantity > Nisab, then we pay rate on Total.
-        // If we strictly follow "Net Assets" logic, we would deduct debt from value first.
-        // But for Agriculture, usually checks yield quantity first.
-        // Let's ensure ZakatDetails reflects the state correctly.
+        // Fiqh Note: Agriculture Nisab is based on the Harvest Quantity (5 Wasqs).
+        // However, calculation is done on the monetary value for consistency.
+        // We check if (Net Value) >= (Nisab Quantity Value) to determine payability.
         
         let net_value = total_value
             .checked_sub(liabilities)

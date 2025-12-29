@@ -125,13 +125,11 @@ mod tests {
     fn test_rikaz() {
         let config = ZakatConfig::default();
         let mining = MiningAssets::new(dec!(1000.0), MiningType::Rikaz).unwrap();
-        // Rikaz: 20%. Deduct debt? 
-        // Usually Rikaz is on gross, but let's see implementation.
-        // Implementation: (value - debt) * 0.20
+        // Rikaz (Buried Treasure) is taxed at 20% on the gross value.
+        // Debts and Hawl are not considered for Rikaz.
         
         let res = mining.with_debt_due_now(dec!(500.0)).unwrap().with_hawl(false).calculate_zakat(&config).unwrap();
-        // (1000 - 500) * 0.20 = 500 * 0.2 = 100. -> NO, Debt is ignored!
-        // 1000 * 0.20 = 200.
+        // Calculation: 1000 * 0.20 = 200. (Debt of 500 is ignored).
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(200.0));

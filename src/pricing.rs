@@ -55,11 +55,12 @@ impl Prices {
 /// let provider = StaticPriceProvider::new(65.0, 0.85)?;
 /// let prices = provider.get_prices().await?;
 /// ```
+#[async_trait::async_trait]
 pub trait PriceProvider {
     /// Fetches current metal prices.
     ///
     /// Returns `Err(ZakatError)` if prices cannot be fetched.
-    fn get_prices(&self) -> impl std::future::Future<Output = Result<Prices, ZakatError>> + Send;
+    async fn get_prices(&self) -> Result<Prices, ZakatError>;
 }
 
 /// A static price provider for testing and development.
@@ -90,6 +91,7 @@ impl StaticPriceProvider {
     }
 }
 
+#[async_trait::async_trait]
 impl PriceProvider for StaticPriceProvider {
     async fn get_prices(&self) -> Result<Prices, ZakatError> {
         Ok(self.prices.clone())

@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use crate::traits::CalculateZakat;
+use crate::traits::{CalculateZakat, AsyncCalculateZakat};
 use crate::types::{ZakatDetails, ZakatError};
 
 /// Individual result for an asset in the portfolio.
@@ -114,66 +114,122 @@ impl ZakatPortfolio {
             }
         }
 
-        // 2. Aggregation Logic (Dam' al-Amwal)
-        // Filter monetary assets (Gold, Silver, Cash, Business, Investments) from SUCCESSFUL results
-        let mut monetary_net_assets = Decimal::ZERO;
-        let mut monetary_indices = Vec::new();
+        aggregate_and_summarize(results, config)
+    }
+}
 
-        for (i, result) in results.iter().enumerate() {
-            if let PortfolioItemResult::Success(detail) = result {
-                 if detail.wealth_type.is_monetary() {
-                    monetary_net_assets += detail.net_assets;
-                    monetary_indices.push(i);
-                }
+pub struct AsyncZakatPortfolio {
+    calculators: Vec<Box<dyn AsyncCalculateZakat>>,
+}
+
+impl AsyncZakatPortfolio {
+    pub fn new() -> Self {
+        Self {
+            calculators: Vec::new(),
+        }
+    }
+    
+    pub fn add<T: AsyncCalculateZakat + 'static>(mut self, calculator: T) -> Self {
+         self.calculators.push(Box::new(calculator));
+         self
+    }
+    
+    // Helper methods for specific calculator types can be added here.
+    
+    /// Calculates Zakat asynchronously for all assets in the portfolio.
+    pub async fn calculate_total_async(&self, config: &crate::config::ZakatConfig) -> PortfolioResult {
+        let mut results = Vec::new();
+
+        for (index, item) in self.calculators.iter().enumerate() {
+            match item.calculate_zakat_async(config).await {
+                Ok(detail) => results.push(PortfolioItemResult::Success(detail)),
+                Err(e) => {
+                    let mut err = e;
+                    let source = if let Some(lbl) = item.get_label() {
+                        lbl
+                    } else {
+                        format!("Item {}", index + 1)
+                    };
+                    err = err.with_source(source.clone());
+                    results.push(PortfolioItemResult::Failure {
+                        source,
+                        error: err,
+                    });
+                },
             }
         }
         
-        // Check against the global monetary Nisab
-        let global_nisab = config.get_monetary_nisab_threshold();
-        
-        if monetary_net_assets >= global_nisab && monetary_net_assets > Decimal::ZERO {
-            let standard_rate = rust_decimal_macros::dec!(0.025);
+        aggregate_and_summarize(results, config)
+    }
+}
 
-            for i in monetary_indices {
-                // We need to mutate the result.
-                if let Some(PortfolioItemResult::Success(detail)) = results.get_mut(i) {
-                    if !detail.is_payable {
-                         detail.is_payable = true;
-                         detail.status_reason = Some("Payable via Aggregation (Dam' al-Amwal)".to_string());
-                         
-                         // Recalculate zakat due
-                         if detail.net_assets > Decimal::ZERO {
-                             detail.zakat_due = detail.net_assets * standard_rate;
-                         }
-                         
-                         // Add trace step explaining aggregation
-                         detail.calculation_trace.push(crate::types::CalculationStep::info(
-                             "Aggregated Monetary Wealth > Nisab -> Payable (Dam' al-Amwal)"
-                         ));
-                         detail.calculation_trace.push(crate::types::CalculationStep::result(
-                             "Recalculated Zakat Due", detail.zakat_due
-                         ));
-                    }
+impl Default for AsyncZakatPortfolio {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Shared logic to aggregate results and apply Dam' al-Amwal (Wealth Aggregation).
+fn aggregate_and_summarize(mut results: Vec<PortfolioItemResult>, config: &crate::config::ZakatConfig) -> PortfolioResult {
+    // 2. Aggregation Logic (Dam' al-Amwal)
+    // Filter monetary assets (Gold, Silver, Cash, Business, Investments) from SUCCESSFUL results
+    let mut monetary_net_assets = Decimal::ZERO;
+    let mut monetary_indices = Vec::new();
+
+    for (i, result) in results.iter().enumerate() {
+        if let PortfolioItemResult::Success(detail) = result {
+             if detail.wealth_type.is_monetary() {
+                monetary_net_assets += detail.net_assets;
+                monetary_indices.push(i);
+            }
+        }
+    }
+    
+    // Check against the global monetary Nisab
+    let global_nisab = config.get_monetary_nisab_threshold();
+    
+    if monetary_net_assets >= global_nisab && monetary_net_assets > Decimal::ZERO {
+        let standard_rate = rust_decimal_macros::dec!(0.025);
+
+        for i in monetary_indices {
+            // We need to mutate the result.
+            if let Some(PortfolioItemResult::Success(detail)) = results.get_mut(i) {
+                if !detail.is_payable {
+                     detail.is_payable = true;
+                     detail.status_reason = Some("Payable via Aggregation (Dam' al-Amwal)".to_string());
+                     
+                     // Recalculate zakat due
+                     if detail.net_assets > Decimal::ZERO {
+                         detail.zakat_due = detail.net_assets * standard_rate;
+                     }
+                     
+                     // Add trace step explaining aggregation
+                     detail.calculation_trace.push(crate::types::CalculationStep::info(
+                         "Aggregated Monetary Wealth > Nisab -> Payable (Dam' al-Amwal)"
+                     ));
+                     detail.calculation_trace.push(crate::types::CalculationStep::result(
+                         "Recalculated Zakat Due", detail.zakat_due
+                     ));
                 }
             }
         }
+    }
 
-        // 3. Final Summation (only successes)
-        let mut total_assets = Decimal::ZERO;
-        let mut total_zakat_due = Decimal::ZERO;
+    // 3. Final Summation (only successes)
+    let mut total_assets = Decimal::ZERO;
+    let mut total_zakat_due = Decimal::ZERO;
 
-        for result in &results {
-            if let PortfolioItemResult::Success(detail) = result {
-                total_assets += detail.total_assets;
-                total_zakat_due += detail.zakat_due;
-            }
+    for result in &results {
+        if let PortfolioItemResult::Success(detail) = result {
+            total_assets += detail.total_assets;
+            total_zakat_due += detail.zakat_due;
         }
+    }
 
-        PortfolioResult {
-            results,
-            total_assets,
-            total_zakat_due,
-        }
+    PortfolioResult {
+        results,
+        total_assets,
+        total_zakat_due,
     }
 }
 

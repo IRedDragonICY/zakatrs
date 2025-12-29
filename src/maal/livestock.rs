@@ -301,10 +301,9 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(String
         else { musinnah = 1; }
     } else {
         // O(1) Optimization: Swap Strategy
-        // We want to maximize Musinnah (40s) as they are valuable (and cover more heads),
-        // but we need to solve: 40*m + 30*t <= count such that (count - (40*m + 30*t)) < 30 ??
-        // No, actually the rule for > 60 is to cover the ENTIRE count using combination of 30s and 40s.
-        // It's a partition problem.
+        // For counts > 60, the rule is to cover the entire herd count using a combination of 
+        // 30s (Tabi') and 40s (Musinnah).
+        // This is a partition problem: count = 30*t + 40*m.
         
         // Start with max possible Musinnahs (40s)
         let mut best_m = count / 40;

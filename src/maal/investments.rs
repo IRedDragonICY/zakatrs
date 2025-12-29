@@ -46,7 +46,10 @@ impl InvestmentAssets {
 }
 
 impl CalculateZakat for InvestmentAssets {
-    fn calculate_zakat(&self, extra_debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, extra_debts: Option<Decimal>, hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
+        if !hawl_satisfied {
+            return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Investment, "Hawl (1 lunar year) not met"));
+        }
         // Requirement: 
         // Crypto: Treated as Trade Goods (2.5% if > Nisab).
         // Stocks: Market Value * 2.5% (Zakah on Principal + Profit).
@@ -71,7 +74,7 @@ mod tests {
         // Due 250.
         
         let inv = InvestmentAssets::new(dec!(10000.0), InvestmentType::Crypto, &config).unwrap();
-        let res = inv.calculate_zakat(None).unwrap();
+        let res = inv.calculate_zakat(None, true).unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(250.0));

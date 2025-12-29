@@ -45,7 +45,7 @@ impl ZakatPortfolio {
         let mut total_zakat_due = Decimal::ZERO;
 
         for item in &self.calculators {
-            let detail = item.calculate_zakat(None)?; // Wrapper handles the debt passing
+            let detail = item.calculate_zakat(None, true)?; // Wrapper handles the debt passing, Hawl assumed true for portfolio total
             total_assets += detail.total_assets;
             total_zakat_due += detail.zakat_due;
             details.push(detail);
@@ -66,9 +66,9 @@ struct PortfolioItemWrapper<T: CalculateZakat> {
 }
 
 impl<T: CalculateZakat> CalculateZakat for PortfolioItemWrapper<T> {
-    fn calculate_zakat(&self, _ignored_debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, _ignored_debts: Option<Decimal>, hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
         // We use the stored debt. We ignore the arg passed to THIS wrapper usually,
         // or we could combine them. For Portfolio iteration, we pass None typically.
-        self.calculator.calculate_zakat(self.debt)
+        self.calculator.calculate_zakat(self.debt, hawl_satisfied)
     }
 }

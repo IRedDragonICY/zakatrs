@@ -35,11 +35,12 @@ impl MiningAssets {
 }
 
 impl CalculateZakat for MiningAssets {
-    fn calculate_zakat(&self, extra_debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, extra_debts: Option<Decimal>, hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
         match self.mining_type {
             MiningType::Rikaz => {
                 // Rate: 20%. No Nisab (or minimal). No Debts deduction.
                 // Requirement: "Rikaz Rate: 20% (No Hawl, No Debts deduction)."
+                // We IGNORE hawl_satisfied here.
                 let rate = dec!(0.20);
                 
                 // We purposefully IGNORE extra_debts for Rikaz as per requirement.
@@ -50,6 +51,9 @@ impl CalculateZakat for MiningAssets {
             },
             MiningType::Mines => {
                 // Rate: 2.5%. Nisab: 85g Gold.
+                if !hawl_satisfied {
+                     return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met"));
+                }
                 let rate = dec!(0.025);
                 let nisab_threshold = self.nisab_threshold_value;
                 let liabilities = extra_debts.unwrap_or(Decimal::ZERO);
@@ -72,7 +76,8 @@ mod tests {
         // Debt passed (e.g. 500) should be IGNORED.
         
         let mining = MiningAssets::new(dec!(1000.0), MiningType::Rikaz, &config).unwrap();
-        let res = mining.calculate_zakat(Some(dec!(500.0))).unwrap();
+        // Rikaz ignores Hawl, so even if false, it should pay.
+        let res = mining.calculate_zakat(Some(dec!(500.0)), false).unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(200.0));
@@ -87,7 +92,7 @@ mod tests {
         // Payable. 9000 * 2.5% = 225.
         
         let mining = MiningAssets::new(dec!(10000.0), MiningType::Mines, &config).unwrap();
-        let res = mining.calculate_zakat(Some(dec!(1000.0))).unwrap();
+        let res = mining.calculate_zakat(Some(dec!(1000.0)), true).unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(225.0));

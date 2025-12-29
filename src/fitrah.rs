@@ -46,6 +46,7 @@ pub fn calculate_fitrah(
         is_payable: true,
         zakat_due: total_value,
         wealth_type: crate::types::WealthType::Fitrah,
+        status_reason: None,
     })
 }
 

@@ -33,11 +33,13 @@ impl PreciousMetal {
 }
 
 impl CalculateZakat for PreciousMetal {
-    fn calculate_zakat(&self, debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, debts: Option<Decimal>, hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
+        let nisab_value = self.nisab_threshold_grams * self.price_per_gram;
+        if !hawl_satisfied {
+            return Ok(ZakatDetails::not_payable(nisab_value, self.metal_type, "Hawl (1 lunar year) not met"));
+        }
         let total_value = self.weight_grams * self.price_per_gram;
         let liabilities = debts.unwrap_or(Decimal::ZERO);
-        
-        let nisab_value = self.nisab_threshold_grams * self.price_per_gram;
 
         // Note: For Gold/Silver, usually debts are deducted from the wealth itself, 
         // or rather, we check if net wealth >= nisab.
@@ -57,7 +59,7 @@ mod tests {
     fn test_gold_below_nisab() {
         let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
         let metal = PreciousMetal::new(dec!(84.0), WealthType::Gold, &config).unwrap();
-        let zakat = metal.calculate_zakat(None).unwrap();
+        let zakat = metal.calculate_zakat(None, true).unwrap();
         
         // 84g < 85g -> Not Payable
         assert!(!zakat.is_payable);
@@ -68,7 +70,7 @@ mod tests {
     fn test_gold_above_nisab() {
         let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
         let metal = PreciousMetal::new(dec!(85.0), WealthType::Gold, &config).unwrap();
-        let zakat = metal.calculate_zakat(None).unwrap();
+        let zakat = metal.calculate_zakat(None, true).unwrap();
         
         // 85g >= 85g -> Payable
         // Value = 8500
@@ -85,7 +87,7 @@ mod tests {
         // Net ($8,000) < Nisab ($8,500) -> Not Payable.
         
         let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold, &config).unwrap();
-        let zakat = metal.calculate_zakat(Some(dec!(2000.0))).unwrap();
+        let zakat = metal.calculate_zakat(Some(dec!(2000.0)), true).unwrap();
         
         assert!(!zakat.is_payable);
         assert_eq!(zakat.zakat_due, Decimal::ZERO);

@@ -12,5 +12,6 @@ pub trait CalculateZakat {
     /// # Returns
     ///
     /// * `Result<ZakatDetails, ZakatError>`
-    fn calculate_zakat(&self, debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError>;
+    /// * `hawl_satisfied` - Whether the asset has been held for one lunar year (Hawl).
+    fn calculate_zakat(&self, debts: Option<Decimal>, hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError>;
 }

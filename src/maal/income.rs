@@ -48,7 +48,7 @@ impl IncomeZakatCalculator {
 }
 
 impl CalculateZakat for IncomeZakatCalculator {
-    fn calculate_zakat(&self, extra_debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, extra_debts: Option<Decimal>, _hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
         let rate = dec!(0.025);
         let external_debt = extra_debts.unwrap_or(Decimal::ZERO);
 
@@ -82,7 +82,7 @@ mod tests {
         // Due 250.
         
         let calc = IncomeZakatCalculator::new(dec!(10000.0), dec!(5000.0), IncomeCalculationMethod::Gross, &config).unwrap();
-        let res = calc.calculate_zakat(None).unwrap();
+        let res = calc.calculate_zakat(None, true).unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(250.0));
@@ -96,7 +96,7 @@ mod tests {
         // Net < Nisab. Not Payable.
         
         let calc = IncomeZakatCalculator::new(dec!(12000.0), dec!(4000.0), IncomeCalculationMethod::Net, &config).unwrap();
-        let res = calc.calculate_zakat(None).unwrap();
+        let res = calc.calculate_zakat(None, true).unwrap();
         
         assert!(!res.is_payable);
         // (12000 - 4000) = 8000. 8000 < 8500.

@@ -44,7 +44,7 @@ impl AgricultureAssets {
 }
 
 impl CalculateZakat for AgricultureAssets {
-    fn calculate_zakat(&self, extra_debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, extra_debts: Option<Decimal>, _hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
         let rate = match self.irrigation {
             IrrigationMethod::Rain => dec!(0.10),
             IrrigationMethod::Irrigated => dec!(0.05),
@@ -103,6 +103,7 @@ impl CalculateZakat for AgricultureAssets {
             is_payable,
             zakat_due,
             wealth_type: crate::types::WealthType::Agriculture,
+            status_reason: None,
         })
     }
 }
@@ -117,7 +118,7 @@ mod tests {
         // Nisab 653. Reached.
         // Rate 10%. Due 100.
         let agri = AgricultureAssets::new(dec!(1000.0), dec!(1.0), IrrigationMethod::Rain, &ZakatConfig::default()).unwrap();
-        let res = agri.calculate_zakat(None).unwrap();
+        let res = agri.calculate_zakat(None, true).unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(100.0));
@@ -128,7 +129,7 @@ mod tests {
         // 1000kg. Price 1. 
         // Rate 5%. Due 50.
         let agri = AgricultureAssets::new(dec!(1000.0), dec!(1.0), IrrigationMethod::Irrigated, &ZakatConfig::default()).unwrap();
-        let res = agri.calculate_zakat(None).unwrap();
+        let res = agri.calculate_zakat(None, true).unwrap();
         
         assert_eq!(res.zakat_due, dec!(50.0));
     }

@@ -51,7 +51,17 @@ impl LivestockAssets {
 }
 
 impl CalculateZakat for LivestockAssets {
-    fn calculate_zakat(&self, _debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, _debts: Option<Decimal>, hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
+        if !hawl_satisfied {
+             // For Livestock, Nisab is count-based, but we need a value for not_payable.
+             // We can calculate the value of "Nisab Count" for the type.
+             let nisab_count_val = match self.animal_type {
+                LivestockType::Sheep => Decimal::from(40) * self.prices.sheep_price,
+                LivestockType::Cow => Decimal::from(30) * self.prices.cow_price,
+                LivestockType::Camel => Decimal::from(5) * self.prices.camel_price,
+             };
+             return Ok(ZakatDetails::not_payable(nisab_count_val, crate::types::WealthType::Livestock, "Hawl (1 lunar year) not met"));
+        }
         // Note: Livestock Zakat is generally strict on counts and tiers, simplified here for "Value" return.
         // We will calculate 'animals due' then multiply by price.
         // Debt deduction is generally not applied to Livestock count directly (Nisab is physical count),
@@ -83,6 +93,7 @@ impl CalculateZakat for LivestockAssets {
             is_payable,
             zakat_due: zakat_value,
             wealth_type: crate::types::WealthType::Livestock,
+            status_reason: None,
         })
     }
 }
@@ -249,7 +260,7 @@ mod tests {
     fn test_sheep() {
         let prices = LivestockPrices { sheep_price: dec!(100.0), ..Default::default() };
         let stock = LivestockAssets::new(40, LivestockType::Sheep, prices);
-        let res = stock.calculate_zakat(None).unwrap();
+        let res = stock.calculate_zakat(None, true).unwrap();
         
         // 40 sheep -> 1 sheep due -> $100
         assert_eq!(res.zakat_due, dec!(100.0));
@@ -260,7 +271,7 @@ mod tests {
     fn test_cows_60() {
         let prices = LivestockPrices { cow_price: dec!(1000.0), ..Default::default() };
         let stock = LivestockAssets::new(60, LivestockType::Cow, prices);
-        let res = stock.calculate_zakat(None).unwrap();
+        let res = stock.calculate_zakat(None, true).unwrap();
         
         // 60 -> 2 Tabi.
         // Tabi = 0.7 * 1000 = 700.

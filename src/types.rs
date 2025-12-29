@@ -19,6 +19,8 @@ pub struct ZakatDetails {
     pub zakat_due: Decimal,
     /// The type of wealth this calculation is for.
     pub wealth_type: WealthType,
+    /// Reason for the status, if not payable (e.g. "Hawl not met").
+    pub status_reason: Option<String>,
 }
 
 impl ZakatDetails {
@@ -49,6 +51,21 @@ impl ZakatDetails {
             is_payable,
             zakat_due,
             wealth_type,
+            status_reason: None,
+        }
+    }
+
+    /// Helper to create a non-payable ZakatDetail with a reason.
+    pub fn not_payable(nisab_threshold: Decimal, wealth_type: WealthType, reason: &str) -> Self {
+        ZakatDetails {
+            total_assets: Decimal::ZERO,
+            deductible_liabilities: Decimal::ZERO,
+            net_assets: Decimal::ZERO,
+            nisab_threshold,
+            is_payable: false,
+            zakat_due: Decimal::ZERO,
+            wealth_type,
+            status_reason: Some(reason.to_string()),
         }
     }
 }

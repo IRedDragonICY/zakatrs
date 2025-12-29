@@ -37,7 +37,6 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 ## Install
 
 ```toml
-```toml
 [dependencies]
 zakat = "0.1.5"
 rust_decimal = "1.39"

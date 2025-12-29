@@ -25,7 +25,7 @@ impl ZakatPortfolio {
         }
     }
 
-    pub fn add_calculator<T: CalculateZakat + Send + Sync + 'static>(mut self, calculator: T) -> Self {
+    pub fn add<T: CalculateZakat + Send + Sync + 'static>(mut self, calculator: T) -> Self {
          self.calculators.push(Box::new(calculator));
          self
     }

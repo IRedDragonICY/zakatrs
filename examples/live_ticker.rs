@@ -7,15 +7,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Initialize Assets ONCE (e.g. at app startup or user input)
     // Notice we do NOT pass config here anymore.
-    let gold_stash = PreciousMetal::new(100, WealthType::Gold)?.with_label("Grandma's Necklace");
+    let gold_stash = PreciousMetals::new(100, WealthType::Gold)?.with_label("Grandma's Necklace");
     let trade_goods = BusinessZakatCalculator::new(
         BusinessAssets::new(10_000, 5_000, 0, 2_000).expect("Assets valid")
     ).with_label("Corner Store");
 
     // 2. Create a Portfolio holding these assets
     let portfolio = ZakatPortfolio::new()
-        .add_calculator(gold_stash)
-        .add_calculator(trade_goods);
+        .add(gold_stash)
+        .add(trade_goods);
 
     // 3. Simulation Day 1: Gold is Cheap ($40/g)
     // Nisab = 85 * 40 = $3,400.

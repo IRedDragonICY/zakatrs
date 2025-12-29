@@ -38,19 +38,38 @@ impl LivestockPrices {
         cow_price: impl Into<Decimal>,
         camel_price: impl Into<Decimal>,
     ) -> Result<Self, ZakatError> {
-        let sheep = sheep_price.into();
-        let cow = cow_price.into();
-        let camel = camel_price.into();
+        let mut prices = Self::default();
+        prices = prices.with_sheep_price(sheep_price)?;
+        prices = prices.with_cow_price(cow_price)?;
+        prices = prices.with_camel_price(camel_price)?;
+        Ok(prices)
+    }
 
-        if sheep < Decimal::ZERO || cow < Decimal::ZERO || camel < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Livestock prices must be non-negative".to_string()));
-        }
+    pub fn with_sheep_price(mut self, price: impl Into<Decimal>) -> Result<Self, ZakatError> {
+        let p = price.into();
+        if p < Decimal::ZERO {
+             return Err(ZakatError::InvalidInput("Sheep price must be non-negative".to_string()));
+         }
+        self.sheep_price = p;
+        Ok(self)
+    }
 
-        Ok(Self {
-            sheep_price: sheep,
-            cow_price: cow,
-            camel_price: camel,
-        })
+    pub fn with_cow_price(mut self, price: impl Into<Decimal>) -> Result<Self, ZakatError> {
+        let p = price.into();
+        if p < Decimal::ZERO {
+             return Err(ZakatError::InvalidInput("Cow price must be non-negative".to_string()));
+         }
+        self.cow_price = p;
+        Ok(self)
+    }
+
+    pub fn with_camel_price(mut self, price: impl Into<Decimal>) -> Result<Self, ZakatError> {
+        let p = price.into();
+        if p < Decimal::ZERO {
+             return Err(ZakatError::InvalidInput("Camel price must be non-negative".to_string()));
+         }
+        self.camel_price = p;
+        Ok(self)
     }
 }
 
@@ -110,12 +129,12 @@ impl CalculateZakat for LivestockAssets {
         };
 
         if self.grazing_method != GrazingMethod::Saimah {
-             return Ok(ZakatDetails::not_payable(nisab_count_val, crate::types::WealthType::Livestock, "Not Sa'imah (naturally grazed)")
+             return Ok(ZakatDetails::below_threshold(nisab_count_val, crate::types::WealthType::Livestock, "Not Sa'imah (naturally grazed)")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
 
         if !self.hawl_satisfied {
-             return Ok(ZakatDetails::not_payable(nisab_count_val, crate::types::WealthType::Livestock, "Hawl (1 lunar year) not met")
+             return Ok(ZakatDetails::below_threshold(nisab_count_val, crate::types::WealthType::Livestock, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
 
@@ -389,7 +408,7 @@ mod tests {
     }
 
     #[test]
-    fn test_maalufah_not_payable() {
+    fn test_maalufah_below_threshold() {
         let prices = LivestockPrices { sheep_price: dec!(100.0), ..Default::default() };
         // 50 Sheep (usually payable) but Feed-lot (Maalufah)
         let stock = LivestockAssets::new(50, LivestockType::Sheep, prices)

@@ -37,7 +37,7 @@ fn test_dx_prelude_and_ergonomics() {
     assert!(!res.is_payable);
     
     // Precious Metals
-    let gold = PreciousMetal::new(
+    let gold = PreciousMetals::new(
         85, // weight: i32
         WealthType::Gold
     ).expect("Valid");

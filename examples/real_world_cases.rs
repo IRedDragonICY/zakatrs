@@ -3,7 +3,7 @@ use zakat::{ZakatConfig, CalculateZakat, WealthType};
 use zakat::maal::business::{BusinessAssets, BusinessZakatCalculator};
 use zakat::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
 use zakat::maal::investments::{InvestmentAssets, InvestmentType};
-use zakat::maal::precious_metals::PreciousMetal;
+use zakat::maal::precious_metals::PreciousMetals;
 use zakat::maal::agriculture::{AgricultureAssets, IrrigationMethod};
 use zakat::maal::livestock::{LivestockAssets, LivestockType, LivestockPrices};
 use zakat::maal::mining::{MiningAssets, MiningType};
@@ -59,7 +59,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // CASE 3: The Gold Saver (Precious Metals)
     // Has 150g Gold bars.
     // Nisab 85g. Payable.
-    let saver = PreciousMetal::new(150, WealthType::Gold)?.with_label("Safe Deposit Gold");
+    let saver = PreciousMetals::new(150, WealthType::Gold)?.with_label("Safe Deposit Gold");
     print_case("Case 3: Gold Saver (150g)", saver.with_hawl(true).calculate_zakat(&config), true);
 
     // CASE 4: The Crypto Trader (Investments)

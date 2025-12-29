@@ -77,7 +77,7 @@ impl CalculateZakat for IncomeZakatCalculator {
         // Income usually doesn't strictly require hawl if it's salary (paid upon receipt),
         // but if the user explicitly sets hawl_satisfied = false, we should respect it.
         if !self.hawl_satisfied {
-             return Ok(ZakatDetails::not_payable(nisab_threshold_value, crate::types::WealthType::Income, "Hawl (1 lunar year) not met")
+             return Ok(ZakatDetails::below_threshold(nisab_threshold_value, crate::types::WealthType::Income, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
 

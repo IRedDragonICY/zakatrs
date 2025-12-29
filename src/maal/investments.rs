@@ -72,7 +72,7 @@ impl CalculateZakat for InvestmentAssets {
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
 
         if !self.hawl_satisfied {
-            return Ok(ZakatDetails::not_payable(nisab_threshold_value, crate::types::WealthType::Investment, "Hawl (1 lunar year) not met")
+            return Ok(ZakatDetails::below_threshold(nisab_threshold_value, crate::types::WealthType::Investment, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
         // Requirement: 

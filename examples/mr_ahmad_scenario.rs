@@ -1,6 +1,6 @@
 use rust_decimal_macros::dec;
 use zakat::{ZakatConfig, ZakatPortfolio, WealthType};
-use zakat::maal::precious_metals::{PreciousMetal};
+use zakat::maal::precious_metals::{PreciousMetals};
 use zakat::maal::investments::{InvestmentAssets, InvestmentType};
 use zakat::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
 
@@ -27,7 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?.with_label("Monthly Salary");
     
     // 2. Gold - integers work directly!
-    let gold_calc = PreciousMetal::new(
+    let gold_calc = PreciousMetals::new(
         100, 
         WealthType::Gold
     )?.with_label("Wife's Gold Stash");
@@ -40,9 +40,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // 4. Portfolio with Debt Deduction on Crypto
     let portfolio = ZakatPortfolio::new()
-        .add_calculator(income_calc) // $5000 * 2.5% = $125
-        .add_calculator(gold_calc)   // $5000 * 2.5% = $125 (100g * 50)
-        .add_calculator(crypto_calc.with_debt_due_now(dec!(2000.0))); // ($20,000 - $2,000) * 2.5% = $450
+        .add(income_calc) // $5000 * 2.5% = $125
+        .add(gold_calc)   // $5000 * 2.5% = $125 (100g * 50)
+        .add(crypto_calc.with_debt_due_now(dec!(2000.0))); // ($20,000 - $2,000) * 2.5% = $450
         
     let result = portfolio.calculate_total(&config)?;
     

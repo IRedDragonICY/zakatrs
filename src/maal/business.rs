@@ -38,12 +38,15 @@ impl BusinessAssets {
 }
 
 impl CalculateZakat for BusinessAssets {
-    fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
-        // BusinessAssets doesn't hold hawl info itself in this design, 
-        // but for safety let's return error as this shouldn't be called directly.
-        // Or if we want to allow it, we assume defaults (no debt, hawl satisfied).
-        // But the error message below says use Wrapper.
-        Err(ZakatError::ConfigurationError("Please use BusinessZakatCalculator wrapper or similar".to_string()))
+    fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        // Delegate to the full calculator with default assumptions:
+        // 1. Hawl is satisfied (default for raw assets unless specified)
+        // 2. Extra liabilities due now are 0 (BusinessAssets has internal liabilities already)
+        // 3. No label (unless we add label to BusinessAssets, but it's not there yet)
+        let calculator = BusinessZakatCalculator::new(*self)
+            .with_hawl(true);
+        
+        calculator.calculate_zakat(config)
     }
 }
 
@@ -100,7 +103,7 @@ impl CalculateZakat for BusinessZakatCalculator {
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
 
         if !self.hawl_satisfied {
-            return Ok(ZakatDetails::not_payable(nisab_threshold_value, crate::types::WealthType::Business, "Hawl (1 lunar year) not met")
+            return Ok(ZakatDetails::below_threshold(nisab_threshold_value, crate::types::WealthType::Business, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
         let gross_assets = self.assets.cash_on_hand + self.assets.inventory_value + self.assets.receivables;

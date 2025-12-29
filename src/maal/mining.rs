@@ -76,7 +76,7 @@ impl CalculateZakat for MiningAssets {
 
                 // Rate: 2.5%. Nisab: 85g Gold.
                 if !self.hawl_satisfied {
-                     return Ok(ZakatDetails::not_payable(nisab_threshold, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met")
+                     return Ok(ZakatDetails::below_threshold(nisab_threshold, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met")
                         .with_label(self.label.clone().unwrap_or_default()));
                 }
                 let rate = dec!(0.025);

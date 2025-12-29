@@ -61,8 +61,8 @@ impl ZakatDetails {
         }
     }
 
-    /// Helper to create a non-payable ZakatDetail with a reason.
-    pub fn not_payable(nisab_threshold: Decimal, wealth_type: WealthType, reason: &str) -> Self {
+    /// Helper to create a non-payable ZakatDetail because it is below the threshold.
+    pub fn below_threshold(nisab_threshold: Decimal, wealth_type: WealthType, reason: &str) -> Self {
         ZakatDetails {
             total_assets: Decimal::ZERO,
             liabilities_due_now: Decimal::ZERO,
@@ -85,6 +85,28 @@ impl ZakatDetails {
     pub fn with_extra_data(mut self, data: std::collections::HashMap<String, String>) -> Self {
         self.extra_data = Some(data);
         self
+    }
+
+    /// Returns the Zakat due formatted as a string with 2 decimal places.
+    pub fn format_amount(&self) -> String {
+        use rust_decimal::RoundingStrategy;
+        // Format with 2 decimal places
+        let rounded = self.zakat_due.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero);
+        format!("{:.2}", rounded)
+    }
+
+    /// Returns a concise status string.
+    /// Format: "{Label}: {Payable/Exempt} - Due: {Amount}"
+    pub fn summary(&self) -> String {
+        let label_str = self.label.as_deref().unwrap_or("Asset");
+        let status = if self.is_payable { "Payable" } else { "Exempt" };
+        let reason = if let Some(r) = &self.status_reason {
+             format!(" ({})", r)
+        } else {
+            String::new()
+        };
+        
+        format!("{}: {}{} - Due: {}", label_str, status, reason, self.format_amount())
     }
 }
 

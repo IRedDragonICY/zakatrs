@@ -19,7 +19,7 @@ pub use crate::types::{WealthType, ZakatDetails, ZakatError};
 pub use crate::maal::business::{BusinessAssets, BusinessZakatCalculator};
 pub use crate::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
 pub use crate::maal::investments::{InvestmentAssets, InvestmentType};
-pub use crate::maal::precious_metals::PreciousMetal;
+pub use crate::maal::precious_metals::PreciousMetals;
 pub use crate::maal::agriculture::{AgricultureAssets, IrrigationMethod};
 pub use crate::maal::livestock::{LivestockAssets, LivestockType, LivestockPrices};
 pub use crate::maal::mining::{MiningAssets, MiningType};

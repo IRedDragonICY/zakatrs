@@ -27,7 +27,7 @@ fn test_labeling_workflow() {
 #[test]
 fn test_sanitization_negative_weight() {
     let config = ZakatConfig::default();
-    let res = PreciousMetal::new(dec!(-50.0), WealthType::Gold);
+    let res = PreciousMetals::new(dec!(-50.0), WealthType::Gold);
     
     assert!(res.is_err());
     if let Err(ZakatError::InvalidInput(msg)) = res {

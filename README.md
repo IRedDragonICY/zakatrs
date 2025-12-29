@@ -90,13 +90,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ZakatConfig::new(65, 1);
 
     let portfolio = ZakatPortfolio::new()
-        .add_calculator(IncomeZakatCalculator::new(
+        .add(IncomeZakatCalculator::new(
             5000, 0, IncomeCalculationMethod::Gross, &config
         )?.with_label("Monthly Salary"))
-        .add_calculator(PreciousMetal::new(
+        .add(PreciousMetal::new(
             100, WealthType::Gold, &config
         )?.with_label("Wife's Gold"))
-        .add_calculator(InvestmentAssets::new(
+        .add(InvestmentAssets::new(
             20000, InvestmentType::Crypto, &config
         )?.with_debt(dec!(2000.0)).with_label("Binance Portfolio"));
 
@@ -136,7 +136,7 @@ use zakat::maal::precious_metals::{PreciousMetal, JewelryUsage};
 use zakat::maal::livestock::{LivestockAssets, LivestockType, LivestockPrices};
 
 // Personal Jewelry (Exempt in Shafi/Maliki, Payable in Hanafi)
-let necklace = PreciousMetal::new(dec!(100.0), WealthType::Gold)?
+let necklace = PreciousMetals::new(dec!(100.0), WealthType::Gold)?
     .with_usage(JewelryUsage::PersonalUse)
     .with_label("Wife's Wedding Necklace");
 

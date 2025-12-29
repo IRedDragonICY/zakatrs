@@ -11,7 +11,7 @@ pub enum JewelryUsage {
     PersonalUse,   // Exempt in Shafi/Maliki/Hanbali usually
 }
 
-pub struct PreciousMetal {
+pub struct PreciousMetals {
     pub weight_grams: Decimal,
     pub metal_type: WealthType, // Gold or Silver
     pub purity: u32, // Karat for Gold (e.g. 24, 21, 18). Ignored for Silver (assumed pure).
@@ -21,7 +21,7 @@ pub struct PreciousMetal {
     pub label: Option<String>,
 }
 
-impl PreciousMetal {
+impl PreciousMetals {
     pub fn new(weight_grams: impl Into<Decimal>, metal_type: WealthType) -> Result<Self, ZakatError> {
         let weight: Decimal = weight_grams.into();
         if weight < Decimal::ZERO {
@@ -70,14 +70,14 @@ impl PreciousMetal {
     }
 }
 
-impl CalculateZakat for PreciousMetal {
+impl CalculateZakat for PreciousMetals {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         // Check for personal usage exemption first
         if self.usage == JewelryUsage::PersonalUse {
             match config.cash_nisab_standard {
                 // Gold Standard -> Implies Shafi/Maliki -> Exempt
                 NisabStandard::Gold => {
-                     return Ok(ZakatDetails::not_payable(
+                     return Ok(ZakatDetails::below_threshold(
                          Decimal::ZERO, 
                          self.metal_type, 
                          "Personal jewelry is exempt in this Madhab"
@@ -101,7 +101,7 @@ impl CalculateZakat for PreciousMetal {
 
         let nisab_value = nisab_threshold_grams * price_per_gram;
         if !self.hawl_satisfied {
-            return Ok(ZakatDetails::not_payable(nisab_value, self.metal_type, "Hawl (1 lunar year) not met")
+            return Ok(ZakatDetails::below_threshold(nisab_value, self.metal_type, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
 
@@ -130,7 +130,7 @@ mod tests {
     #[test]
     fn test_gold_below_nisab() {
         let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
-        let metal = PreciousMetal::new(dec!(84.0), WealthType::Gold).unwrap();
+        let metal = PreciousMetals::new(dec!(84.0), WealthType::Gold).unwrap();
         let zakat = metal.with_hawl(true).calculate_zakat(&config).unwrap();
         
         // 84g < 85g -> Not Payable
@@ -141,7 +141,7 @@ mod tests {
     #[test]
     fn test_gold_above_nisab() {
         let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
-        let metal = PreciousMetal::new(dec!(85.0), WealthType::Gold).unwrap();
+        let metal = PreciousMetals::new(dec!(85.0), WealthType::Gold).unwrap();
         let zakat = metal.with_hawl(true).calculate_zakat(&config).unwrap();
         
         // 85g >= 85g -> Payable
@@ -158,7 +158,7 @@ mod tests {
         // Nisab 85g = $8,500.
         // Net ($8,000) < Nisab ($8,500) -> Not Payable.
         
-        let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap();
+        let metal = PreciousMetals::new(dec!(100.0), WealthType::Gold).unwrap();
         let zakat = metal.with_debt_due_now(dec!(2000.0)).with_hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(!zakat.is_payable);
@@ -175,7 +175,7 @@ mod tests {
         // 75g < 85g -> Not Payable.
         // If it were treated as 24K, it would be payable.
         
-        let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap()
+        let metal = PreciousMetals::new(dec!(100.0), WealthType::Gold).unwrap()
             .with_purity(18);
             
         let zakat = metal.with_hawl(true).calculate_zakat(&config).unwrap();
@@ -184,7 +184,7 @@ mod tests {
         assert_eq!(zakat.zakat_due, Decimal::ZERO);
         
         // Test 24K explicit
-        let metal24 = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap()
+        let metal24 = PreciousMetals::new(dec!(100.0), WealthType::Gold).unwrap()
             .with_purity(24);
         let zakat24 = metal24.with_hawl(true).calculate_zakat(&config).unwrap();
         assert!(zakat24.is_payable);
@@ -199,7 +199,7 @@ mod tests {
         };
         
         // 100g > 85g Nisab
-        let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap()
+        let metal = PreciousMetals::new(dec!(100.0), WealthType::Gold).unwrap()
             .with_usage(JewelryUsage::PersonalUse);
             
         let zakat = metal.with_hawl(true).calculate_zakat(&config).unwrap();
@@ -215,7 +215,7 @@ mod tests {
             ..Default::default() 
         };
         
-        let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap()
+        let metal = PreciousMetals::new(dec!(100.0), WealthType::Gold).unwrap()
             .with_usage(JewelryUsage::PersonalUse);
             
         let zakat = metal.with_hawl(true).calculate_zakat(&config).unwrap();

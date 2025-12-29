@@ -38,7 +38,7 @@ impl BusinessAssets {
 }
 
 impl CalculateZakat for BusinessAssets {
-    fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         // BusinessAssets doesn't hold hawl info itself in this design, 
         // but for safety let's return error as this shouldn't be called directly.
         // Or if we want to allow it, we assume defaults (no debt, hawl satisfied).
@@ -51,36 +51,19 @@ impl CalculateZakat for BusinessAssets {
 // The Trait is fine, but the struct needs the context.
 pub struct BusinessZakatCalculator {
     assets: BusinessAssets,
-    nisab_threshold_value: Decimal,
     deductible_liabilities: Decimal,
     hawl_satisfied: bool,
     label: Option<String>,
 }
 
 impl BusinessZakatCalculator {
-    pub fn new(assets: BusinessAssets, config: &ZakatConfig) -> Result<Self, ZakatError> {
-        // For LowerOfTwo or Silver standard, we need silver price too
-        let needs_silver = matches!(
-            config.cash_nisab_standard,
-            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
-        );
-        
-        if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError("Gold price needed for Business Nisab".to_string()));
-        }
-        if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Silver price needed for Business Nisab with current standard".to_string()));
-        }
-        
-        let nisab_threshold_value = config.get_monetary_nisab_threshold();
-        
-        Ok(Self {
+    pub fn new(assets: BusinessAssets) -> Self {
+        Self {
             assets,
-            nisab_threshold_value,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
-        })
+        }
     }
 
     pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
@@ -100,9 +83,24 @@ impl BusinessZakatCalculator {
 }
 
 impl CalculateZakat for BusinessZakatCalculator {
-    fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        // For LowerOfTwo or Silver standard, we need silver price too
+        let needs_silver = matches!(
+            config.cash_nisab_standard,
+            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
+        );
+        
+        if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
+            return Err(ZakatError::ConfigurationError("Gold price needed for Business Nisab".to_string()));
+        }
+        if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
+            return Err(ZakatError::ConfigurationError("Silver price needed for Business Nisab with current standard".to_string()));
+        }
+        
+        let nisab_threshold_value = config.get_monetary_nisab_threshold();
+
         if !self.hawl_satisfied {
-            return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Business, "Hawl (1 lunar year) not met")
+            return Ok(ZakatDetails::not_payable(nisab_threshold_value, crate::types::WealthType::Business, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
         let gross_assets = self.assets.cash_on_hand + self.assets.inventory_value + self.assets.receivables;
@@ -110,18 +108,12 @@ impl CalculateZakat for BusinessZakatCalculator {
         
         let total_assets = gross_assets;
         
-        // Logic: (Assets - Liabilities) >= Nisab
-        // ZakatDetails expects:
-        // total_assets, deductible_liabilities, nisab values
-        
-        // total_assets, deductible_liabilities, nisab values
-        
         // Sum internal short term liabilities with any extra deductible liabilities set via builder
         let total_liabilities = business_debt + self.deductible_liabilities;
 
         let rate = dec!(0.025);
 
-        Ok(ZakatDetails::new(total_assets, total_liabilities, self.nisab_threshold_value, rate, crate::types::WealthType::Business)
+        Ok(ZakatDetails::new(total_assets, total_liabilities, nisab_threshold_value, rate, crate::types::WealthType::Business)
             .with_label(self.label.clone().unwrap_or_default()))
     }
 }
@@ -140,13 +132,13 @@ mod tests {
             dec!(5000.0), // Inventory
             dec!(0.0),    // Receivables
             dec!(1000.0)  // Debt
-        );
+        ).expect("Valid assets");
         // Gross: 10,000. Debt: 1,000. Net: 9,000.
         // Nisab: 8,500.
         // Payable: Yes. 9000 * 2.5% = 225.
 
-        let calculator = BusinessZakatCalculator::new(assets, &config).unwrap();
-        let result = calculator.with_hawl(true).calculate_zakat().unwrap();
+        let calculator = BusinessZakatCalculator::new(assets);
+        let result = calculator.with_hawl(true).calculate_zakat(&config).unwrap();
 
         assert!(result.is_payable);
         assert_eq!(result.net_assets, dec!(9000.0));
@@ -156,11 +148,11 @@ mod tests {
     #[test]
     fn test_business_below_nisab() {
          let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
-         let assets = BusinessAssets::new(dec!(1000.0), dec!(1000.0), dec!(0.0), dec!(0.0));
+         let assets = BusinessAssets::new(dec!(1000.0), dec!(1000.0), dec!(0.0), dec!(0.0)).expect("Valid");
          // Net 2000 < 8500
          
-         let calculator = BusinessZakatCalculator::new(assets, &config).unwrap();
-         let result = calculator.with_hawl(true).calculate_zakat().unwrap();
+         let calculator = BusinessZakatCalculator::new(assets);
+         let result = calculator.with_hawl(true).calculate_zakat(&config).unwrap();
          
          assert!(!result.is_payable);
     }
@@ -172,13 +164,13 @@ mod tests {
         let config = ZakatConfig { gold_price_per_gram: dec!(1000000.0), ..Default::default() };
         
         // Assets 100M
-        let assets = BusinessAssets::new(dec!(100000000.0), dec!(0.0), dec!(0.0), dec!(20000000.0));
+        let assets = BusinessAssets::new(dec!(100000000.0), dec!(0.0), dec!(0.0), dec!(20000000.0)).expect("Valid");
         // Net = 100M - 20M = 80M.
         // Nisab = 85M.
         // 80M < 85M -> Not Payable.
         
-        let calculator = BusinessZakatCalculator::new(assets, &config).unwrap();
-        let result = calculator.with_hawl(true).calculate_zakat().unwrap();
+        let calculator = BusinessZakatCalculator::new(assets);
+        let result = calculator.with_hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(!result.is_payable);
         assert_eq!(result.net_assets, dec!(80000000.0));
@@ -197,14 +189,14 @@ mod tests {
         // If Madhab is Shafi (Gold Standard): $5,000 < $8,500 -> Not Payable
         // If Madhab is Hanafi (LowerOfTwo -> Silver): $5,000 > $1,190 -> Payable
         
-        let assets = BusinessAssets::new(dec!(5000.0), dec!(0.0), dec!(0.0), dec!(0.0));
+        let assets = BusinessAssets::new(dec!(5000.0), dec!(0.0), dec!(0.0), dec!(0.0)).expect("Valid");
         
         // 1. Test Shafi (Gold)
         let shafi_config = ZakatConfig::new(dec!(100.0), dec!(2.0))
             .with_madhab(Madhab::Shafi);
             
-        let shafi_calc = BusinessZakatCalculator::new(assets.clone(), &shafi_config).unwrap();
-        let shafi_res = shafi_calc.with_hawl(true).calculate_zakat().unwrap();
+        let shafi_calc = BusinessZakatCalculator::new(assets.clone());
+        let shafi_res = shafi_calc.with_hawl(true).calculate_zakat(&shafi_config).unwrap();
         
         assert!(!shafi_res.is_payable, "Shafi (Gold) should not be payable as 5000 < 8500");
         assert_eq!(shafi_res.nisab_threshold, dec!(8500.0));
@@ -213,8 +205,8 @@ mod tests {
         let hanafi_config = ZakatConfig::new(dec!(100.0), dec!(2.0))
             .with_madhab(Madhab::Hanafi);
             
-        let hanafi_calc = BusinessZakatCalculator::new(assets, &hanafi_config).unwrap();
-        let hanafi_res = hanafi_calc.with_hawl(true).calculate_zakat().unwrap();
+        let hanafi_calc = BusinessZakatCalculator::new(assets);
+        let hanafi_res = hanafi_calc.with_hawl(true).calculate_zakat(&hanafi_config).unwrap();
         
         assert!(hanafi_res.is_payable, "Hanafi (LowerOfTwo) should be payable as 5000 > 1190");
         assert_eq!(hanafi_res.nisab_threshold, dec!(1190.0));

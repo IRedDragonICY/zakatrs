@@ -7,35 +7,26 @@ use crate::config::ZakatConfig;
 pub struct PreciousMetal {
     pub weight_grams: Decimal,
     pub metal_type: WealthType, // Gold or Silver
-    pub price_per_gram: Decimal,
-    pub nisab_threshold_grams: Decimal,
     pub deductible_liabilities: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
 }
 
 impl PreciousMetal {
-    pub fn new(weight_grams: impl Into<Decimal>, metal_type: WealthType, config: &ZakatConfig) -> Result<Self, ZakatError> {
+    pub fn new(weight_grams: impl Into<Decimal>, metal_type: WealthType) -> Result<Self, ZakatError> {
         let weight: Decimal = weight_grams.into();
         if weight < Decimal::ZERO {
             return Err(ZakatError::InvalidInput("Weight must be non-negative".to_string()));
         }
 
-        let (price_per_gram, nisab_threshold_grams) = match metal_type {
-            WealthType::Gold => (config.gold_price_per_gram, config.get_nisab_gold_grams()),
-            WealthType::Silver => (config.silver_price_per_gram, config.get_nisab_silver_grams()),
+        match metal_type {
+            WealthType::Gold | WealthType::Silver => {},
             _ => return Err(ZakatError::InvalidInput("Type must be Gold or Silver".to_string())),
         };
         
-        if price_per_gram <= Decimal::ZERO {
-             return Err(ZakatError::ConfigurationError("Price for metal not set".to_string()));
-        }
-
         Ok(Self {
             weight_grams: weight,
             metal_type,
-            price_per_gram,
-            nisab_threshold_grams,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
@@ -59,19 +50,25 @@ impl PreciousMetal {
 }
 
 impl CalculateZakat for PreciousMetal {
-    fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
-        let nisab_value = self.nisab_threshold_grams * self.price_per_gram;
+    fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        let (price_per_gram, nisab_threshold_grams) = match self.metal_type {
+            WealthType::Gold => (config.gold_price_per_gram, config.get_nisab_gold_grams()),
+            WealthType::Silver => (config.silver_price_per_gram, config.get_nisab_silver_grams()),
+            _ => return Err(ZakatError::InvalidInput("Type must be Gold or Silver".to_string())),
+        };
+
+        if price_per_gram <= Decimal::ZERO {
+             return Err(ZakatError::ConfigurationError("Price for metal not set".to_string()));
+        }
+
+        let nisab_value = nisab_threshold_grams * price_per_gram;
         if !self.hawl_satisfied {
             return Ok(ZakatDetails::not_payable(nisab_value, self.metal_type, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
-        let total_value = self.weight_grams * self.price_per_gram;
+        let total_value = self.weight_grams * price_per_gram;
         let liabilities = self.deductible_liabilities;
 
-        // Note: For Gold/Silver, usually debts are deducted from the wealth itself, 
-        // or rather, we check if net wealth >= nisab.
-        // The implementation plan says: "Deductible Rule: Allow passing 'Current Debts' to be deducted from assets before checking Nisab"
-        
         let rate = dec!(0.025); // 2.5%
 
         Ok(ZakatDetails::new(total_value, liabilities, nisab_value, rate, self.metal_type)
@@ -86,8 +83,8 @@ mod tests {
     #[test]
     fn test_gold_below_nisab() {
         let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
-        let metal = PreciousMetal::new(dec!(84.0), WealthType::Gold, &config).unwrap();
-        let zakat = metal.with_hawl(true).calculate_zakat().unwrap();
+        let metal = PreciousMetal::new(dec!(84.0), WealthType::Gold).unwrap();
+        let zakat = metal.with_hawl(true).calculate_zakat(&config).unwrap();
         
         // 84g < 85g -> Not Payable
         assert!(!zakat.is_payable);
@@ -97,8 +94,8 @@ mod tests {
     #[test]
     fn test_gold_above_nisab() {
         let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
-        let metal = PreciousMetal::new(dec!(85.0), WealthType::Gold, &config).unwrap();
-        let zakat = metal.with_hawl(true).calculate_zakat().unwrap();
+        let metal = PreciousMetal::new(dec!(85.0), WealthType::Gold).unwrap();
+        let zakat = metal.with_hawl(true).calculate_zakat(&config).unwrap();
         
         // 85g >= 85g -> Payable
         // Value = 8500
@@ -114,8 +111,8 @@ mod tests {
         // Nisab 85g = $8,500.
         // Net ($8,000) < Nisab ($8,500) -> Not Payable.
         
-        let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold, &config).unwrap();
-        let zakat = metal.with_debt(dec!(2000.0)).with_hawl(true).calculate_zakat().unwrap();
+        let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap();
+        let zakat = metal.with_debt(dec!(2000.0)).with_hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(!zakat.is_payable);
         assert_eq!(zakat.zakat_due, Decimal::ZERO);

@@ -19,7 +19,7 @@ fn test_dx_prelude_and_ergonomics() {
         5000,  // inventory: i32
         0,     // receivables: i32
         1000   // debt: i32
-    );
+    ).expect("Valid assets");
     
     assert_eq!(business.cash_on_hand, dec!(10000.0));
     
@@ -27,11 +27,10 @@ fn test_dx_prelude_and_ergonomics() {
     let income = IncomeZakatCalculator::new(
         12000, // total_income: i32
         4000,   // basic_expenses: i32
-        IncomeCalculationMethod::Net,
-        &config
+        IncomeCalculationMethod::Net
     ).expect("Config valid");
     
-    let res = income.with_debt(500).calculate_zakat().unwrap();
+    let res = income.with_debt(500).calculate_zakat(&config).unwrap();
     // Net: 12000 - 4000 - 500 = 7500.
     // Nisab: 85 * 100 = 8500.
     // Not payable.
@@ -40,11 +39,10 @@ fn test_dx_prelude_and_ergonomics() {
     // Precious Metals
     let gold = PreciousMetal::new(
         85, // weight: i32
-        WealthType::Gold, 
-        &config
+        WealthType::Gold
     ).expect("Valid");
     
     // 85g >= 85g. Payable.
-    let gold_res = gold.calculate_zakat().unwrap();
+    let gold_res = gold.calculate_zakat(&config).unwrap();
     assert!(gold_res.is_payable);
 }

@@ -44,29 +44,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Net Income < Nisab. Not Payable (if calculated monthly strictly on surplus).
     // Note: Some opinions accumulate annual income. Assuming monthly calculation here.
     let freelancer = IncomeZakatCalculator::new(
-        4000, 1500, IncomeCalculationMethod::Net, &config
+        4000, 1500, IncomeCalculationMethod::Net
     )?.with_label("Freelance Project X");
-    print_case("Case 1: Freelancer (Net Income)", freelancer.with_hawl(true).calculate_zakat(), false);
+    print_case("Case 1: Freelancer (Net Income)", freelancer.with_hawl(true).calculate_zakat(&config), false);
 
     // CASE 2: The Startup Founder (Business Assets - Equity)
     // Cash: $500k. Inventory/IP Valued(?): $0. Short Debt: $50k.
     // Liquid Assets for Zakat: $500k. Debt: $50k. Net: $450k.
     // Nisab ~$5.5k. Payable.
     let startup = BusinessAssets::new(500000, 0, 0, 50000)?;
-    let startup_calc = BusinessZakatCalculator::new(startup, &config)?.with_label("Tech Startup Equity");
-    print_case("Case 2: Startup Founder (Business Cash)", startup_calc.with_hawl(true).calculate_zakat(), true);
+    let startup_calc = BusinessZakatCalculator::new(startup).with_label("Tech Startup Equity");
+    print_case("Case 2: Startup Founder (Business Cash)", startup_calc.with_hawl(true).calculate_zakat(&config), true);
 
     // CASE 3: The Gold Saver (Precious Metals)
     // Has 150g Gold bars.
     // Nisab 85g. Payable.
-    let saver = PreciousMetal::new(150, WealthType::Gold, &config)?.with_label("Safe Deposit Gold");
-    print_case("Case 3: Gold Saver (150g)", saver.with_hawl(true).calculate_zakat(), true);
+    let saver = PreciousMetal::new(150, WealthType::Gold)?.with_label("Safe Deposit Gold");
+    print_case("Case 3: Gold Saver (150g)", saver.with_hawl(true).calculate_zakat(&config), true);
 
     // CASE 4: The Crypto Trader (Investments)
     // Portfolio worth $3000.
     // Nisab $5525. Not Payable.
-    let crypto = InvestmentAssets::new(3000, InvestmentType::Crypto, &config)?.with_label("Altcoin Bag");
-    print_case("Case 4: Crypto Trader (Small Portfolio)", crypto.with_hawl(true).calculate_zakat(), false);
+    let crypto = InvestmentAssets::new(3000, InvestmentType::Crypto)?.with_label("Altcoin Bag");
+    print_case("Case 4: Crypto Trader (Small Portfolio)", crypto.with_hawl(true).calculate_zakat(&config), false);
 
     // CASE 5: The Rice Farmer (Agriculture - Rain Fed)
     // Harvested 1000kg Rice. No debt.
@@ -75,17 +75,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Price per kg: $0.50 (Locally).
     // Value: $500. Zakat: 10% = $50.
     let farmer_rain = AgricultureAssets::new(
-        1000, dec!(0.50), IrrigationMethod::Rain, &config
+        1000, dec!(0.50), IrrigationMethod::Rain
     )?.with_label("Paddy Field A");
-    print_case("Case 5: Rice Farmer (Rain Fed)", farmer_rain.with_hawl(true).calculate_zakat(), true);
+    print_case("Case 5: Rice Farmer (Rain Fed)", farmer_rain.with_hawl(true).calculate_zakat(&config), true);
 
     // CASE 6: The Modern Farmer (Agriculture - Irrigated/Costly)
     // Harvested 1000kg.
     // Rate 5%. Zakat: $25.
     let farmer_irr = AgricultureAssets::new(
-        1000, dec!(0.50), IrrigationMethod::Irrigated, &config
+        1000, dec!(0.50), IrrigationMethod::Irrigated
     )?.with_label("Greenhouse B");
-    print_case("Case 6: Modern Farmer (Irrigated)", farmer_irr.with_hawl(true).calculate_zakat(), true);
+    print_case("Case 6: Modern Farmer (Irrigated)", farmer_irr.with_hawl(true).calculate_zakat(&config), true);
 
     // CASE 7: The Sheep Herder (Livestock)
     // 50 Sheep.
@@ -95,22 +95,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Due: $150.
     let livestock_prices = LivestockPrices::new(150, 0, 0)?;
     let shepherd = LivestockAssets::new(50, LivestockType::Sheep, livestock_prices).with_label("Merino Flock");
-    print_case("Case 7: Sheep Herder (50 Sheep)", shepherd.with_hawl(true).calculate_zakat(), true);
+    print_case("Case 7: Sheep Herder (50 Sheep)", shepherd.with_hawl(true).calculate_zakat(&config), true);
 
     // CASE 8: The Treasure Hunter (Rikaz)
     // Found ancient coins worth $10,000.
     // Rate 20%. No Nisab check strictly (or minimal).
     // Due: $2,000.
-    let treasure = MiningAssets::new(10000, MiningType::Rikaz, &config)?.with_label("Roman Coins");
+    let treasure = MiningAssets::new(10000, MiningType::Rikaz)?.with_label("Roman Coins");
     // Use false for Hawl to prove Rikaz ignores it (it should still be payable)
-    print_case("Case 8: Treasure Hunter (Rikaz)", treasure.with_hawl(false).calculate_zakat(), true);
+    print_case("Case 8: Treasure Hunter (Rikaz)", treasure.with_hawl(false).calculate_zakat(&config), true);
 
     // CASE 9: The Stock Investor (Long Term)
     // Stocks worth $50,000.
     // Conservative opinion: 2.5% on Market Value for liquid stocks.
     // Due: $1,250.
-    let stocks = InvestmentAssets::new(50000, InvestmentType::Stock, &config)?.with_label("Tech Stocks ETF");
-    print_case("Case 9: Stock Investor (Market Value)", stocks.with_hawl(true).calculate_zakat(), true);
+    let stocks = InvestmentAssets::new(50000, InvestmentType::Stock)?.with_label("Tech Stocks ETF");
+    print_case("Case 9: Stock Investor (Market Value)", stocks.with_hawl(true).calculate_zakat(&config), true);
 
     // CASE 10: Zakat Fitrah for Family
     // Family of 5.

@@ -13,7 +13,6 @@ pub struct IncomeZakatCalculator {
     total_income: Decimal,
     basic_expenses: Decimal,
     method: IncomeCalculationMethod,
-    nisab_threshold_value: Decimal,
     deductible_liabilities: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
@@ -24,7 +23,6 @@ impl IncomeZakatCalculator {
         total_income: impl Into<Decimal>,
         basic_expenses: impl Into<Decimal>,
         method: IncomeCalculationMethod,
-        config: &ZakatConfig,
     ) -> Result<Self, ZakatError> {
         let income = total_income.into();
         let expenses = basic_expenses.into();
@@ -33,26 +31,10 @@ impl IncomeZakatCalculator {
             return Err(ZakatError::InvalidInput("Income and expenses must be non-negative".to_string()));
         }
 
-        // For LowerOfTwo or Silver standard, we need silver price too
-        let needs_silver = matches!(
-            config.cash_nisab_standard,
-            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
-        );
-        
-        if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError("Gold price needed for Income Nisab".to_string()));
-        }
-        if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Silver price needed for Income Nisab with current standard".to_string()));
-        }
-        
-        let nisab_threshold_value = config.get_monetary_nisab_threshold();
-        
         Ok(Self {
             total_income: income,
             basic_expenses: expenses,
             method,
-            nisab_threshold_value,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
@@ -76,11 +58,26 @@ impl IncomeZakatCalculator {
 }
 
 impl CalculateZakat for IncomeZakatCalculator {
-    fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        // For LowerOfTwo or Silver standard, we need silver price too
+        let needs_silver = matches!(
+            config.cash_nisab_standard,
+            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
+        );
+        
+        if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
+            return Err(ZakatError::ConfigurationError("Gold price needed for Income Nisab".to_string()));
+        }
+        if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
+            return Err(ZakatError::ConfigurationError("Silver price needed for Income Nisab with current standard".to_string()));
+        }
+        
+        let nisab_threshold_value = config.get_monetary_nisab_threshold();
+
         // Income usually doesn't strictly require hawl if it's salary (paid upon receipt),
         // but if the user explicitly sets hawl_satisfied = false, we should respect it.
         if !self.hawl_satisfied {
-             return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Income, "Hawl (1 lunar year) not met")
+             return Ok(ZakatDetails::not_payable(nisab_threshold_value, crate::types::WealthType::Income, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
 
@@ -101,7 +98,7 @@ impl CalculateZakat for IncomeZakatCalculator {
             }
         };
 
-        Ok(ZakatDetails::new(total_assets, liabilities, self.nisab_threshold_value, rate, crate::types::WealthType::Income)
+        Ok(ZakatDetails::new(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Income)
             .with_label(self.label.clone().unwrap_or_default()))
     }
 }
@@ -117,8 +114,8 @@ mod tests {
         // Income 10,000. Gross.
         // Due 250.
         
-        let calc = IncomeZakatCalculator::new(dec!(10000.0), dec!(5000.0), IncomeCalculationMethod::Gross, &config).unwrap();
-        let res = calc.with_hawl(true).calculate_zakat().unwrap();
+        let calc = IncomeZakatCalculator::new(dec!(10000.0), dec!(5000.0), IncomeCalculationMethod::Gross).unwrap();
+        let res = calc.with_hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(250.0));
@@ -131,8 +128,8 @@ mod tests {
         // Income 12,000. Expenses 4,000. Net 8,000.
         // Net < Nisab. Not Payable.
         
-        let calc = IncomeZakatCalculator::new(dec!(12000.0), dec!(4000.0), IncomeCalculationMethod::Net, &config).unwrap();
-        let res = calc.with_hawl(true).calculate_zakat().unwrap();
+        let calc = IncomeZakatCalculator::new(dec!(12000.0), dec!(4000.0), IncomeCalculationMethod::Net).unwrap();
+        let res = calc.with_hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(!res.is_payable);
         // (12000 - 4000) = 8000. 8000 < 8500.

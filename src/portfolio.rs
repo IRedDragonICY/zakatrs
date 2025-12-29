@@ -37,7 +37,7 @@ impl ZakatPortfolio {
 
         // 1. Initial calculation for all assets
         for item in &self.calculators {
-            let detail = item.calculate_zakat()?; 
+            let detail = item.calculate_zakat(config)?; 
             details.push(detail);
         }
 

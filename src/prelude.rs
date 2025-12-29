@@ -11,7 +11,7 @@
 
 // Core exports
 pub use crate::config::{ZakatConfig, Madhab, NisabStandard};
-pub use crate::portfolio::ZakatPortfolio;
+pub use crate::portfolio::{ZakatPortfolio, PortfolioResult};
 pub use crate::traits::CalculateZakat;
 pub use crate::types::{WealthType, ZakatDetails, ZakatError};
 

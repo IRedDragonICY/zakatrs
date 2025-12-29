@@ -13,7 +13,6 @@ pub enum InvestmentType {
 pub struct InvestmentAssets {
     pub market_value: Decimal,
     pub investment_type: InvestmentType,
-    pub nisab_threshold_value: Decimal,
     pub deductible_liabilities: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
@@ -23,7 +22,6 @@ impl InvestmentAssets {
     pub fn new(
         market_value: impl Into<Decimal>,
         investment_type: InvestmentType,
-        config: &ZakatConfig,
     ) -> Result<Self, ZakatError> {
         let value = market_value.into();
 
@@ -31,25 +29,9 @@ impl InvestmentAssets {
             return Err(ZakatError::InvalidInput("Market value must be non-negative".to_string()));
         }
 
-        // For LowerOfTwo or Silver standard, we need silver price too
-        let needs_silver = matches!(
-            config.cash_nisab_standard,
-            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
-        );
-        
-        if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError("Gold price needed for Investment Nisab".to_string()));
-        }
-        if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Silver price needed for Investment Nisab with current standard".to_string()));
-        }
-        
-        let nisab_threshold_value = config.get_monetary_nisab_threshold();
-        
         Ok(Self {
             market_value: value,
             investment_type,
-            nisab_threshold_value,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
@@ -73,9 +55,24 @@ impl InvestmentAssets {
 }
 
 impl CalculateZakat for InvestmentAssets {
-    fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        // For LowerOfTwo or Silver standard, we need silver price too
+        let needs_silver = matches!(
+            config.cash_nisab_standard,
+            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
+        );
+        
+        if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
+            return Err(ZakatError::ConfigurationError("Gold price needed for Investment Nisab".to_string()));
+        }
+        if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
+            return Err(ZakatError::ConfigurationError("Silver price needed for Investment Nisab with current standard".to_string()));
+        }
+        
+        let nisab_threshold_value = config.get_monetary_nisab_threshold();
+
         if !self.hawl_satisfied {
-            return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Investment, "Hawl (1 lunar year) not met")
+            return Ok(ZakatDetails::not_payable(nisab_threshold_value, crate::types::WealthType::Investment, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
         // Requirement: 
@@ -86,7 +83,7 @@ impl CalculateZakat for InvestmentAssets {
         let liabilities = self.deductible_liabilities;
         let rate = dec!(0.025);
 
-        Ok(ZakatDetails::new(total_assets, liabilities, self.nisab_threshold_value, rate, crate::types::WealthType::Investment)
+        Ok(ZakatDetails::new(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Investment)
             .with_label(self.label.clone().unwrap_or_default()))
     }
 }
@@ -102,8 +99,8 @@ mod tests {
         // Crypto worth 10,000.
         // Due 250.
         
-        let inv = InvestmentAssets::new(dec!(10000.0), InvestmentType::Crypto, &config).unwrap();
-        let res = inv.with_hawl(true).calculate_zakat().unwrap();
+        let inv = InvestmentAssets::new(dec!(10000.0), InvestmentType::Crypto).unwrap();
+        let res = inv.with_hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(250.0));

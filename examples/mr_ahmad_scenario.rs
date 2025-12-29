@@ -23,22 +23,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let income_calc = IncomeZakatCalculator::new(
         5000, 
         0, 
-        IncomeCalculationMethod::Gross, 
-        &config
+        IncomeCalculationMethod::Gross
     )?.with_label("Monthly Salary");
     
     // 2. Gold - integers work directly!
     let gold_calc = PreciousMetal::new(
         100, 
-        WealthType::Gold, 
-        &config
+        WealthType::Gold
     )?.with_label("Wife's Gold Stash");
     
     // 3. Crypto - integers work directly!
     let crypto_calc = InvestmentAssets::new(
         20000, 
-        InvestmentType::Crypto, 
-        &config
+        InvestmentType::Crypto
     )?.with_label("Bitcoin Holding");
     
     // 4. Portfolio with Debt Deduction on Crypto

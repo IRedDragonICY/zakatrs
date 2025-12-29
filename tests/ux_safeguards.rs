@@ -9,19 +9,17 @@ fn test_labeling_workflow() {
         ..Default::default()
     };
 
-    let business_a_assets = BusinessAssets::builder()
+    let business_a = BusinessZakat::builder()
         .cash(10000)
+        .label("Shop A")
         .build()
         .unwrap();
-    let business_a = BusinessZakatCalculator::new(business_a_assets)
-        .with_label("Shop A");
 
-    let business_b_assets = BusinessAssets::builder()
+    let business_b = BusinessZakat::builder()
         .cash(500)
+        .label("Shop B")
         .build()
         .unwrap();
-    let business_b = BusinessZakatCalculator::new(business_b_assets)
-        .with_label("Shop B");
 
     let details_a = business_a.calculate_zakat(&config).unwrap();
     let details_b = business_b.calculate_zakat(&config).unwrap();
@@ -45,7 +43,7 @@ fn test_sanitization_negative_weight() {
 
 #[test]
 fn test_sanitization_business_negative() {
-    let res = BusinessAssets::builder()
+    let res = BusinessZakat::builder()
         .cash(-100)
         .build();
     assert!(res.is_err());

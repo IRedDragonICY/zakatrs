@@ -160,12 +160,26 @@ use crate::config::ZakatConfig;
 
 impl CalculateZakat for LivestockAssets {
     fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
-        // Calculate Nisab Count Value for reporting consistency even if not payable
+        // Validate price for the specific animal type
         let single_price = match self.animal_type {
             LivestockType::Sheep => self.prices.sheep_price,
             LivestockType::Cow => self.prices.cow_price,
             LivestockType::Camel => self.prices.camel_price,
         };
+
+        if single_price <= Decimal::ZERO {
+            let animal_str = match self.animal_type {
+                LivestockType::Sheep => "Sheep",
+                LivestockType::Cow => "Cow",
+                LivestockType::Camel => "Camel",
+            };
+            return Err(ZakatError::ConfigurationError(
+                format!("Price for {} must be greater than zero", animal_str), 
+                self.label.clone()
+            ));
+        }
+
+        // Calculate Nisab Count Value for reporting consistency even if not payable
         
         let nisab_count_val = match self.animal_type {
             LivestockType::Sheep => Decimal::from(40).checked_mul(single_price).unwrap_or(Decimal::MAX),

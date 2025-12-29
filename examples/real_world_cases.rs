@@ -1,6 +1,6 @@
 use rust_decimal_macros::dec;
 use zakat::{ZakatConfig, CalculateZakat, WealthType, AssetBuilder};
-use zakat::maal::business::{BusinessAssets, BusinessZakatCalculator};
+use zakat::maal::business::BusinessZakat;
 use zakat::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
 use zakat::maal::investments::{InvestmentAssets, InvestmentType};
 use zakat::maal::precious_metals::PreciousMetals;
@@ -52,13 +52,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Cash: $500k. Inventory/IP Valued(?): $0. Short Debt: $50k.
     // Liquid Assets for Zakat: $500k. Debt: $50k. Net: $450k.
     // Nisab ~$5.5k. Payable.
-    let startup_assets = BusinessAssets::builder()
+    let startup_calc = BusinessZakat::builder()
         .cash(500000)
         .liabilities(50000)
+        .label("Tech Startup Equity")
         .build()?;
         
-    let startup_calc = BusinessZakatCalculator::new(startup_assets).with_label("Tech Startup Equity");
-    print_case("Case 2: Startup Founder (Business Cash)", startup_calc.with_hawl(true).calculate_zakat(&config), true);
+    print_case("Case 2: Startup Founder (Business Cash)", startup_calc.calculate_zakat(&config), true);
 
     // CASE 3: The Gold Saver (Precious Metals)
     // Has 150g Gold bars.

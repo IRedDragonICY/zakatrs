@@ -14,7 +14,7 @@ fn test_dx_prelude_and_ergonomics() {
     assert_eq!(config.silver_price_per_gram, dec!(1.0));
     
     // BusinessAssets: Passing integers
-    let business = BusinessAssets::builder()
+    let business = BusinessZakat::builder()
         .cash(10000)
         .inventory(5000)
         .receivables(0)

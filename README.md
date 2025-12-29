@@ -38,7 +38,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 
 ```toml
 [dependencies]
-zakat = "0.3.0"
+zakat = "0.4.0"
 rust_decimal = "1.39"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -52,22 +52,22 @@ serde_json = "1.0"
 
 ```rust
 use zakat::{ZakatConfig, CalculateZakat};
-use zakat::maal::business::BusinessAssets;
+use zakat::maal::business::BusinessZakat;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ZakatConfig::new(65, 1)?; // gold $65/g, silver $1/g
 
     // 1. Simple Case: Trading Goods (Cash + Inventory)
-    let assets = BusinessAssets::trading_goods(10_000, 50_000)?;
-    
-    // 2. Or specialized: Cash-only business
-    // let assets = BusinessAssets::from_cash(100_000)?;
+    // Now unified into a single builder step!
+    let store = BusinessZakat::builder()
+        .cash(10_000)
+        .inventory(50_000)
+        .label("Main Store")
+        .hawl(true)
+        .build()?;
 
-    // Calculate with labeling and Hawl
-    let result = zakat::maal::business::BusinessZakatCalculator::new(assets)
-        .with_label("Main Store")
-        .with_hawl(true)
-        .calculate_zakat(&config)?;
+    // Calculate directly
+    let result = store.calculate_zakat(&config)?;
 
     if result.is_payable {
         println!("Zakat for {}: ${}", result.label.unwrap_or_default(), result.zakat_due);
@@ -81,21 +81,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 For complex scenarios involving debts and receivables:
 
 ```rust
-let assets = BusinessAssets::builder()
+let assets = BusinessZakat::builder()
     .cash(50000)
     .inventory(20000)
     .receivables(5000)
     .liabilities(1000)
+    .debt(500) // Deductible immediate debt
     .build()?;
 ```
 
 ### Portfolio
 
 ```rust
-use zakat::{ZakatConfig, ZakatPortfolio, WealthType};
-use zakat::maal::precious_metals::PreciousMetals;
-use zakat::maal::investments::{InvestmentAssets, InvestmentType};
-use zakat::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
+use zakat::prelude::*;
 use rust_decimal_macros::dec;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -103,7 +101,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let portfolio = ZakatPortfolio::new()
         .add(IncomeZakatCalculator::new(
-            5000, 0, IncomeCalculationMethod::Gross, &config
+            5000, 0, IncomeCalculationMethod::Gross
         )?.with_label("Monthly Salary"))
         .add(PreciousMetals::new(
             100, WealthType::Gold

@@ -600,7 +600,7 @@ dependencies = [
 
 [[package]]
 name = "zakat"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "rust_decimal",
  "rust_decimal_macros",

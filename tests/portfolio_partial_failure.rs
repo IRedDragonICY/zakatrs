@@ -8,7 +8,7 @@ struct FailingAsset;
 
 impl CalculateZakat for FailingAsset {
     fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
-        Err(ZakatError::CalculationError("Intentional Failure".to_string()))
+        Err(ZakatError::CalculationError("Intentional Failure".to_string(), None))
     }
 }
 

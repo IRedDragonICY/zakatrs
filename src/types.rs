@@ -1,6 +1,5 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PaymentPayload {
@@ -108,6 +107,8 @@ impl ZakatDetails {
 
     /// Returns a concise status string.
     /// Format: "{Label}: {Payable/Exempt} - Due: {Amount}"
+    /// Returns a concise status string.
+    /// Format: "{Label}: {Payable/Exempt} - Due: {Amount}"
     pub fn summary(&self) -> String {
         let label_str = self.label.as_deref().unwrap_or("Asset");
         let status = if self.is_payable { "Payable" } else { "Exempt" };
@@ -121,14 +122,77 @@ impl ZakatDetails {
     }
 }
 
-#[derive(Error, Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl std::fmt::Display for ZakatDetails {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let label_str = self.label.as_deref().unwrap_or("Asset");
+        let type_str = format!("{:?}", self.wealth_type);
+        
+        writeln!(f, "Asset: {} (Type: {})", label_str, type_str)?;
+        writeln!(f, "Net Assets: {} | Nisab: {}", self.net_assets, self.nisab_threshold)?;
+        
+        let status = if self.is_payable { "PAYABLE" } else { "EXEMPT" };
+        let reason_str = self.status_reason.as_deref().unwrap_or("");
+        
+        if self.is_payable {
+            write!(f, "Status: {} ({} due)", status, self.format_amount())
+        } else {
+            let reason_suffix = if !reason_str.is_empty() { format!(" - {}", reason_str) } else { String::new() };
+            write!(f, "Status: {}{}", status, reason_suffix)
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum ZakatError {
-    #[error("Calculation error: {0}")]
-    CalculationError(String),
-    #[error("Invalid input: {0}")]
-    InvalidInput(String),
-    #[error("Missing configuration: {0}")]
-    ConfigurationError(String),
+    CalculationError(String, Option<String>), // Msg, Source
+    InvalidInput(String, Option<String>),
+    ConfigurationError(String, Option<String>),
+}
+
+impl ZakatError {
+    pub fn with_source(self, source: String) -> Self {
+        match self {
+            ZakatError::CalculationError(msg, _) => ZakatError::CalculationError(msg, Some(source)),
+            ZakatError::InvalidInput(msg, _) => ZakatError::InvalidInput(msg, Some(source)),
+            ZakatError::ConfigurationError(msg, _) => ZakatError::ConfigurationError(msg, Some(source)),
+        }
+    }
+}
+
+impl std::fmt::Display for ZakatError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ZakatError::CalculationError(msg, source) => {
+                let s = source.as_deref().unwrap_or("Unknown");
+                write!(f, "Calculation Error [Asset: {}]: {}", s, msg)
+            }
+            ZakatError::InvalidInput(msg, source) => {
+                let s = source.as_deref().unwrap_or("Unknown");
+                write!(f, "Invalid Input [Asset: {}]: {}", s, msg)
+            }
+            ZakatError::ConfigurationError(msg, source) => {
+                let s = source.as_deref().unwrap_or("Unknown");
+                write!(f, "Configuration Error [Asset: {}]: {}", s, msg)
+            }
+        }
+    }
+}
+
+impl std::error::Error for ZakatError {}
+
+/// Helper for backward compatibility or easy creation
+#[allow(non_snake_case)]
+pub mod ZakatErrorConstructors {
+    use super::ZakatError;
+    pub fn CalculationError(msg: impl Into<String>) -> ZakatError {
+        ZakatError::CalculationError(msg.into(), None)
+    }
+    pub fn InvalidInput(msg: impl Into<String>) -> ZakatError {
+        ZakatError::InvalidInput(msg.into(), None)
+    }
+    pub fn ConfigurationError(msg: impl Into<String>) -> ZakatError {
+        ZakatError::ConfigurationError(msg.into(), None)
+    }
 }
 
 /// Helper enum to categorize wealth types

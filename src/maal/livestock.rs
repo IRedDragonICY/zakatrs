@@ -26,7 +26,7 @@ pub struct LivestockAssets {
     pub label: Option<String>,
 }
 
-#[derive(Debug, Clone, Copy, Default)]
+#[derive(Debug, Clone, Copy)]
 pub struct LivestockPrices {
     pub sheep_price: Decimal,
     pub cow_price: Decimal, // For Tabi/Musinnah avg or simplified
@@ -34,45 +34,86 @@ pub struct LivestockPrices {
 }
 
 impl LivestockPrices {
+    pub fn builder() -> LivestockPricesBuilder {
+        LivestockPricesBuilder::default()
+    }
+
+    /// Deprecated: Use `LivestockPrices::builder()` instead.
+    #[deprecated(since = "0.2.1", note = "Use `LivestockPrices::builder()` instead")]
     pub fn new(
         sheep_price: impl IntoZakatDecimal,
         cow_price: impl IntoZakatDecimal,
         camel_price: impl IntoZakatDecimal,
     ) -> Result<Self, ZakatError> {
-        let mut prices = Self::default();
-        prices = prices.with_sheep_price(sheep_price)?;
-        prices = prices.with_cow_price(cow_price)?;
-        prices = prices.with_camel_price(camel_price)?;
-        Ok(prices)
-    }
-
-    pub fn with_sheep_price(mut self, price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        let p = price.into_zakat_decimal()?;
-        if p < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput("Sheep price must be non-negative".to_string()));
-         }
-        self.sheep_price = p;
-        Ok(self)
-    }
-
-    pub fn with_cow_price(mut self, price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        let p = price.into_zakat_decimal()?;
-        if p < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput("Cow price must be non-negative".to_string()));
-         }
-        self.cow_price = p;
-        Ok(self)
-    }
-
-    pub fn with_camel_price(mut self, price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        let p = price.into_zakat_decimal()?;
-        if p < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput("Camel price must be non-negative".to_string()));
-         }
-        self.camel_price = p;
-        Ok(self)
+        Self::builder()
+            .sheep_price(sheep_price)
+            .cow_price(cow_price)
+            .camel_price(camel_price)
+            .build()
     }
 }
+
+impl Default for LivestockPrices {
+    fn default() -> Self {
+        Self {
+            sheep_price: Decimal::ZERO,
+            cow_price: Decimal::ZERO,
+            camel_price: Decimal::ZERO,
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct LivestockPricesBuilder {
+    sheep_price: Option<Decimal>,
+    cow_price: Option<Decimal>,
+    camel_price: Option<Decimal>,
+}
+
+impl LivestockPricesBuilder {
+    pub fn sheep_price(mut self, price: impl IntoZakatDecimal) -> Self {
+        if let Ok(p) = price.into_zakat_decimal() {
+            self.sheep_price = Some(p);
+        }
+        self
+    }
+
+    pub fn cow_price(mut self, price: impl IntoZakatDecimal) -> Self {
+        if let Ok(p) = price.into_zakat_decimal() {
+            self.cow_price = Some(p);
+        }
+        self
+    }
+
+    pub fn camel_price(mut self, price: impl IntoZakatDecimal) -> Self {
+         if let Ok(p) = price.into_zakat_decimal() {
+            self.camel_price = Some(p);
+        }
+        self
+    }
+
+    pub fn build(self) -> Result<LivestockPrices, ZakatError> {
+        // We require at least one price to be set or explicit 0.
+        // But for safety, let's just ensure if they ARE set, they are non-negative.
+        // If not set, they default to 0, which is technically safer than "Random Default" but user should set them.
+        
+        let s = self.sheep_price.unwrap_or(Decimal::ZERO);
+        let c = self.cow_price.unwrap_or(Decimal::ZERO);
+        let ca = self.camel_price.unwrap_or(Decimal::ZERO);
+
+        if s < Decimal::ZERO || c < Decimal::ZERO || ca < Decimal::ZERO {
+             return Err(ZakatError::InvalidInput("Livestock prices must be non-negative".to_string(), None));
+        }
+
+        Ok(LivestockPrices {
+            sheep_price: s,
+            cow_price: c,
+            camel_price: ca,
+        })
+    }
+}
+
+const MAX_ITERATIONS: u32 = 1000;
 
 impl LivestockAssets {
     pub fn new(
@@ -124,9 +165,9 @@ impl CalculateZakat for LivestockAssets {
         };
         
         let nisab_count_val = match self.animal_type {
-            LivestockType::Sheep => Decimal::from(40) * single_price,
-            LivestockType::Cow => Decimal::from(30) * single_price,
-            LivestockType::Camel => Decimal::from(5) * single_price,
+            LivestockType::Sheep => Decimal::from(40).checked_mul(single_price).unwrap_or(Decimal::MAX),
+            LivestockType::Cow => Decimal::from(30).checked_mul(single_price).unwrap_or(Decimal::MAX),
+            LivestockType::Camel => Decimal::from(5).checked_mul(single_price).unwrap_or(Decimal::MAX),
         };
 
         if self.grazing_method != GrazingMethod::Saimah {
@@ -141,14 +182,14 @@ impl CalculateZakat for LivestockAssets {
 
         let (zakat_value, nisab_count, heads_due) = match self.animal_type {
             LivestockType::Sheep => calculate_sheep_zakat(self.count, self.prices.sheep_price),
-            LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price),
-            LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices),
+            LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price)?,
+            LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices)?,
         };
 
         // We construct ZakatDetails.
         // Total Assets = Count * Price (Approx value of herd)
         
-        let total_value = Decimal::from(self.count) * single_price;
+        let total_value = Decimal::from(self.count).checked_mul(single_price).ok_or(ZakatError::CalculationError("Total asset value overflow".to_string(), None))?;
         let is_payable = zakat_value > Decimal::ZERO;
 
         // Generate description string from heads_due
@@ -161,7 +202,7 @@ impl CalculateZakat for LivestockAssets {
             total_assets: total_value,
             liabilities_due_now: self.liabilities_due_now,
             net_assets: total_value, 
-            nisab_threshold: Decimal::from(nisab_count) * single_price, 
+            nisab_threshold: Decimal::from(nisab_count).checked_mul(single_price).unwrap_or(Decimal::MAX), 
             is_payable,
             zakat_due: zakat_value,
             wealth_type: crate::types::WealthType::Livestock,
@@ -172,6 +213,10 @@ impl CalculateZakat for LivestockAssets {
                 heads_due 
             },
         })
+    }
+
+    fn get_label(&self) -> Option<String> {
+        self.label.clone()
     }
 }
 
@@ -195,10 +240,10 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(Stri
     (Decimal::from(sheep_due) * price, nisab, vec![("Sheep".to_string(), sheep_due)])
 }
 
-fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(String, u32)>) {
+fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
     let nisab = 30;
     if count < 30 {
-        return (Decimal::ZERO, nisab, vec![]);
+        return Ok((Decimal::ZERO, nisab, vec![]));
     }
 
     // Cows Zakat Logic:
@@ -221,7 +266,13 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(String
         let mut best_t = 0;
         let mut found = false;
         
+        let mut iterations = 0;
         for m in (0..=max_m).rev() {
+            iterations += 1;
+            if iterations > MAX_ITERATIONS {
+                return Err(ZakatError::CalculationError("Cow Zakat complexity limit exceeded".to_string(), None));
+            }
+
             let remainder = count - (m * 40);
             if remainder % 30 == 0 {
                 best_m = m;
@@ -260,13 +311,13 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(String
     if tabi > 0 { parts.push(("Tabi'".to_string(), tabi)); }
     if musinnah > 0 { parts.push(("Musinnah".to_string(), musinnah)); }
 
-    (total_zakat_val, nisab, parts)
+    Ok((total_zakat_val, nisab, parts))
 }
 
-fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32, Vec<(String, u32)>) {
+fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
     let nisab = 5;
     if count < 5 {
-        return (Decimal::ZERO, nisab, vec![]);
+        return Ok((Decimal::ZERO, nisab, vec![]));
     }
     
     // 5-9: 1 Sheep
@@ -298,7 +349,13 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32,
         let mut best_b = 0;
         let max_h = count / 50;
         
+        let mut iterations = 0;
         for h in (0..=max_h).rev() {
+             iterations += 1;
+            if iterations > MAX_ITERATIONS {
+                return Err(ZakatError::CalculationError("Camel Zakat complexity limit exceeded".to_string(), None));
+            }
+
             let rem = count - (h * 50);
             if rem % 40 == 0 {
                 best_h = h;
@@ -337,7 +394,7 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32,
     if hiqqah > 0 { parts.push(("Hiqqah".to_string(), hiqqah)); }
     if jazaah > 0 { parts.push(("Jaza'ah".to_string(), jazaah)); }
 
-    (total, nisab, parts)
+    Ok((total, nisab, parts))
 }
 
 #[cfg(test)]
@@ -416,5 +473,31 @@ mod tests {
         let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
         assert!(!res.is_payable);
         assert_eq!(res.status_reason, Some("Not Sa'imah (naturally grazed)".to_string()));
+    }
+
+    #[test]
+    fn test_complexity_limit() {
+        let prices = LivestockPrices::builder()
+            .cow_price(dec!(500.0))
+            .build().unwrap();
+
+        // 100,000,001 is not divisible by 10.
+        // 40x + 30y = 100,000,001 has no integer solution? 
+        // Actually gcd(30, 40) = 10.
+        // For integer solution to exist, N must be divisible by 10.
+        // 100,000,001 is NOT divisible by 10.
+        // So the loop will search exhaustively.
+        // Max m = ~2.5 million.
+        // Limit = 1000.
+        // Should error.
+        
+        let stock_fail = LivestockAssets::new(100_000_001, LivestockType::Cow, prices);
+        let res_fail = stock_fail.calculate_zakat(&ZakatConfig::default());
+        
+        assert!(res_fail.is_err());
+        match res_fail {
+             Err(ZakatError::CalculationError(msg, _)) => assert_eq!(msg, "Cow Zakat complexity limit exceeded"),
+             _ => panic!("Expected complexity error, got {:?}", res_fail),
+        }
     }
 }

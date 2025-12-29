@@ -38,10 +38,18 @@ impl ZakatPortfolio {
         let mut errors = Vec::new();
 
         // 1. Initial calculation for all assets
-        for item in &self.calculators {
+        for (index, item) in self.calculators.iter().enumerate() {
             match item.calculate_zakat(config) {
                 Ok(detail) => details.push(detail),
-                Err(e) => errors.push(e.to_string()),
+                Err(e) => {
+                    let mut err = e;
+                    if let Some(lbl) = item.get_label() {
+                        err = err.with_source(lbl);
+                    } else {
+                        err = err.with_source(format!("Item {}", index + 1));
+                    }
+                    errors.push(err.to_string())
+                },
             }
         }
 

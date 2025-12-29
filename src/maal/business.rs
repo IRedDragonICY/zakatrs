@@ -14,26 +14,79 @@ pub struct BusinessAssets {
 }
 
 impl BusinessAssets {
+    /// Deprecated: Use `BusinessAssets::builder()` instead.
+    #[deprecated(since = "0.2.1", note = "Use `BusinessAssets::builder()` instead")]
     pub fn new(
         cash: impl IntoZakatDecimal,
         inventory: impl IntoZakatDecimal,
         receivables: impl IntoZakatDecimal,
         short_term_liabilities: impl IntoZakatDecimal,
     ) -> Result<Self, ZakatError> {
-        let cash_dec = cash.into_zakat_decimal()?;
-        let inventory_dec = inventory.into_zakat_decimal()?;
-        let receivables_dec = receivables.into_zakat_decimal()?;
-        let liabilities_dec = short_term_liabilities.into_zakat_decimal()?;
+        Self::builder()
+            .cash(cash)
+            .inventory(inventory)
+            .receivables(receivables)
+            .liabilities(short_term_liabilities)
+            .build()
+    }
 
-        if cash_dec < Decimal::ZERO || inventory_dec < Decimal::ZERO || receivables_dec < Decimal::ZERO || liabilities_dec < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Business assets and liabilities must be non-negative".to_string()));
+    pub fn builder() -> BusinessAssetsBuilder {
+        BusinessAssetsBuilder::default()
+    }
+}
+
+#[derive(Default)]
+pub struct BusinessAssetsBuilder {
+    cash_on_hand: Option<Decimal>,
+    inventory_value: Option<Decimal>,
+    receivables: Option<Decimal>,
+    short_term_liabilities: Option<Decimal>,
+}
+
+impl BusinessAssetsBuilder {
+    pub fn cash(mut self, cash: impl IntoZakatDecimal) -> Self {
+        if let Ok(val) = cash.into_zakat_decimal() {
+             self.cash_on_hand = Some(val);
+        }
+        self
+    }
+
+    pub fn inventory(mut self, inventory: impl IntoZakatDecimal) -> Self {
+        if let Ok(val) = inventory.into_zakat_decimal() {
+            self.inventory_value = Some(val);
+        }
+        self
+    }
+
+    pub fn receivables(mut self, receivables: impl IntoZakatDecimal) -> Self {
+        if let Ok(val) = receivables.into_zakat_decimal() {
+            self.receivables = Some(val);
+        }
+        self
+    }
+
+    pub fn liabilities(mut self, liabilities: impl IntoZakatDecimal) -> Self {
+        if let Ok(val) = liabilities.into_zakat_decimal() {
+            self.short_term_liabilities = Some(val);
+        }
+        self
+    }
+
+    pub fn build(self) -> Result<BusinessAssets, ZakatError> {
+        let cash = self.cash_on_hand.unwrap_or(Decimal::ZERO);
+        let inventory = self.inventory_value.unwrap_or(Decimal::ZERO);
+        let receivables = self.receivables.unwrap_or(Decimal::ZERO);
+        let liabilities = self.short_term_liabilities.unwrap_or(Decimal::ZERO);
+
+        if cash < Decimal::ZERO || inventory < Decimal::ZERO || receivables < Decimal::ZERO || liabilities < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Business assets and liabilities must be non-negative".to_string(), None));
         }
 
-        Ok(Self {
-            cash_on_hand: cash_dec,
-            inventory_value: inventory_dec,
-            receivables: receivables_dec,
-            short_term_liabilities: liabilities_dec,
+        Ok(BusinessAssets {
+            cash_on_hand: cash,
+            inventory_value: inventory,
+            receivables: receivables,
+            short_term_liabilities: liabilities,
         })
     }
 }
@@ -95,10 +148,10 @@ impl CalculateZakat for BusinessZakatCalculator {
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError("Gold price needed for Business Nisab".to_string()));
+            return Err(ZakatError::ConfigurationError("Gold price needed for Business Nisab".to_string(), None));
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Silver price needed for Business Nisab with current standard".to_string()));
+            return Err(ZakatError::ConfigurationError("Silver price needed for Business Nisab with current standard".to_string(), None));
         }
         
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
@@ -120,6 +173,10 @@ impl CalculateZakat for BusinessZakatCalculator {
         Ok(ZakatDetails::new(total_assets, total_liabilities, nisab_threshold_value, rate, crate::types::WealthType::Business)
             .with_label(self.label.clone().unwrap_or_default()))
     }
+
+    fn get_label(&self) -> Option<String> {
+        self.label.clone()
+    }
 }
 
 #[cfg(test)]
@@ -131,12 +188,13 @@ mod tests {
         // Gold $100/g -> Nisab $8500
         let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
         
-        let assets = BusinessAssets::new(
-            dec!(5000.0), // Cash
-            dec!(5000.0), // Inventory
-            dec!(0.0),    // Receivables
-            dec!(1000.0)  // Debt
-        ).expect("Valid assets");
+        let assets = BusinessAssets::builder()
+            .cash(dec!(5000.0))
+            .inventory(dec!(5000.0))
+            .receivables(dec!(0.0))
+            .liabilities(dec!(1000.0))
+            .build()
+            .expect("Valid assets");
         // Gross: 10,000. Debt: 1,000. Net: 9,000.
         // Nisab: 8,500.
         // Payable: Yes. 9000 * 2.5% = 225.
@@ -152,7 +210,11 @@ mod tests {
     #[test]
     fn test_business_below_nisab() {
          let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
-         let assets = BusinessAssets::new(dec!(1000.0), dec!(1000.0), dec!(0.0), dec!(0.0)).expect("Valid");
+         let assets = BusinessAssets::builder()
+             .cash(dec!(1000.0))
+             .inventory(dec!(1000.0))
+             .build()
+             .expect("Valid");
          // Net 2000 < 8500
          
          let calculator = BusinessZakatCalculator::new(assets);
@@ -168,7 +230,11 @@ mod tests {
         let config = ZakatConfig { gold_price_per_gram: dec!(1000000.0), ..Default::default() };
         
         // Assets 100M
-        let assets = BusinessAssets::new(dec!(100000000.0), dec!(0.0), dec!(0.0), dec!(20000000.0)).expect("Valid");
+        let assets = BusinessAssets::builder()
+            .cash(dec!(100000000.0))
+            .liabilities(dec!(20000000.0))
+            .build()
+            .expect("Valid");
         // Net = 100M - 20M = 80M.
         // Nisab = 85M.
         // 80M < 85M -> Not Payable.
@@ -193,7 +259,10 @@ mod tests {
         // If Madhab is Shafi (Gold Standard): $5,000 < $8,500 -> Not Payable
         // If Madhab is Hanafi (LowerOfTwo -> Silver): $5,000 > $1,190 -> Payable
         
-        let assets = BusinessAssets::new(dec!(5000.0), dec!(0.0), dec!(0.0), dec!(0.0)).expect("Valid");
+        let assets = BusinessAssets::builder()
+            .cash(dec!(5000.0))
+            .build()
+            .expect("Valid");
         
         // 1. Test Shafi (Gold)
         let shafi_config = ZakatConfig::new(dec!(100.0), dec!(2.0)).unwrap()

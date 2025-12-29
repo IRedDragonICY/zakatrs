@@ -30,7 +30,7 @@ impl AgricultureAssets {
         let price = price_per_kg.into_zakat_decimal()?;
 
         if weight < Decimal::ZERO || price < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Harvest weight and price must be non-negative".to_string()));
+            return Err(ZakatError::InvalidInput("Harvest weight and price must be non-negative".to_string(), None));
         }
 
         Ok(Self {
@@ -115,6 +115,10 @@ impl CalculateZakat for AgricultureAssets {
             label: self.label.clone(),
             payload: crate::types::PaymentPayload::Monetary(zakat_due),
         })
+    }
+
+    fn get_label(&self) -> Option<String> {
+        self.label.clone()
     }
 }
 

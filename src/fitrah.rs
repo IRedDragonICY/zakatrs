@@ -25,10 +25,10 @@ impl FitrahCalculator {
         };
 
         if person_count == 0 {
-            return Err(ZakatError::InvalidInput("Person count must be greater than 0".to_string()));
+            return Err(ZakatError::InvalidInput("Person count must be greater than 0".to_string(), None));
         }
         if price < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Price per unit must be non-negative".to_string()));
+            return Err(ZakatError::InvalidInput("Price per unit must be non-negative".to_string(), None));
         }
 
         Ok(Self {
@@ -62,6 +62,10 @@ impl CalculateZakat for FitrahCalculator {
             label: self.label.clone(),
             payload: crate::types::PaymentPayload::Monetary(total_value),
         })
+    }
+
+    fn get_label(&self) -> Option<String> {
+        self.label.clone()
     }
 }
 

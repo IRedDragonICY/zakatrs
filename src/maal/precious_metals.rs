@@ -27,12 +27,12 @@ impl PreciousMetals {
     pub fn new(weight_grams: impl IntoZakatDecimal, metal_type: WealthType) -> Result<Self, ZakatError> {
         let weight: Decimal = weight_grams.into_zakat_decimal()?;
         if weight < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Weight must be non-negative".to_string()));
+            return Err(ZakatError::InvalidInput("Weight must be non-negative".to_string(), None));
         }
 
         match metal_type {
             WealthType::Gold | WealthType::Silver => {},
-            _ => return Err(ZakatError::InvalidInput("Type must be Gold or Silver".to_string())),
+            _ => return Err(ZakatError::InvalidInput("Type must be Gold or Silver".to_string(), None)),
         };
         
         Ok(Self {
@@ -89,11 +89,11 @@ impl CalculateZakat for PreciousMetals {
         let (price_per_gram, nisab_threshold_grams) = match self.metal_type {
             WealthType::Gold => (config.gold_price_per_gram, config.get_nisab_gold_grams()),
             WealthType::Silver => (config.silver_price_per_gram, config.get_nisab_silver_grams()),
-            _ => return Err(ZakatError::InvalidInput("Type must be Gold or Silver".to_string())),
+            _ => return Err(ZakatError::InvalidInput("Type must be Gold or Silver".to_string(), None)),
         };
 
         if price_per_gram <= Decimal::ZERO {
-             return Err(ZakatError::ConfigurationError("Price for metal not set".to_string()));
+             return Err(ZakatError::ConfigurationError("Price for metal not set".to_string(), None));
         }
 
         let nisab_value = nisab_threshold_grams * price_per_gram;
@@ -117,6 +117,10 @@ impl CalculateZakat for PreciousMetals {
 
         Ok(ZakatDetails::new(total_value, liabilities, nisab_value, rate, self.metal_type)
             .with_label(self.label.clone().unwrap_or_default()))
+    }
+
+    fn get_label(&self) -> Option<String> {
+        self.label.clone()
     }
 }
 

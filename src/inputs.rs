@@ -39,7 +39,7 @@ macro_rules! impl_into_zakat_decimal_float {
             impl IntoZakatDecimal for $t {
                 fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
                     Decimal::from_f64_retain(self as f64)
-                        .ok_or_else(|| ZakatError::InvalidInput(format!("Invalid float value: {}", self)))
+                        .ok_or_else(|| ZakatError::InvalidInput(format!("Invalid float value: {}", self), None))
                 }
             }
         )*
@@ -51,12 +51,12 @@ impl_into_zakat_decimal_float!(f32, f64);
 // Implement for Strings
 impl IntoZakatDecimal for &str {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
-        Decimal::from_str(self).map_err(|e| ZakatError::InvalidInput(format!("Invalid string format: {}", e)))
+        Decimal::from_str(self).map_err(|e| ZakatError::InvalidInput(format!("Invalid string format: {}", e), None))
     }
 }
 
 impl IntoZakatDecimal for String {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
-        Decimal::from_str(&self).map_err(|e| ZakatError::InvalidInput(format!("Invalid string format: {}", e)))
+        Decimal::from_str(&self).map_err(|e| ZakatError::InvalidInput(format!("Invalid string format: {}", e), None))
     }
 }

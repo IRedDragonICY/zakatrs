@@ -52,8 +52,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Cash: $500k. Inventory/IP Valued(?): $0. Short Debt: $50k.
     // Liquid Assets for Zakat: $500k. Debt: $50k. Net: $450k.
     // Nisab ~$5.5k. Payable.
-    let startup = BusinessAssets::new(500000, 0, 0, 50000)?;
-    let startup_calc = BusinessZakatCalculator::new(startup).with_label("Tech Startup Equity");
+    let startup_assets = BusinessAssets::builder()
+        .cash(500000)
+        .liabilities(50000)
+        .build()?;
+        
+    let startup_calc = BusinessZakatCalculator::new(startup_assets).with_label("Tech Startup Equity");
     print_case("Case 2: Startup Founder (Business Cash)", startup_calc.with_hawl(true).calculate_zakat(&config), true);
 
     // CASE 3: The Gold Saver (Precious Metals)
@@ -93,7 +97,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Rate: 1 Sheep (40-120 range).
     // Sheep Price: $150.
     // Due: $150.
-    let livestock_prices = LivestockPrices::new(150, 0, 0)?;
+    let livestock_prices = LivestockPrices::builder()
+        .sheep_price(150)
+        .build()?;
+        
     let shepherd = LivestockAssets::new(50, LivestockType::Sheep, livestock_prices).with_label("Merino Flock");
     print_case("Case 7: Sheep Herder (50 Sheep)", shepherd.with_hawl(true).calculate_zakat(&config), true);
 

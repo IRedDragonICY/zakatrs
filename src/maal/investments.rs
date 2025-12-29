@@ -27,7 +27,7 @@ impl InvestmentAssets {
         let value = market_value.into_zakat_decimal()?;
 
         if value < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Market value must be non-negative".to_string()));
+            return Err(ZakatError::InvalidInput("Market value must be non-negative".to_string(), None));
         }
 
         Ok(Self {
@@ -64,10 +64,10 @@ impl CalculateZakat for InvestmentAssets {
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError("Gold price needed for Investment Nisab".to_string()));
+            return Err(ZakatError::ConfigurationError("Gold price needed for Investment Nisab".to_string(), None));
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Silver price needed for Investment Nisab with current standard".to_string()));
+            return Err(ZakatError::ConfigurationError("Silver price needed for Investment Nisab with current standard".to_string(), None));
         }
         
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
@@ -86,6 +86,10 @@ impl CalculateZakat for InvestmentAssets {
 
         Ok(ZakatDetails::new(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Investment)
             .with_label(self.label.clone().unwrap_or_default()))
+    }
+
+    fn get_label(&self) -> Option<String> {
+        self.label.clone()
     }
 }
 

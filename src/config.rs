@@ -60,14 +60,14 @@ impl ZakatConfig {
     /// - `ZAKAT_SILVER_PRICE`
     pub fn from_env() -> Result<Self, ZakatError> {
         let gold_str = env::var("ZAKAT_GOLD_PRICE")
-            .map_err(|_| ZakatError::ConfigurationError("ZAKAT_GOLD_PRICE env var not set".to_string()))?;
+            .map_err(|_| ZakatError::ConfigurationError("ZAKAT_GOLD_PRICE env var not set".to_string(), None))?;
         let silver_str = env::var("ZAKAT_SILVER_PRICE")
-            .map_err(|_| ZakatError::ConfigurationError("ZAKAT_SILVER_PRICE env var not set".to_string()))?;
+            .map_err(|_| ZakatError::ConfigurationError("ZAKAT_SILVER_PRICE env var not set".to_string(), None))?;
 
         let gold_price = gold_str.parse::<Decimal>()
-            .map_err(|e| ZakatError::ConfigurationError(format!("Invalid gold price format: {}", e)))?;
+            .map_err(|e| ZakatError::ConfigurationError(format!("Invalid gold price format: {}", e), None))?;
         let silver_price = silver_str.parse::<Decimal>()
-            .map_err(|e| ZakatError::ConfigurationError(format!("Invalid silver price format: {}", e)))?;
+            .map_err(|e| ZakatError::ConfigurationError(format!("Invalid silver price format: {}", e), None))?;
 
         Self::new(gold_price, silver_price)
     }
@@ -75,12 +75,31 @@ impl ZakatConfig {
     /// Attempts to load configuration from a JSON file.
     pub fn try_from_json(path: &str) -> Result<Self, ZakatError> {
         let content = fs::read_to_string(path)
-            .map_err(|e| ZakatError::ConfigurationError(format!("Failed to read config file: {}", e)))?;
+            .map_err(|e| ZakatError::ConfigurationError(format!("Failed to read config file: {}", e), None))?;
         
         let config: ZakatConfig = serde_json::from_str(&content)
-            .map_err(|e| ZakatError::ConfigurationError(format!("Failed to parse config JSON: {}", e)))?;
+            .map_err(|e| ZakatError::ConfigurationError(format!("Failed to parse config JSON: {}", e), None))?;
             
         Ok(config)
+    }
+
+    /// Creates a ZakatConfig from an async PriceProvider.
+    ///
+    /// This method fetches current gold and silver prices from the provider
+    /// and constructs a ZakatConfig with those values.
+    ///
+    /// # Example
+    /// ```ignore
+    /// use zakat::{ZakatConfig, StaticPriceProvider};
+    ///
+    /// let provider = StaticPriceProvider::new(65, 1)?;
+    /// let config = ZakatConfig::from_provider(&provider).await?;
+    /// ```
+    pub async fn from_provider<P: crate::pricing::PriceProvider>(
+        provider: &P,
+    ) -> Result<Self, ZakatError> {
+        let prices = provider.get_prices().await?;
+        Self::new(prices.gold_per_gram, prices.silver_per_gram)
     }
 
     // ========== Fluent Builder Methods ==========

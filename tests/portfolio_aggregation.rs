@@ -26,12 +26,10 @@ fn test_portfolio_aggregation_mix_gold_and_cash() {
 
     // Using BusinessAssets to represent Cash roughly, or closest equivalent if Cash isn't explicit
     // Actually, BusinessAssets::new(cash, inventory, ...)
-    let cash_assets_data = BusinessAssets::new(
-            4000.0, // Cash equivalent
-            0, 
-            0, 
-            0
-    ).expect("Valid assets");
+    let cash_assets_data = BusinessAssets::builder()
+            .cash(4000.0) // Cash equivalent
+            .build()
+            .expect("Valid assets");
     let cash_calculator = BusinessZakatCalculator::new(cash_assets_data)
         .with_hawl(true); // Ensure hawl is met
 
@@ -74,7 +72,7 @@ fn test_portfolio_no_aggregation_if_total_below_nisab() {
     let config = ZakatConfig::new(100.0, 1.0).unwrap();
     
     let gold_asset = PreciousMetals::new(30.0, WealthType::Gold).unwrap();
-    let cash_assets_data = BusinessAssets::new(2000.0, 0, 0, 0).expect("Valid");
+    let cash_assets_data = BusinessAssets::builder().cash(2000.0).build().expect("Valid");
     let cash_calculator = BusinessZakatCalculator::new(cash_assets_data)
         .with_hawl(true);
 

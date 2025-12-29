@@ -28,7 +28,7 @@ impl MiningAssets {
         let val = value.into_zakat_decimal()?;
 
         if val < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Mining value must be non-negative".to_string()));
+            return Err(ZakatError::InvalidInput("Mining value must be non-negative".to_string(), None));
         }
 
         Ok(Self {
@@ -87,6 +87,10 @@ impl CalculateZakat for MiningAssets {
                     .with_label(self.label.clone().unwrap_or_default()))
             }
         }
+    }
+
+    fn get_label(&self) -> Option<String> {
+        self.label.clone()
     }
 }
 

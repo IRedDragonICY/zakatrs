@@ -14,12 +14,12 @@ fn test_dx_prelude_and_ergonomics() {
     assert_eq!(config.silver_price_per_gram, dec!(1.0));
     
     // BusinessAssets: Passing integers
-    let business = BusinessAssets::new(
-        10000, // cash: i32
-        5000,  // inventory: i32
-        0,     // receivables: i32
-        1000   // debt: i32
-    ).expect("Valid assets");
+    let business = BusinessAssets::builder()
+        .cash(10000)
+        .inventory(5000)
+        .receivables(0)
+        .liabilities(1000)
+        .build().expect("Valid assets");
     
     assert_eq!(business.cash_on_hand, dec!(10000.0));
     

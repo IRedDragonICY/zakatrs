@@ -27,6 +27,8 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Zakat Fitrah
 - Configurable Nisab thresholds
 - Portfolio aggregation
+- **Asset Labeling** (e.g., "Main Store", "Crypto Wallet")
+- **Input Sanitization** (Rejects negative values)
 
 ## Install
 
@@ -53,15 +55,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         20000, // inventory
         5000,  // receivables
         1000   // debt
-    );
+    )?;
 
-    let calc = BusinessZakatCalculator::new(assets, &config)?;
-    let result = calc.with_hawl(true)
-                     .with_debt(1000)
-                     .calculate_zakat()?;
+    let calc = BusinessZakatCalculator::new(assets, &config)?
+                     .with_label("Main Store")
+                     .with_hawl(true)
+                     .with_debt(1000); // Additional debts
+
+    let result = calc.calculate_zakat()?;
 
     if result.is_payable {
-        println!("Zakat: ${}", result.zakat_due);
+        println!("Zakat for {}: ${}", result.label.unwrap_or_default(), result.zakat_due);
     }
     Ok(())
 }
@@ -82,16 +86,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let portfolio = ZakatPortfolio::new()
         .add_calculator(IncomeZakatCalculator::new(
             5000, 0, IncomeCalculationMethod::Gross, &config
-        )?)
+        )?.with_label("Monthly Salary"))
         .add_calculator(PreciousMetal::new(
             100, WealthType::Gold, &config
-        )?)
+        )?.with_label("Wife's Gold"))
         .add_calculator(InvestmentAssets::new(
             20000, InvestmentType::Crypto, &config
-        )?.with_debt(dec!(2000.0)));
+        )?.with_debt(dec!(2000.0)).with_label("Binance Portfolio"));
 
     let result = portfolio.calculate_total(&config)?;
-    println!("Total: ${}", result.total_zakat_due);
+    println!("Total Zakat Due: ${}", result.total_zakat_due);
+    
+    // Iterate details to see labels
+    for detail in result.details {
+        if let Some(label) = detail.label {
+            println!(" - {}: ${}", label, detail.zakat_due);
+        }
+    }
     Ok(())
 }
 ```

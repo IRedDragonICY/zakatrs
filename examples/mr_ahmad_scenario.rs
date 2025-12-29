@@ -4,7 +4,7 @@ use zakat::maal::precious_metals::{PreciousMetal};
 use zakat::maal::investments::{InvestmentAssets, InvestmentType};
 use zakat::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Mr. Ahmad Zakat Scenario ===");
 
     // Scenario:
@@ -25,21 +25,21 @@ fn main() {
         0, 
         IncomeCalculationMethod::Gross, 
         &config
-    ).unwrap();
+    )?.with_label("Monthly Salary");
     
     // 2. Gold - integers work directly!
     let gold_calc = PreciousMetal::new(
         100, 
         WealthType::Gold, 
         &config
-    ).unwrap();
+    )?.with_label("Wife's Gold Stash");
     
     // 3. Crypto - integers work directly!
     let crypto_calc = InvestmentAssets::new(
         20000, 
         InvestmentType::Crypto, 
         &config
-    ).unwrap();
+    )?.with_label("Bitcoin Holding");
     
     // 4. Portfolio with Debt Deduction on Crypto
     let portfolio = ZakatPortfolio::new()
@@ -47,7 +47,7 @@ fn main() {
         .add_calculator(gold_calc)   // $5000 * 2.5% = $125 (100g * 50)
         .add_calculator(crypto_calc.with_debt(dec!(2000.0))); // ($20,000 - $2,000) * 2.5% = $450
         
-    let result = portfolio.calculate_total(&config).unwrap();
+    let result = portfolio.calculate_total(&config)?;
     
     println!("\n--- Portfolio Result ---");
     println!("Total Assets: ${}", result.total_assets);
@@ -55,11 +55,13 @@ fn main() {
     
     println!("\n--- Breakdown ---");
     for detail in &result.details {
-        println!("Type: {:?}, Net Assets: ${}, Zakat: ${}", detail.wealth_type, detail.net_assets, detail.zakat_due);
+        print!("Asset: {:<20} | Type: {:<12}", detail.label.as_deref().unwrap_or("Unknown"), format!("{:?}", detail.wealth_type));
+        println!(" | Net: ${:<10} | Zakat: ${}", detail.net_assets, detail.zakat_due);
     }
 
     // Assertions to ensure correctness (Self-verifying example)
     // Total: 125 + 125 + 450 = 700.0
     assert_eq!(result.total_zakat_due, dec!(700.0));
     println!("\n[SUCCESS] Calculation verified successfully.");
+    Ok(())
 }

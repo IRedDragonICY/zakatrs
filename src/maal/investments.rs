@@ -16,6 +16,7 @@ pub struct InvestmentAssets {
     pub nisab_threshold_value: Decimal,
     pub deductible_liabilities: Decimal,
     pub hawl_satisfied: bool,
+    pub label: Option<String>,
 }
 
 impl InvestmentAssets {
@@ -24,6 +25,12 @@ impl InvestmentAssets {
         investment_type: InvestmentType,
         config: &ZakatConfig,
     ) -> Result<Self, ZakatError> {
+        let value = market_value.into();
+
+        if value < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Market value must be non-negative".to_string()));
+        }
+
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(
             config.cash_nisab_standard,
@@ -40,11 +47,12 @@ impl InvestmentAssets {
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
         
         Ok(Self {
-            market_value: market_value.into(),
+            market_value: value,
             investment_type,
             nisab_threshold_value,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
+            label: None,
         })
     }
 
@@ -57,12 +65,18 @@ impl InvestmentAssets {
         self.hawl_satisfied = satisfied;
         self
     }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
 }
 
 impl CalculateZakat for InvestmentAssets {
     fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
         if !self.hawl_satisfied {
-            return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Investment, "Hawl (1 lunar year) not met"));
+            return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Investment, "Hawl (1 lunar year) not met")
+                .with_label(self.label.clone().unwrap_or_default()));
         }
         // Requirement: 
         // Crypto: Treated as Trade Goods (2.5% if > Nisab).
@@ -72,7 +86,8 @@ impl CalculateZakat for InvestmentAssets {
         let liabilities = self.deductible_liabilities;
         let rate = dec!(0.025);
 
-        Ok(ZakatDetails::new(total_assets, liabilities, self.nisab_threshold_value, rate, crate::types::WealthType::Investment))
+        Ok(ZakatDetails::new(total_assets, liabilities, self.nisab_threshold_value, rate, crate::types::WealthType::Investment)
+            .with_label(self.label.clone().unwrap_or_default()))
     }
 }
 

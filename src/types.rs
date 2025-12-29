@@ -21,6 +21,8 @@ pub struct ZakatDetails {
     pub wealth_type: WealthType,
     /// Reason for the status, if not payable (e.g. "Hawl not met").
     pub status_reason: Option<String>,
+    /// Optional label for the asset (e.g. "Main Store", "Gold Necklace").
+    pub label: Option<String>,
 }
 
 impl ZakatDetails {
@@ -52,6 +54,7 @@ impl ZakatDetails {
             zakat_due,
             wealth_type,
             status_reason: None,
+            label: None,
         }
     }
 
@@ -66,7 +69,13 @@ impl ZakatDetails {
             zakat_due: Decimal::ZERO,
             wealth_type,
             status_reason: Some(reason.to_string()),
+            label: None,
         }
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
     }
 }
 

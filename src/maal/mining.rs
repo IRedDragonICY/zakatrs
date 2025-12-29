@@ -17,6 +17,7 @@ pub struct MiningAssets {
     pub nisab_threshold_value: Decimal,
     pub deductible_liabilities: Decimal,
     pub hawl_satisfied: bool,
+    pub label: Option<String>,
 }
 
 impl MiningAssets {
@@ -25,15 +26,22 @@ impl MiningAssets {
         mining_type: MiningType,
         config: &ZakatConfig,
     ) -> Result<Self, ZakatError> {
+        let val = value.into();
+
+        if val < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Mining value must be non-negative".to_string()));
+        }
+
         // For Rikaz, strictly speaking we might not need gold price if there is no Nisab check (some opinions say minimal amount, but generally 20% on whatever is found).
         // However, for consistency and Mines, we'll take config.
         let nisab = config.gold_price_per_gram * config.get_nisab_gold_grams(); 
         Ok(Self {
-            value: value.into(),
+            value: val,
             mining_type,
             nisab_threshold_value: nisab,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
+            label: None,
         })
     }
 
@@ -44,6 +52,11 @@ impl MiningAssets {
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
         self.hawl_satisfied = satisfied;
+        self
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
         self
     }
 }
@@ -61,18 +74,21 @@ impl CalculateZakat for MiningAssets {
                 // We set liabilities to 0.
                 // Nisab: 0 (Paying on whatever is found).
                 
-                Ok(ZakatDetails::new(self.value, Decimal::ZERO, Decimal::ZERO, rate, crate::types::WealthType::Rikaz))
+                Ok(ZakatDetails::new(self.value, Decimal::ZERO, Decimal::ZERO, rate, crate::types::WealthType::Rikaz)
+                    .with_label(self.label.clone().unwrap_or_default()))
             },
             MiningType::Mines => {
                 // Rate: 2.5%. Nisab: 85g Gold.
                 if !self.hawl_satisfied {
-                     return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met"));
+                     return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met")
+                        .with_label(self.label.clone().unwrap_or_default()));
                 }
                 let rate = dec!(0.025);
                 let nisab_threshold = self.nisab_threshold_value;
                 let liabilities = self.deductible_liabilities;
                 
-                Ok(ZakatDetails::new(self.value, liabilities, nisab_threshold, rate, crate::types::WealthType::Mining))
+                Ok(ZakatDetails::new(self.value, liabilities, nisab_threshold, rate, crate::types::WealthType::Mining)
+                    .with_label(self.label.clone().unwrap_or_default()))
             }
         }
     }

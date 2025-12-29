@@ -17,6 +17,7 @@ pub struct AgricultureAssets {
     pub nisab_threshold_kg: Decimal,
     pub deductible_liabilities: Decimal,
     pub hawl_satisfied: bool,
+    pub label: Option<String>,
 }
 
 impl AgricultureAssets {
@@ -26,23 +27,25 @@ impl AgricultureAssets {
         irrigation: IrrigationMethod,
         config: &ZakatConfig, 
     ) -> Result<Self, ZakatError> {
-        let harvest_weight_kg = harvest_weight_kg.into();
-        let price_per_kg = price_per_kg.into();
+        let weight = harvest_weight_kg.into();
+        let price = price_per_kg.into();
+
+        if weight < Decimal::ZERO || price < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Harvest weight and price must be non-negative".to_string()));
+        }
+
         // Nisab: 5 Wasq. 1 Wasq ~ 60 Sa'. 1 Sa' ~ 2.176 kg (varies but commonly ~653kg total).
         // Requirement says "~653 kg". Use config.
         let nisab = config.get_nisab_agriculture_kg();
-        
-        if harvest_weight_kg < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Harvest weight cannot be negative".to_string()));
-        }
 
         Ok(Self {
-            harvest_weight_kg,
-            price_per_kg,
+            harvest_weight_kg: weight,
+            price_per_kg: price,
             irrigation,
             nisab_threshold_kg: nisab,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
+            label: None,
         })
     }
 
@@ -53,6 +56,11 @@ impl AgricultureAssets {
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
         self.hawl_satisfied = satisfied;
+        self
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
         self
     }
 }
@@ -118,6 +126,7 @@ impl CalculateZakat for AgricultureAssets {
             zakat_due,
             wealth_type: crate::types::WealthType::Agriculture,
             status_reason: None,
+            label: self.label.clone(),
         })
     }
 }

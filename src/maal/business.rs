@@ -18,13 +18,22 @@ impl BusinessAssets {
         inventory: impl Into<Decimal>,
         receivables: impl Into<Decimal>,
         short_term_liabilities: impl Into<Decimal>,
-    ) -> Self {
-        Self {
-            cash_on_hand: cash.into(),
-            inventory_value: inventory.into(),
-            receivables: receivables.into(),
-            short_term_liabilities: short_term_liabilities.into(),
+    ) -> Result<Self, ZakatError> {
+        let cash_dec = cash.into();
+        let inventory_dec = inventory.into();
+        let receivables_dec = receivables.into();
+        let liabilities_dec = short_term_liabilities.into();
+
+        if cash_dec < Decimal::ZERO || inventory_dec < Decimal::ZERO || receivables_dec < Decimal::ZERO || liabilities_dec < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Business assets and liabilities must be non-negative".to_string()));
         }
+
+        Ok(Self {
+            cash_on_hand: cash_dec,
+            inventory_value: inventory_dec,
+            receivables: receivables_dec,
+            short_term_liabilities: liabilities_dec,
+        })
     }
 }
 
@@ -45,6 +54,7 @@ pub struct BusinessZakatCalculator {
     nisab_threshold_value: Decimal,
     deductible_liabilities: Decimal,
     hawl_satisfied: bool,
+    label: Option<String>,
 }
 
 impl BusinessZakatCalculator {
@@ -69,6 +79,7 @@ impl BusinessZakatCalculator {
             nisab_threshold_value,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
+            label: None,
         })
     }
 
@@ -81,12 +92,18 @@ impl BusinessZakatCalculator {
         self.hawl_satisfied = satisfied;
         self
     }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
 }
 
 impl CalculateZakat for BusinessZakatCalculator {
     fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
         if !self.hawl_satisfied {
-            return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Business, "Hawl (1 lunar year) not met"));
+            return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Business, "Hawl (1 lunar year) not met")
+                .with_label(self.label.clone().unwrap_or_default()));
         }
         let gross_assets = self.assets.cash_on_hand + self.assets.inventory_value + self.assets.receivables;
         let business_debt = self.assets.short_term_liabilities;
@@ -104,7 +121,8 @@ impl CalculateZakat for BusinessZakatCalculator {
 
         let rate = dec!(0.025);
 
-        Ok(ZakatDetails::new(total_assets, total_liabilities, self.nisab_threshold_value, rate, crate::types::WealthType::Business))
+        Ok(ZakatDetails::new(total_assets, total_liabilities, self.nisab_threshold_value, rate, crate::types::WealthType::Business)
+            .with_label(self.label.clone().unwrap_or_default()))
     }
 }
 

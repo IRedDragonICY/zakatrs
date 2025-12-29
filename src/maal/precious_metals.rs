@@ -11,10 +11,16 @@ pub struct PreciousMetal {
     pub nisab_threshold_grams: Decimal,
     pub deductible_liabilities: Decimal,
     pub hawl_satisfied: bool,
+    pub label: Option<String>,
 }
 
 impl PreciousMetal {
     pub fn new(weight_grams: impl Into<Decimal>, metal_type: WealthType, config: &ZakatConfig) -> Result<Self, ZakatError> {
+        let weight: Decimal = weight_grams.into();
+        if weight < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Weight must be non-negative".to_string()));
+        }
+
         let (price_per_gram, nisab_threshold_grams) = match metal_type {
             WealthType::Gold => (config.gold_price_per_gram, config.get_nisab_gold_grams()),
             WealthType::Silver => (config.silver_price_per_gram, config.get_nisab_silver_grams()),
@@ -26,12 +32,13 @@ impl PreciousMetal {
         }
 
         Ok(Self {
-            weight_grams: weight_grams.into(),
+            weight_grams: weight,
             metal_type,
             price_per_gram,
             nisab_threshold_grams,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
+            label: None,
         })
     }
 
@@ -44,13 +51,19 @@ impl PreciousMetal {
         self.hawl_satisfied = satisfied;
         self
     }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
 }
 
 impl CalculateZakat for PreciousMetal {
     fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
         let nisab_value = self.nisab_threshold_grams * self.price_per_gram;
         if !self.hawl_satisfied {
-            return Ok(ZakatDetails::not_payable(nisab_value, self.metal_type, "Hawl (1 lunar year) not met"));
+            return Ok(ZakatDetails::not_payable(nisab_value, self.metal_type, "Hawl (1 lunar year) not met")
+                .with_label(self.label.clone().unwrap_or_default()));
         }
         let total_value = self.weight_grams * self.price_per_gram;
         let liabilities = self.deductible_liabilities;
@@ -61,7 +74,8 @@ impl CalculateZakat for PreciousMetal {
         
         let rate = dec!(0.025); // 2.5%
 
-        Ok(ZakatDetails::new(total_value, liabilities, nisab_value, rate, self.metal_type))
+        Ok(ZakatDetails::new(total_value, liabilities, nisab_value, rate, self.metal_type)
+            .with_label(self.label.clone().unwrap_or_default()))
     }
 }
 

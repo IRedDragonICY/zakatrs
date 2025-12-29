@@ -15,7 +15,8 @@ pub struct IncomeZakatCalculator {
     method: IncomeCalculationMethod,
     nisab_threshold_value: Decimal,
     deductible_liabilities: Decimal,
-    hawl_satisfied: bool,
+    pub hawl_satisfied: bool,
+    pub label: Option<String>,
 }
 
 impl IncomeZakatCalculator {
@@ -25,6 +26,13 @@ impl IncomeZakatCalculator {
         method: IncomeCalculationMethod,
         config: &ZakatConfig,
     ) -> Result<Self, ZakatError> {
+        let income = total_income.into();
+        let expenses = basic_expenses.into();
+
+        if income < Decimal::ZERO || expenses < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Income and expenses must be non-negative".to_string()));
+        }
+
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(
             config.cash_nisab_standard,
@@ -41,12 +49,13 @@ impl IncomeZakatCalculator {
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
         
         Ok(Self {
-            total_income: total_income.into(),
-            basic_expenses: basic_expenses.into(),
+            total_income: income,
+            basic_expenses: expenses,
             method,
             nisab_threshold_value,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
+            label: None,
         })
     }
 
@@ -59,6 +68,11 @@ impl IncomeZakatCalculator {
         self.hawl_satisfied = satisfied;
         self
     }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
 }
 
 impl CalculateZakat for IncomeZakatCalculator {
@@ -66,7 +80,8 @@ impl CalculateZakat for IncomeZakatCalculator {
         // Income usually doesn't strictly require hawl if it's salary (paid upon receipt),
         // but if the user explicitly sets hawl_satisfied = false, we should respect it.
         if !self.hawl_satisfied {
-             return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Income, "Hawl (1 lunar year) not met"));
+             return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Income, "Hawl (1 lunar year) not met")
+                .with_label(self.label.clone().unwrap_or_default()));
         }
 
         let rate = dec!(0.025);
@@ -86,7 +101,8 @@ impl CalculateZakat for IncomeZakatCalculator {
             }
         };
 
-        Ok(ZakatDetails::new(total_assets, liabilities, self.nisab_threshold_value, rate, crate::types::WealthType::Income))
+        Ok(ZakatDetails::new(total_assets, liabilities, self.nisab_threshold_value, rate, crate::types::WealthType::Income)
+            .with_label(self.label.clone().unwrap_or_default()))
     }
 }
 

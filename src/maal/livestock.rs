@@ -15,6 +15,7 @@ pub struct LivestockAssets {
     pub prices: LivestockPrices,
     pub deductible_liabilities: Decimal,
     pub hawl_satisfied: bool,
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -29,12 +30,20 @@ impl LivestockPrices {
         sheep_price: impl Into<Decimal>,
         cow_price: impl Into<Decimal>,
         camel_price: impl Into<Decimal>,
-    ) -> Self {
-        Self {
-            sheep_price: sheep_price.into(),
-            cow_price: cow_price.into(),
-            camel_price: camel_price.into(),
+    ) -> Result<Self, ZakatError> {
+        let sheep = sheep_price.into();
+        let cow = cow_price.into();
+        let camel = camel_price.into();
+
+        if sheep < Decimal::ZERO || cow < Decimal::ZERO || camel < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Livestock prices must be non-negative".to_string()));
         }
+
+        Ok(Self {
+            sheep_price: sheep,
+            cow_price: cow,
+            camel_price: camel,
+        })
     }
 }
 
@@ -50,6 +59,7 @@ impl LivestockAssets {
             prices,
             deductible_liabilities: Decimal::ZERO,
             hawl_satisfied: true,
+            label: None,
         }
     }
 
@@ -60,6 +70,11 @@ impl LivestockAssets {
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
         self.hawl_satisfied = satisfied;
+        self
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
         self
     }
 }
@@ -74,7 +89,8 @@ impl CalculateZakat for LivestockAssets {
                 LivestockType::Cow => Decimal::from(30) * self.prices.cow_price,
                 LivestockType::Camel => Decimal::from(5) * self.prices.camel_price,
              };
-             return Ok(ZakatDetails::not_payable(nisab_count_val, crate::types::WealthType::Livestock, "Hawl (1 lunar year) not met"));
+             return Ok(ZakatDetails::not_payable(nisab_count_val, crate::types::WealthType::Livestock, "Hawl (1 lunar year) not met")
+                .with_label(self.label.clone().unwrap_or_default()));
         }
         // Note: Livestock Zakat is generally strict on counts and tiers, simplified here for "Value" return.
         // We will calculate 'animals due' then multiply by price.
@@ -117,6 +133,7 @@ impl CalculateZakat for LivestockAssets {
             zakat_due: zakat_value,
             wealth_type: crate::types::WealthType::Livestock,
             status_reason: None,
+            label: self.label.clone(),
         })
     }
 }

@@ -43,7 +43,7 @@ fn main() {
     let freelancer = IncomeZakatCalculator::new(
         4000, 1500, IncomeCalculationMethod::Net, &config
     ).unwrap();
-    print_case("Case 1: Freelancer (Net Income)", freelancer.calculate_zakat(None, true), false);
+    print_case("Case 1: Freelancer (Net Income)", freelancer.with_hawl(true).calculate_zakat(), false);
 
     // CASE 2: The Startup Founder (Business Assets - Equity)
     // Cash: $500k. Inventory/IP Valued(?): $0. Short Debt: $50k.
@@ -51,19 +51,19 @@ fn main() {
     // Nisab ~$5.5k. Payable.
     let startup = BusinessAssets::new(500000, 0, 0, 50000);
     let startup_calc = BusinessZakatCalculator::new(startup, &config).unwrap();
-    print_case("Case 2: Startup Founder (Business Cash)", startup_calc.calculate_zakat(None, true), true);
+    print_case("Case 2: Startup Founder (Business Cash)", startup_calc.with_hawl(true).calculate_zakat(), true);
 
     // CASE 3: The Gold Saver (Precious Metals)
     // Has 150g Gold bars.
     // Nisab 85g. Payable.
     let saver = PreciousMetal::new(150, WealthType::Gold, &config).unwrap();
-    print_case("Case 3: Gold Saver (150g)", saver.calculate_zakat(None, true), true);
+    print_case("Case 3: Gold Saver (150g)", saver.with_hawl(true).calculate_zakat(), true);
 
     // CASE 4: The Crypto Trader (Investments)
     // Portfolio worth $3000.
     // Nisab $5525. Not Payable.
     let crypto = InvestmentAssets::new(3000, InvestmentType::Crypto, &config).unwrap();
-    print_case("Case 4: Crypto Trader (Small Portfolio)", crypto.calculate_zakat(None, true), false);
+    print_case("Case 4: Crypto Trader (Small Portfolio)", crypto.with_hawl(true).calculate_zakat(), false);
 
     // CASE 5: The Rice Farmer (Agriculture - Rain Fed)
     // Harvested 1000kg Rice. No debt.
@@ -74,7 +74,7 @@ fn main() {
     let farmer_rain = AgricultureAssets::new(
         1000, dec!(0.50), IrrigationMethod::Rain, &config
     ).unwrap();
-    print_case("Case 5: Rice Farmer (Rain Fed)", farmer_rain.calculate_zakat(None, true), true);
+    print_case("Case 5: Rice Farmer (Rain Fed)", farmer_rain.with_hawl(true).calculate_zakat(), true);
 
     // CASE 6: The Modern Farmer (Agriculture - Irrigated/Costly)
     // Harvested 1000kg.
@@ -82,7 +82,7 @@ fn main() {
     let farmer_irr = AgricultureAssets::new(
         1000, dec!(0.50), IrrigationMethod::Irrigated, &config
     ).unwrap();
-    print_case("Case 6: Modern Farmer (Irrigated)", farmer_irr.calculate_zakat(None, true), true);
+    print_case("Case 6: Modern Farmer (Irrigated)", farmer_irr.with_hawl(true).calculate_zakat(), true);
 
     // CASE 7: The Sheep Herder (Livestock)
     // 50 Sheep.
@@ -92,7 +92,7 @@ fn main() {
     // Due: $150.
     let livestock_prices = LivestockPrices::new(150, 0, 0);
     let shepherd = LivestockAssets::new(50, LivestockType::Sheep, livestock_prices);
-    print_case("Case 7: Sheep Herder (50 Sheep)", shepherd.calculate_zakat(None, true), true);
+    print_case("Case 7: Sheep Herder (50 Sheep)", shepherd.with_hawl(true).calculate_zakat(), true);
 
     // CASE 8: The Treasure Hunter (Rikaz)
     // Found ancient coins worth $10,000.
@@ -100,14 +100,14 @@ fn main() {
     // Due: $2,000.
     let treasure = MiningAssets::new(10000, MiningType::Rikaz, &config).unwrap();
     // Use false for Hawl to prove Rikaz ignores it (it should still be payable)
-    print_case("Case 8: Treasure Hunter (Rikaz)", treasure.calculate_zakat(None, false), true);
+    print_case("Case 8: Treasure Hunter (Rikaz)", treasure.with_hawl(false).calculate_zakat(), true);
 
     // CASE 9: The Stock Investor (Long Term)
     // Stocks worth $50,000.
     // Conservative opinion: 2.5% on Market Value for liquid stocks.
     // Due: $1,250.
     let stocks = InvestmentAssets::new(50000, InvestmentType::Stock, &config).unwrap();
-    print_case("Case 9: Stock Investor (Market Value)", stocks.calculate_zakat(None, true), true);
+    print_case("Case 9: Stock Investor (Market Value)", stocks.with_hawl(true).calculate_zakat(), true);
 
     // CASE 10: Zakat Fitrah for Family
     // Family of 5.

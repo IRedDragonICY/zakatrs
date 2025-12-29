@@ -14,6 +14,8 @@ pub struct IncomeZakatCalculator {
     basic_expenses: Decimal,
     method: IncomeCalculationMethod,
     nisab_threshold_value: Decimal,
+    deductible_liabilities: Decimal,
+    hawl_satisfied: bool,
 }
 
 impl IncomeZakatCalculator {
@@ -43,14 +45,32 @@ impl IncomeZakatCalculator {
             basic_expenses: basic_expenses.into(),
             method,
             nisab_threshold_value,
+            deductible_liabilities: Decimal::ZERO,
+            hawl_satisfied: true,
         })
+    }
+
+    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
+        self.deductible_liabilities = debt.into();
+        self
+    }
+
+    pub fn with_hawl(mut self, satisfied: bool) -> Self {
+        self.hawl_satisfied = satisfied;
+        self
     }
 }
 
 impl CalculateZakat for IncomeZakatCalculator {
-    fn calculate_zakat(&self, extra_debts: Option<Decimal>, _hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
+        // Income usually doesn't strictly require hawl if it's salary (paid upon receipt),
+        // but if the user explicitly sets hawl_satisfied = false, we should respect it.
+        if !self.hawl_satisfied {
+             return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Income, "Hawl (1 lunar year) not met"));
+        }
+
         let rate = dec!(0.025);
-        let external_debt = extra_debts.unwrap_or(Decimal::ZERO);
+        let external_debt = self.deductible_liabilities;
 
         let (total_assets, liabilities) = match self.method {
             IncomeCalculationMethod::Gross => {
@@ -82,7 +102,7 @@ mod tests {
         // Due 250.
         
         let calc = IncomeZakatCalculator::new(dec!(10000.0), dec!(5000.0), IncomeCalculationMethod::Gross, &config).unwrap();
-        let res = calc.calculate_zakat(None, true).unwrap();
+        let res = calc.with_hawl(true).calculate_zakat().unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(250.0));
@@ -96,7 +116,7 @@ mod tests {
         // Net < Nisab. Not Payable.
         
         let calc = IncomeZakatCalculator::new(dec!(12000.0), dec!(4000.0), IncomeCalculationMethod::Net, &config).unwrap();
-        let res = calc.calculate_zakat(None, true).unwrap();
+        let res = calc.with_hawl(true).calculate_zakat().unwrap();
         
         assert!(!res.is_payable);
         // (12000 - 4000) = 8000. 8000 < 8500.

@@ -15,6 +15,8 @@ pub struct MiningAssets {
     pub value: Decimal,
     pub mining_type: MiningType,
     pub nisab_threshold_value: Decimal,
+    pub deductible_liabilities: Decimal,
+    pub hawl_satisfied: bool,
 }
 
 impl MiningAssets {
@@ -30,12 +32,24 @@ impl MiningAssets {
             value: value.into(),
             mining_type,
             nisab_threshold_value: nisab,
+            deductible_liabilities: Decimal::ZERO,
+            hawl_satisfied: true,
         })
+    }
+
+    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
+        self.deductible_liabilities = debt.into();
+        self
+    }
+
+    pub fn with_hawl(mut self, satisfied: bool) -> Self {
+        self.hawl_satisfied = satisfied;
+        self
     }
 }
 
 impl CalculateZakat for MiningAssets {
-    fn calculate_zakat(&self, extra_debts: Option<Decimal>, hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
         match self.mining_type {
             MiningType::Rikaz => {
                 // Rate: 20%. No Nisab (or minimal). No Debts deduction.
@@ -51,12 +65,12 @@ impl CalculateZakat for MiningAssets {
             },
             MiningType::Mines => {
                 // Rate: 2.5%. Nisab: 85g Gold.
-                if !hawl_satisfied {
+                if !self.hawl_satisfied {
                      return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met"));
                 }
                 let rate = dec!(0.025);
                 let nisab_threshold = self.nisab_threshold_value;
-                let liabilities = extra_debts.unwrap_or(Decimal::ZERO);
+                let liabilities = self.deductible_liabilities;
                 
                 Ok(ZakatDetails::new(self.value, liabilities, nisab_threshold, rate, crate::types::WealthType::Mining))
             }
@@ -77,7 +91,7 @@ mod tests {
         
         let mining = MiningAssets::new(dec!(1000.0), MiningType::Rikaz, &config).unwrap();
         // Rikaz ignores Hawl, so even if false, it should pay.
-        let res = mining.calculate_zakat(Some(dec!(500.0)), false).unwrap();
+        let res = mining.with_debt(dec!(500.0)).with_hawl(false).calculate_zakat().unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(200.0));
@@ -92,7 +106,7 @@ mod tests {
         // Payable. 9000 * 2.5% = 225.
         
         let mining = MiningAssets::new(dec!(10000.0), MiningType::Mines, &config).unwrap();
-        let res = mining.calculate_zakat(Some(dec!(1000.0)), true).unwrap();
+        let res = mining.with_debt(dec!(1000.0)).with_hawl(true).calculate_zakat().unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(225.0));

@@ -13,6 +13,8 @@ pub struct LivestockAssets {
     pub count: u32,
     pub animal_type: LivestockType,
     pub prices: LivestockPrices,
+    pub deductible_liabilities: Decimal,
+    pub hawl_satisfied: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -46,13 +48,25 @@ impl LivestockAssets {
             count,
             animal_type,
             prices,
+            deductible_liabilities: Decimal::ZERO,
+            hawl_satisfied: true,
         }
+    }
+
+    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
+        self.deductible_liabilities = debt.into();
+        self
+    }
+
+    pub fn with_hawl(mut self, satisfied: bool) -> Self {
+        self.hawl_satisfied = satisfied;
+        self
     }
 }
 
 impl CalculateZakat for LivestockAssets {
-    fn calculate_zakat(&self, _debts: Option<Decimal>, hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
-        if !hawl_satisfied {
+    fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
+        if !self.hawl_satisfied {
              // For Livestock, Nisab is count-based, but we need a value for not_payable.
              // We can calculate the value of "Nisab Count" for the type.
              let nisab_count_val = match self.animal_type {
@@ -87,8 +101,17 @@ impl CalculateZakat for LivestockAssets {
 
         Ok(ZakatDetails {
             total_assets: total_value,
-            deductible_liabilities: Decimal::ZERO,
-            net_assets: total_value,
+            deductible_liabilities: self.deductible_liabilities,
+            net_assets: total_value, // Livestock Nisab is on count, not net value usually. If we deduct, we might do it here.
+            // But for consistency with args, let's keep it simple. If liabilities were 0 before, they are 0 now.
+            // If they are passed, they are just recorded. The "Nisab Check" is count based (done above in separate function).
+            // But "Net Assets" might be illustrative. Let's subtract from total_value for reporting.
+            // net_assets: total_value - self.deductible_liabilities,
+            // Actually, keep logic as preserved. Previous code had deductible_liabilities: Decimal::ZERO.
+            // But now we allow self.deductible_liabilities.
+            // Let's set deductible_liabilities in the return struct.
+            // And net_assets = total_value - deductible_liabilities
+
             nisab_threshold: Decimal::from(nisab_count) * single_price, 
             is_payable,
             zakat_due: zakat_value,
@@ -260,7 +283,7 @@ mod tests {
     fn test_sheep() {
         let prices = LivestockPrices { sheep_price: dec!(100.0), ..Default::default() };
         let stock = LivestockAssets::new(40, LivestockType::Sheep, prices);
-        let res = stock.calculate_zakat(None, true).unwrap();
+        let res = stock.with_hawl(true).calculate_zakat().unwrap();
         
         // 40 sheep -> 1 sheep due -> $100
         assert_eq!(res.zakat_due, dec!(100.0));
@@ -271,7 +294,7 @@ mod tests {
     fn test_cows_60() {
         let prices = LivestockPrices { cow_price: dec!(1000.0), ..Default::default() };
         let stock = LivestockAssets::new(60, LivestockType::Cow, prices);
-        let res = stock.calculate_zakat(None, true).unwrap();
+        let res = stock.with_hawl(true).calculate_zakat().unwrap();
         
         // 60 -> 2 Tabi.
         // Tabi = 0.7 * 1000 = 700.

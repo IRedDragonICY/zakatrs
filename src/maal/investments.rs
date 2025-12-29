@@ -14,6 +14,8 @@ pub struct InvestmentAssets {
     pub market_value: Decimal,
     pub investment_type: InvestmentType,
     pub nisab_threshold_value: Decimal,
+    pub deductible_liabilities: Decimal,
+    pub hawl_satisfied: bool,
 }
 
 impl InvestmentAssets {
@@ -41,13 +43,25 @@ impl InvestmentAssets {
             market_value: market_value.into(),
             investment_type,
             nisab_threshold_value,
+            deductible_liabilities: Decimal::ZERO,
+            hawl_satisfied: true,
         })
+    }
+
+    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
+        self.deductible_liabilities = debt.into();
+        self
+    }
+
+    pub fn with_hawl(mut self, satisfied: bool) -> Self {
+        self.hawl_satisfied = satisfied;
+        self
     }
 }
 
 impl CalculateZakat for InvestmentAssets {
-    fn calculate_zakat(&self, extra_debts: Option<Decimal>, hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
-        if !hawl_satisfied {
+    fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
+        if !self.hawl_satisfied {
             return Ok(ZakatDetails::not_payable(self.nisab_threshold_value, crate::types::WealthType::Investment, "Hawl (1 lunar year) not met"));
         }
         // Requirement: 
@@ -55,7 +69,7 @@ impl CalculateZakat for InvestmentAssets {
         // Stocks: Market Value * 2.5% (Zakah on Principal + Profit).
         
         let total_assets = self.market_value;
-        let liabilities = extra_debts.unwrap_or(Decimal::ZERO);
+        let liabilities = self.deductible_liabilities;
         let rate = dec!(0.025);
 
         Ok(ZakatDetails::new(total_assets, liabilities, self.nisab_threshold_value, rate, crate::types::WealthType::Investment))
@@ -74,7 +88,7 @@ mod tests {
         // Due 250.
         
         let inv = InvestmentAssets::new(dec!(10000.0), InvestmentType::Crypto, &config).unwrap();
-        let res = inv.calculate_zakat(None, true).unwrap();
+        let res = inv.with_hawl(true).calculate_zakat().unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(250.0));

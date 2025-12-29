@@ -26,14 +26,7 @@ impl ZakatPortfolio {
     }
 
     pub fn add_calculator<T: CalculateZakat + Send + Sync + 'static>(mut self, calculator: T) -> Self {
-         // Wraps the calculator with no specific debt (None).
-         // The debt handled here is specific to this portfolio item.
-         self.calculators.push(Box::new(PortfolioItemWrapper { calculator, debt: None }));
-         self
-    }
-    
-    pub fn add_calculator_with_debt<T: CalculateZakat + Send + Sync + 'static>(mut self, calculator: T, debt: Decimal) -> Self {
-         self.calculators.push(Box::new(PortfolioItemWrapper { calculator, debt: Some(debt) }));
+         self.calculators.push(Box::new(calculator));
          self
     }
 
@@ -45,7 +38,7 @@ impl ZakatPortfolio {
         let mut total_zakat_due = Decimal::ZERO;
 
         for item in &self.calculators {
-            let detail = item.calculate_zakat(None, true)?; // Wrapper handles the debt passing, Hawl assumed true for portfolio total
+            let detail = item.calculate_zakat()?; 
             total_assets += detail.total_assets;
             total_zakat_due += detail.zakat_due;
             details.push(detail);
@@ -59,16 +52,4 @@ impl ZakatPortfolio {
     }
 }
 
-// Wrapper to hold debt context for the generic list
-struct PortfolioItemWrapper<T: CalculateZakat> {
-    calculator: T,
-    debt: Option<Decimal>,
-}
 
-impl<T: CalculateZakat> CalculateZakat for PortfolioItemWrapper<T> {
-    fn calculate_zakat(&self, _ignored_debts: Option<Decimal>, hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
-        // We use the stored debt. We ignore the arg passed to THIS wrapper usually,
-        // or we could combine them. For Portfolio iteration, we pass None typically.
-        self.calculator.calculate_zakat(self.debt, hawl_satisfied)
-    }
-}

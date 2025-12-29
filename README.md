@@ -45,7 +45,7 @@ rust_decimal_macros = "1.39"
 use zakat::{ZakatConfig, CalculateZakat};
 use zakat::maal::business::{BusinessAssets, BusinessZakatCalculator};
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ZakatConfig::new(65, 1); // gold $65/g, silver $1/g
 
     let assets = BusinessAssets::new(
@@ -55,12 +55,15 @@ fn main() {
         1000   // debt
     );
 
-    let calc = BusinessZakatCalculator::new(assets, &config).unwrap();
-    let result = calc.calculate_zakat(None).unwrap();
+    let calc = BusinessZakatCalculator::new(assets, &config)?;
+    let result = calc.with_hawl(true)
+                     .with_debt(1000)
+                     .calculate_zakat()?;
 
     if result.is_payable {
         println!("Zakat: ${}", result.zakat_due);
     }
+    Ok(())
 }
 ```
 
@@ -73,22 +76,23 @@ use zakat::maal::investments::{InvestmentAssets, InvestmentType};
 use zakat::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
 use rust_decimal_macros::dec;
 
-fn main() {
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ZakatConfig::new(65, 1);
 
     let portfolio = ZakatPortfolio::new()
         .add_calculator(IncomeZakatCalculator::new(
             5000, 0, IncomeCalculationMethod::Gross, &config
-        ).unwrap())
+        )?)
         .add_calculator(PreciousMetal::new(
             100, WealthType::Gold, &config
-        ).unwrap())
-        .add_calculator_with_debt(InvestmentAssets::new(
+        )?)
+        .add_calculator(InvestmentAssets::new(
             20000, InvestmentType::Crypto, &config
-        ).unwrap(), dec!(2000.0));
+        )?.with_debt(dec!(2000.0)));
 
-    let result = portfolio.calculate_total().unwrap();
+    let result = portfolio.calculate_total()?;
     println!("Total: ${}", result.total_zakat_due);
+    Ok(())
 }
 ```
 

@@ -15,6 +15,8 @@ pub struct AgricultureAssets {
     pub price_per_kg: Decimal,
     pub irrigation: IrrigationMethod,
     pub nisab_threshold_kg: Decimal,
+    pub deductible_liabilities: Decimal,
+    pub hawl_satisfied: bool,
 }
 
 impl AgricultureAssets {
@@ -39,12 +41,24 @@ impl AgricultureAssets {
             price_per_kg,
             irrigation,
             nisab_threshold_kg: nisab,
+            deductible_liabilities: Decimal::ZERO,
+            hawl_satisfied: true,
         })
+    }
+
+    pub fn with_debt(mut self, debt: impl Into<Decimal>) -> Self {
+        self.deductible_liabilities = debt.into();
+        self
+    }
+
+    pub fn with_hawl(mut self, satisfied: bool) -> Self {
+        self.hawl_satisfied = satisfied;
+        self
     }
 }
 
 impl CalculateZakat for AgricultureAssets {
-    fn calculate_zakat(&self, extra_debts: Option<Decimal>, _hawl_satisfied: bool) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self) -> Result<ZakatDetails, ZakatError> {
         let rate = match self.irrigation {
             IrrigationMethod::Rain => dec!(0.10),
             IrrigationMethod::Irrigated => dec!(0.05),
@@ -55,7 +69,7 @@ impl CalculateZakat for AgricultureAssets {
         let nisab_value = self.nisab_threshold_kg * self.price_per_kg; // Nisab is strictly on weight, but we convert for ZakatDetails
         
         // Agriculture usually doesn't deduct debts in some madhabs, but requirements said allow flexible.
-        let liabilities = extra_debts.unwrap_or(Decimal::ZERO);
+        let liabilities = self.deductible_liabilities;
         
         // Check Nisab by Weight
         let is_nisab_reached = self.harvest_weight_kg >= self.nisab_threshold_kg;
@@ -118,7 +132,7 @@ mod tests {
         // Nisab 653. Reached.
         // Rate 10%. Due 100.
         let agri = AgricultureAssets::new(dec!(1000.0), dec!(1.0), IrrigationMethod::Rain, &ZakatConfig::default()).unwrap();
-        let res = agri.calculate_zakat(None, true).unwrap();
+        let res = agri.with_hawl(true).calculate_zakat().unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(100.0));
@@ -129,7 +143,7 @@ mod tests {
         // 1000kg. Price 1. 
         // Rate 5%. Due 50.
         let agri = AgricultureAssets::new(dec!(1000.0), dec!(1.0), IrrigationMethod::Irrigated, &ZakatConfig::default()).unwrap();
-        let res = agri.calculate_zakat(None, true).unwrap();
+        let res = agri.with_hawl(true).calculate_zakat().unwrap();
         
         assert_eq!(res.zakat_due, dec!(50.0));
     }

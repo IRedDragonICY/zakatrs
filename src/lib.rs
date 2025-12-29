@@ -2,6 +2,7 @@ pub mod config;
 pub mod fitrah;
 pub mod maal;
 pub mod portfolio;
+pub mod prelude;
 pub mod traits;
 pub mod types;
 

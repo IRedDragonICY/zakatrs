@@ -2,7 +2,9 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError, WealthType};
 use crate::traits::CalculateZakat;
-use crate::config::{ZakatConfig, NisabStandard};
+use crate::config::ZakatConfig;
+
+use crate::inputs::IntoZakatDecimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -22,8 +24,8 @@ pub struct PreciousMetals {
 }
 
 impl PreciousMetals {
-    pub fn new(weight_grams: impl Into<Decimal>, metal_type: WealthType) -> Result<Self, ZakatError> {
-        let weight: Decimal = weight_grams.into();
+    pub fn new(weight_grams: impl IntoZakatDecimal, metal_type: WealthType) -> Result<Self, ZakatError> {
+        let weight: Decimal = weight_grams.into_zakat_decimal()?;
         if weight < Decimal::ZERO {
             return Err(ZakatError::InvalidInput("Weight must be non-negative".to_string()));
         }
@@ -44,9 +46,9 @@ impl PreciousMetals {
         })
     }
 
-    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
-        self.liabilities_due_now = debt.into();
-        self
+    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.liabilities_due_now = debt.into_zakat_decimal()?;
+        Ok(self)
     }
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
@@ -73,19 +75,14 @@ impl PreciousMetals {
 impl CalculateZakat for PreciousMetals {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         // Check for personal usage exemption first
+        // Check for personal usage exemption first
         if self.usage == JewelryUsage::PersonalUse {
-            match config.cash_nisab_standard {
-                // Gold Standard -> Implies Shafi/Maliki -> Exempt
-                NisabStandard::Gold => {
-                     return Ok(ZakatDetails::below_threshold(
-                         Decimal::ZERO, 
-                         self.metal_type, 
-                         "Personal jewelry is exempt in this Madhab"
-                     ).with_label(self.label.clone().unwrap_or_default()));
-                },
-                // LowerOfTwo (Hanafi) -> Payable
-                // Silver -> Conservative -> Payable
-                _ => {} 
+            if config.madhab.strategy().is_jewelry_exempt() {
+                 return Ok(ZakatDetails::below_threshold(
+                     Decimal::ZERO, 
+                     self.metal_type, 
+                     "Personal jewelry is exempt in this Madhab"
+                 ).with_label(self.label.clone().unwrap_or_default()));
             }
         }
 
@@ -126,6 +123,7 @@ impl CalculateZakat for PreciousMetals {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::madhab::Madhab;
 
     #[test]
     fn test_gold_below_nisab() {
@@ -159,7 +157,7 @@ mod tests {
         // Net ($8,000) < Nisab ($8,500) -> Not Payable.
         
         let metal = PreciousMetals::new(dec!(100.0), WealthType::Gold).unwrap();
-        let zakat = metal.with_debt_due_now(dec!(2000.0)).with_hawl(true).calculate_zakat(&config).unwrap();
+        let zakat = metal.with_debt_due_now(dec!(2000.0)).unwrap().with_hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(!zakat.is_payable);
         assert_eq!(zakat.zakat_due, Decimal::ZERO);
@@ -194,7 +192,7 @@ mod tests {
         // Hanafi uses LowerOfTwo. Personal jewelry is Zakatable.
         let config = ZakatConfig { 
             gold_price_per_gram: dec!(100.0), 
-            cash_nisab_standard: NisabStandard::LowerOfTwo,
+            madhab: Madhab::Hanafi,
             ..Default::default() 
         };
         
@@ -211,7 +209,7 @@ mod tests {
         // Shafi uses Gold Standard. Personal jewelry is Exempt.
         let config = ZakatConfig { 
             gold_price_per_gram: dec!(100.0), 
-            cash_nisab_standard: NisabStandard::Gold,
+            madhab: Madhab::Shafi,
             ..Default::default() 
         };
         

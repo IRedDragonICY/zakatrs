@@ -3,44 +3,15 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
 use crate::types::ZakatError;
+use crate::inputs::IntoZakatDecimal;
+use crate::madhab::{Madhab, NisabStandard};
 
-/// Islamic school of thought (Madhab) for Zakat calculation.
-/// 
-/// Each Madhab has different rulings on which Nisab standard to use
-/// for cash, paper currency, and trade goods (Urud al-Tijarah).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum Madhab {
-    /// Hanafi school - Uses LowerOfTwo (Silver or Gold, whichever is lower).
-    /// This is considered "Ahwat" (more cautious/beneficial for the poor).
-    #[default]
-    Hanafi,
-    /// Shafi'i school - Uses Gold standard (85g) for monetary wealth.
-    Shafi,
-    /// Maliki school - Uses Gold standard (85g) for monetary wealth.
-    Maliki,
-    /// Hanbali school - Uses LowerOfTwo (explicitly prefers benefit for the poor).
-    Hanbali,
-}
 
-/// Nisab standard for calculating the Zakat threshold on monetary wealth.
-/// 
-/// - **Gold**: 85 grams of gold equivalent
-/// - **Silver**: 595 grams of silver equivalent  
-/// - **LowerOfTwo**: Whichever of Gold or Silver produces a lower monetary threshold
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
-pub enum NisabStandard {
-    /// Use the gold Nisab (85g × gold_price)
-    #[default]
-    Gold,
-    /// Use the silver Nisab (595g × silver_price)
-    Silver,
-    /// Use the lower of gold or silver Nisab - most beneficial for the poor
-    LowerOfTwo,
-}
 
 /// Global configuration for Zakat prices.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ZakatConfig {
+    pub madhab: Madhab, // Added field to store the selected Madhab
     pub gold_price_per_gram: Decimal,
     pub silver_price_per_gram: Decimal,
     pub rice_price_per_kg: Option<Decimal>,
@@ -59,6 +30,7 @@ pub struct ZakatConfig {
 impl Default for ZakatConfig {
     fn default() -> Self {
         ZakatConfig {
+            madhab: Madhab::default(),
             gold_price_per_gram: Decimal::ZERO,
             silver_price_per_gram: Decimal::ZERO,
             rice_price_per_kg: None,
@@ -73,12 +45,12 @@ impl Default for ZakatConfig {
 
 // Ensure the caller can easily create a config
 impl ZakatConfig {
-    pub fn new(gold_price: impl Into<Decimal>, silver_price: impl Into<Decimal>) -> Self {
-        Self {
-            gold_price_per_gram: gold_price.into(),
-            silver_price_per_gram: silver_price.into(),
+    pub fn new(gold_price: impl IntoZakatDecimal, silver_price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        Ok(Self {
+            gold_price_per_gram: gold_price.into_zakat_decimal()?,
+            silver_price_per_gram: silver_price.into_zakat_decimal()?,
             ..Default::default()
-        }
+        })
     }
 
     /// Attempts to load configuration from environment variables.
@@ -97,7 +69,7 @@ impl ZakatConfig {
         let silver_price = silver_str.parse::<Decimal>()
             .map_err(|e| ZakatError::ConfigurationError(format!("Invalid silver price format: {}", e)))?;
 
-        Ok(Self::new(gold_price, silver_price))
+        Self::new(gold_price, silver_price)
     }
 
     /// Attempts to load configuration from a JSON file.
@@ -114,33 +86,33 @@ impl ZakatConfig {
     // ========== Fluent Builder Methods ==========
 
     /// Sets a custom gold nisab threshold (default: 85g)
-    pub fn with_gold_nisab(mut self, grams: impl Into<Decimal>) -> Self {
-        self.nisab_gold_grams = Some(grams.into());
-        self
+    pub fn with_gold_nisab(mut self, grams: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.nisab_gold_grams = Some(grams.into_zakat_decimal()?);
+        Ok(self)
     }
 
     /// Sets a custom silver nisab threshold (default: 595g)
-    pub fn with_silver_nisab(mut self, grams: impl Into<Decimal>) -> Self {
-        self.nisab_silver_grams = Some(grams.into());
-        self
+    pub fn with_silver_nisab(mut self, grams: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.nisab_silver_grams = Some(grams.into_zakat_decimal()?);
+        Ok(self)
     }
 
     /// Sets a custom agriculture nisab threshold (default: 653kg)
-    pub fn with_agriculture_nisab(mut self, kg: impl Into<Decimal>) -> Self {
-        self.nisab_agriculture_kg = Some(kg.into());
-        self
+    pub fn with_agriculture_nisab(mut self, kg: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.nisab_agriculture_kg = Some(kg.into_zakat_decimal()?);
+        Ok(self)
     }
 
     /// Sets the rice price per kilogram (for Fitrah calculations)
-    pub fn with_rice_price_per_kg(mut self, price: impl Into<Decimal>) -> Self {
-        self.rice_price_per_kg = Some(price.into());
-        self
+    pub fn with_rice_price_per_kg(mut self, price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.rice_price_per_kg = Some(price.into_zakat_decimal()?);
+        Ok(self)
     }
 
     /// Sets the rice price per liter (for Fitrah calculations)
-    pub fn with_rice_price_per_liter(mut self, price: impl Into<Decimal>) -> Self {
-        self.rice_price_per_liter = Some(price.into());
-        self
+    pub fn with_rice_price_per_liter(mut self, price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.rice_price_per_liter = Some(price.into_zakat_decimal()?);
+        Ok(self)
     }
 
     /// Configures Nisab standard based on Islamic school of thought (Madhab).
@@ -153,21 +125,20 @@ impl ZakatConfig {
     /// 
     /// # Example
     /// ```
-    /// use zakat::config::{ZakatConfig, Madhab, NisabStandard};
+    /// use zakat::config::ZakatConfig;
+    /// use zakat::madhab::{Madhab, NisabStandard};
     /// use rust_decimal_macros::dec;
     /// 
-    /// let config = ZakatConfig::new(dec!(100.0), dec!(1.0))
+    /// use zakat::prelude::*;
+    /// 
+    /// let config = ZakatConfig::new(dec!(100.0), dec!(1.0)).unwrap()
     ///     .with_madhab(Madhab::Hanafi);
     /// 
     /// assert_eq!(config.cash_nisab_standard, NisabStandard::LowerOfTwo);
     /// ```
     pub fn with_madhab(mut self, madhab: Madhab) -> Self {
-        self.cash_nisab_standard = match madhab {
-            Madhab::Hanafi => NisabStandard::LowerOfTwo,
-            Madhab::Shafi => NisabStandard::Gold,
-            Madhab::Maliki => NisabStandard::Gold,
-            Madhab::Hanbali => NisabStandard::LowerOfTwo,
-        };
+        self.madhab = madhab;
+        self.cash_nisab_standard = madhab.strategy().nisab_standard();
         self
     }
 
@@ -226,7 +197,7 @@ mod tests {
     fn test_madhab_hanafi_uses_lower_threshold() {
         // Gold: $100/g → $8,500 | Silver: $1/g → $595
         // Hanafi should use LowerOfTwo → $595 (silver is lower)
-        let config = ZakatConfig::new(dec!(100.0), dec!(1.0))
+        let config = ZakatConfig::new(dec!(100.0), dec!(1.0)).unwrap()
             .with_madhab(Madhab::Hanafi);
         
         assert_eq!(config.cash_nisab_standard, NisabStandard::LowerOfTwo);
@@ -237,7 +208,7 @@ mod tests {
     fn test_madhab_shafi_uses_gold_threshold() {
         // Gold: $100/g → $8,500 | Silver: $1/g → $595
         // Shafi should use Gold → $8,500
-        let config = ZakatConfig::new(dec!(100.0), dec!(1.0))
+        let config = ZakatConfig::new(dec!(100.0), dec!(1.0)).unwrap()
             .with_madhab(Madhab::Shafi);
         
         assert_eq!(config.cash_nisab_standard, NisabStandard::Gold);
@@ -246,7 +217,7 @@ mod tests {
 
     #[test]
     fn test_madhab_maliki_uses_gold_threshold() {
-        let config = ZakatConfig::new(dec!(100.0), dec!(1.0))
+        let config = ZakatConfig::new(dec!(100.0), dec!(1.0)).unwrap()
             .with_madhab(Madhab::Maliki);
         
         assert_eq!(config.cash_nisab_standard, NisabStandard::Gold);
@@ -254,7 +225,7 @@ mod tests {
 
     #[test]
     fn test_madhab_hanbali_uses_lower_threshold() {
-        let config = ZakatConfig::new(dec!(100.0), dec!(1.0))
+        let config = ZakatConfig::new(dec!(100.0), dec!(1.0)).unwrap()
             .with_madhab(Madhab::Hanbali);
         
         assert_eq!(config.cash_nisab_standard, NisabStandard::LowerOfTwo);
@@ -264,7 +235,7 @@ mod tests {
     fn test_lower_of_two_picks_minimum() {
         // Scenario where gold is cheaper (unusual but tests the min logic)
         // Gold: $5/g → $425 | Silver: $1/g → $595
-        let config = ZakatConfig::new(dec!(5.0), dec!(1.0))
+        let config = ZakatConfig::new(dec!(5.0), dec!(1.0)).unwrap()
             .with_madhab(Madhab::Hanafi);
         
         // min(425, 595) = 425
@@ -273,7 +244,7 @@ mod tests {
 
     #[test]
     fn test_nisab_standard_can_be_set_manually() {
-        let config = ZakatConfig::new(dec!(100.0), dec!(1.0))
+        let config = ZakatConfig::new(dec!(100.0), dec!(1.0)).unwrap()
             .with_nisab_standard(NisabStandard::Silver);
         
         assert_eq!(config.cash_nisab_standard, NisabStandard::Silver);

@@ -3,6 +3,7 @@ use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
+use crate::inputs::IntoZakatDecimal;
 
 pub enum MiningType {
     /// Buried Treasure / Ancient Wealth found.
@@ -21,10 +22,10 @@ pub struct MiningAssets {
 
 impl MiningAssets {
     pub fn new(
-        value: impl Into<Decimal>,
+        value: impl IntoZakatDecimal,
         mining_type: MiningType,
     ) -> Result<Self, ZakatError> {
-        let val = value.into();
+        let val = value.into_zakat_decimal()?;
 
         if val < Decimal::ZERO {
             return Err(ZakatError::InvalidInput("Mining value must be non-negative".to_string()));
@@ -39,9 +40,9 @@ impl MiningAssets {
         })
     }
 
-    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
-        self.liabilities_due_now = debt.into();
-        self
+    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.liabilities_due_now = debt.into_zakat_decimal()?;
+        Ok(self)
     }
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
@@ -101,7 +102,7 @@ mod tests {
         // Usually Rikaz is on gross, but let's see implementation.
         // Implementation: (value - debt) * 0.20
         
-        let res = mining.with_debt_due_now(dec!(500.0)).with_hawl(false).calculate_zakat(&config).unwrap();
+        let res = mining.with_debt_due_now(dec!(500.0)).unwrap().with_hawl(false).calculate_zakat(&config).unwrap();
         // (1000 - 500) * 0.20 = 500 * 0.2 = 100. -> NO, Debt is ignored!
         // 1000 * 0.20 = 200.
         

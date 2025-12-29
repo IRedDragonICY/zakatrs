@@ -9,11 +9,11 @@ fn test_labeling_workflow() {
         ..Default::default()
     };
 
-    let business_a_assets = BusinessAssets::new(dec!(10000), dec!(0), dec!(0), dec!(0)).unwrap();
+    let business_a_assets = BusinessAssets::new(10000, 0, 0, 0).unwrap();
     let business_a = BusinessZakatCalculator::new(business_a_assets)
         .with_label("Shop A");
 
-    let business_b_assets = BusinessAssets::new(dec!(500), dec!(0), dec!(0), dec!(0)).unwrap();
+    let business_b_assets = BusinessAssets::new(500, 0, 0, 0).unwrap();
     let business_b = BusinessZakatCalculator::new(business_b_assets)
         .with_label("Shop B");
 
@@ -27,7 +27,7 @@ fn test_labeling_workflow() {
 #[test]
 fn test_sanitization_negative_weight() {
     let config = ZakatConfig::default();
-    let res = PreciousMetals::new(dec!(-50.0), WealthType::Gold);
+    let res = PreciousMetals::new(-50.0, WealthType::Gold);
     
     assert!(res.is_err());
     if let Err(ZakatError::InvalidInput(msg)) = res {
@@ -39,20 +39,20 @@ fn test_sanitization_negative_weight() {
 
 #[test]
 fn test_sanitization_business_negative() {
-    let res = BusinessAssets::new(dec!(-100), dec!(0), dec!(0), dec!(0));
+    let res = BusinessAssets::new(-100, 0, 0, 0);
     assert!(res.is_err());
 }
 
 #[test]
 fn test_sanitization_income_negative() {
     let config = ZakatConfig::default();
-    let res = IncomeZakatCalculator::new(dec!(-1000), dec!(0), IncomeCalculationMethod::Gross);
+    let res = IncomeZakatCalculator::new(-1000, 0, IncomeCalculationMethod::Gross);
     assert!(res.is_err());
 }
 
 #[test]
 fn test_sanitization_investment_negative() {
     let config = ZakatConfig::default();
-    let res = InvestmentAssets::new(dec!(-500), InvestmentType::Stock);
+    let res = InvestmentAssets::new(-500, InvestmentType::Stock);
     assert!(res.is_err());
 }

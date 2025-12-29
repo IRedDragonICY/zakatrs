@@ -3,6 +3,7 @@ use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
+use crate::inputs::IntoZakatDecimal;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BusinessAssets {
@@ -14,15 +15,15 @@ pub struct BusinessAssets {
 
 impl BusinessAssets {
     pub fn new(
-        cash: impl Into<Decimal>,
-        inventory: impl Into<Decimal>,
-        receivables: impl Into<Decimal>,
-        short_term_liabilities: impl Into<Decimal>,
+        cash: impl IntoZakatDecimal,
+        inventory: impl IntoZakatDecimal,
+        receivables: impl IntoZakatDecimal,
+        short_term_liabilities: impl IntoZakatDecimal,
     ) -> Result<Self, ZakatError> {
-        let cash_dec = cash.into();
-        let inventory_dec = inventory.into();
-        let receivables_dec = receivables.into();
-        let liabilities_dec = short_term_liabilities.into();
+        let cash_dec = cash.into_zakat_decimal()?;
+        let inventory_dec = inventory.into_zakat_decimal()?;
+        let receivables_dec = receivables.into_zakat_decimal()?;
+        let liabilities_dec = short_term_liabilities.into_zakat_decimal()?;
 
         if cash_dec < Decimal::ZERO || inventory_dec < Decimal::ZERO || receivables_dec < Decimal::ZERO || liabilities_dec < Decimal::ZERO {
             return Err(ZakatError::InvalidInput("Business assets and liabilities must be non-negative".to_string()));
@@ -69,9 +70,9 @@ impl BusinessZakatCalculator {
         }
     }
 
-    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
-        self.liabilities_due_now = debt.into();
-        self
+    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.liabilities_due_now = debt.into_zakat_decimal()?;
+        Ok(self)
     }
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
@@ -90,7 +91,7 @@ impl CalculateZakat for BusinessZakatCalculator {
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(
             config.cash_nisab_standard,
-            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
+            crate::madhab::NisabStandard::Silver | crate::madhab::NisabStandard::LowerOfTwo
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
@@ -181,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_business_madhab_affects_nisab() {
-        use crate::config::Madhab;
+        use crate::madhab::Madhab;
         
         // Setup:
         // Gold: $100/g → Nisab = 85 * 100 = $8,500
@@ -195,7 +196,7 @@ mod tests {
         let assets = BusinessAssets::new(dec!(5000.0), dec!(0.0), dec!(0.0), dec!(0.0)).expect("Valid");
         
         // 1. Test Shafi (Gold)
-        let shafi_config = ZakatConfig::new(dec!(100.0), dec!(2.0))
+        let shafi_config = ZakatConfig::new(dec!(100.0), dec!(2.0)).unwrap()
             .with_madhab(Madhab::Shafi);
             
         let shafi_calc = BusinessZakatCalculator::new(assets.clone());
@@ -205,7 +206,7 @@ mod tests {
         assert_eq!(shafi_res.nisab_threshold, dec!(8500.0));
 
         // 2. Test Hanafi (LowerOfTwo)
-        let hanafi_config = ZakatConfig::new(dec!(100.0), dec!(2.0))
+        let hanafi_config = ZakatConfig::new(dec!(100.0), dec!(2.0)).unwrap()
             .with_madhab(Madhab::Hanafi);
             
         let hanafi_calc = BusinessZakatCalculator::new(assets);

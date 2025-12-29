@@ -2,12 +2,13 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
 use crate::traits::CalculateZakat;
-use crate::types::{ZakatDetails, ZakatError};
+use crate::types::ZakatDetails;
 
-/// Result of a portfolio calculation.
+/// Result of a portfolio calculation, including any partial failures.
 #[derive(Debug, Serialize, Deserialize)]
-pub struct PortfolioResult {
+pub struct PortfolioReport {
     pub details: Vec<ZakatDetails>,
+    pub errors: Vec<String>,
     pub total_assets: Decimal,
     pub total_zakat_due: Decimal,
 }
@@ -32,13 +33,16 @@ impl ZakatPortfolio {
 
     // Helper methods for specific calculator types can be added here.
     
-    pub fn calculate_total(&self, config: &crate::config::ZakatConfig) -> Result<PortfolioResult, ZakatError> {
+    pub fn calculate_total(&self, config: &crate::config::ZakatConfig) -> PortfolioReport {
         let mut details = Vec::new();
+        let mut errors = Vec::new();
 
         // 1. Initial calculation for all assets
         for item in &self.calculators {
-            let detail = item.calculate_zakat(config)?; 
-            details.push(detail);
+            match item.calculate_zakat(config) {
+                Ok(detail) => details.push(detail),
+                Err(e) => errors.push(e.to_string()),
+            }
         }
 
         // 2. Aggregation Logic (Dam' al-Amwal)
@@ -89,11 +93,12 @@ impl ZakatPortfolio {
             total_zakat_due += detail.zakat_due;
         }
 
-        Ok(PortfolioResult {
+        PortfolioReport {
             details,
+            errors,
             total_assets,
             total_zakat_due,
-        })
+        }
     }
 }
 

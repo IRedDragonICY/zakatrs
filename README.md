@@ -40,7 +40,6 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 [dependencies]
 zakat = "0.1.5"
 rust_decimal = "1.39"
-rust_decimal_macros = "1.39"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 ```
@@ -48,6 +47,8 @@ serde_json = "1.0"
 ## Usage
 
 ### Business Zakat
+
+> **Note:** You can pass standard Rust types (`i32`, `f64`, `&str`) directly to all constructors. There is no need to manually convert to `Decimal` or use the `dec!()` macro anymore.
 
 ```rust
 use zakat::{ZakatConfig, CalculateZakat};
@@ -81,24 +82,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```rust
 use zakat::{ZakatConfig, ZakatPortfolio, WealthType};
-use zakat::maal::precious_metals::PreciousMetal;
+use zakat::maal::precious_metals::PreciousMetals;
 use zakat::maal::investments::{InvestmentAssets, InvestmentType};
 use zakat::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
 use rust_decimal_macros::dec;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = ZakatConfig::new(65, 1);
+    let config = ZakatConfig::new(65, 1)?;
 
     let portfolio = ZakatPortfolio::new()
         .add(IncomeZakatCalculator::new(
             5000, 0, IncomeCalculationMethod::Gross, &config
         )?.with_label("Monthly Salary"))
-        .add(PreciousMetal::new(
-            100, WealthType::Gold, &config
+        .add(PreciousMetals::new(
+            100, WealthType::Gold
         )?.with_label("Wife's Gold"))
         .add(InvestmentAssets::new(
-            20000, InvestmentType::Crypto, &config
-        )?.with_debt(dec!(2000.0)).with_label("Binance Portfolio"));
+            20000, InvestmentType::Crypto
+        )?.with_debt(2000)?.with_label("Binance Portfolio"));
 
     let result = portfolio.calculate_total(&config)?;
     println!("Total Zakat Due: ${}", result.total_zakat_due);
@@ -125,7 +126,7 @@ let config = ZakatConfig::from_env()?;
 let config = ZakatConfig::try_from_json("config.json")?;
 
 // Or fluent builder
-let config = ZakatConfig::new(dec!(100.0), dec!(1.0))
+let config = ZakatConfig::new(100.0, 1.0)?
     .with_madhab(Madhab::Hanafi); // Sets Nisab standard automatically (LowerOfTwo)
 ```
 
@@ -136,20 +137,21 @@ use zakat::maal::precious_metals::{PreciousMetal, JewelryUsage};
 use zakat::maal::livestock::{LivestockAssets, LivestockType, LivestockPrices};
 
 // Personal Jewelry (Exempt in Shafi/Maliki, Payable in Hanafi)
-let necklace = PreciousMetals::new(dec!(100.0), WealthType::Gold)?
+let necklace = PreciousMetals::new(100.0, WealthType::Gold)?
     .with_usage(JewelryUsage::PersonalUse)
     .with_label("Wife's Wedding Necklace");
 
 // Livestock Reporting
-let prices = LivestockPrices::new(dec!(200.0), dec!(1500.0), dec!(3000.0))?;
+let prices = LivestockPrices::new(200, 1500, 3000)?;
 let camels = LivestockAssets::new(30, LivestockType::Camel, prices);
 
 let result = camels.calculate_zakat(&config)?;
 
 if result.is_payable {
     // Access detailed "in-kind" payment info
-    if let Some(extra) = result.extra_data {
-        println!("Pay Due: {}", extra.get("animals_due_description").unwrap_or(&"Unknown".to_string()));
+    use zakat::types::PaymentPayload;
+    if let PaymentPayload::Livestock { description, .. } = result.payload {
+        println!("Pay Due: {}", description);
         // Output: "Pay Due: 1 Bint Makhad"
     }
 }
@@ -160,9 +162,9 @@ if result.is_payable {
 ```rust
 use zakat::ZakatConfig;
 
-let config = ZakatConfig::new(dec!(65.0), dec!(1.0))
-    .with_gold_nisab(dec!(87.0))
-    .with_agriculture_nisab(dec!(700.0));
+let config = ZakatConfig::new(65.0, 1.0)?
+    .with_gold_nisab(87)
+    .with_agriculture_nisab(700);
 ```
 
 ## Modules

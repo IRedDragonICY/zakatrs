@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // - Gold Price: $50/gram.
     
     // Config - NEW ERGONOMIC API: No dec!() needed!
-    let config = ZakatConfig::new(50, 1); // Gold $50/g, Silver $1/g
+    let config = ZakatConfig::new(50, 1)?; // Gold $50/g, Silver $1/g
     println!("Configuration: Gold Price = ${}/g", config.gold_price_per_gram);
     println!("Nisab Threshold (Gold): ${}", config.gold_price_per_gram * config.get_nisab_gold_grams());
 
@@ -42,9 +42,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let portfolio = ZakatPortfolio::new()
         .add(income_calc) // $5000 * 2.5% = $125
         .add(gold_calc)   // $5000 * 2.5% = $125 (100g * 50)
-        .add(crypto_calc.with_debt_due_now(dec!(2000.0))); // ($20,000 - $2,000) * 2.5% = $450
+        .add(crypto_calc.with_debt_due_now(dec!(2000.0))?); // ($20,000 - $2,000) * 2.5% = $450
         
-    let result = portfolio.calculate_total(&config)?;
+    let result = portfolio.calculate_total(&config);
+    
+    if !result.errors.is_empty() {
+        println!("Likely Errors: {:?}", result.errors);
+    }
     
     println!("\n--- Portfolio Result ---");
     println!("Total Assets: ${}", result.total_assets);

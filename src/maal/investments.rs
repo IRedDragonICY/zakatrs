@@ -3,6 +3,7 @@ use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
+use crate::inputs::IntoZakatDecimal;
 
 pub enum InvestmentType {
     Stock,
@@ -20,10 +21,10 @@ pub struct InvestmentAssets {
 
 impl InvestmentAssets {
     pub fn new(
-        market_value: impl Into<Decimal>,
+        market_value: impl IntoZakatDecimal,
         investment_type: InvestmentType,
     ) -> Result<Self, ZakatError> {
-        let value = market_value.into();
+        let value = market_value.into_zakat_decimal()?;
 
         if value < Decimal::ZERO {
             return Err(ZakatError::InvalidInput("Market value must be non-negative".to_string()));
@@ -38,9 +39,9 @@ impl InvestmentAssets {
         })
     }
 
-    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
-        self.liabilities_due_now = debt.into();
-        self
+    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.liabilities_due_now = debt.into_zakat_decimal()?;
+        Ok(self)
     }
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
@@ -59,7 +60,7 @@ impl CalculateZakat for InvestmentAssets {
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(
             config.cash_nisab_standard,
-            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
+            crate::madhab::NisabStandard::Silver | crate::madhab::NisabStandard::LowerOfTwo
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {

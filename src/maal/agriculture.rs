@@ -3,6 +3,7 @@ use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
+use crate::inputs::IntoZakatDecimal;
 
 pub enum IrrigationMethod {
     Rain, // Natural, 10%
@@ -21,12 +22,12 @@ pub struct AgricultureAssets {
 
 impl AgricultureAssets {
     pub fn new(
-        harvest_weight_kg: impl Into<Decimal>,
-        price_per_kg: impl Into<Decimal>,
+        harvest_weight_kg: impl IntoZakatDecimal,
+        price_per_kg: impl IntoZakatDecimal,
         irrigation: IrrigationMethod,
     ) -> Result<Self, ZakatError> {
-        let weight = harvest_weight_kg.into();
-        let price = price_per_kg.into();
+        let weight = harvest_weight_kg.into_zakat_decimal()?;
+        let price = price_per_kg.into_zakat_decimal()?;
 
         if weight < Decimal::ZERO || price < Decimal::ZERO {
             return Err(ZakatError::InvalidInput("Harvest weight and price must be non-negative".to_string()));
@@ -45,19 +46,19 @@ impl AgricultureAssets {
     /// Creates a new AgricultureAssets instance from Wasaq units.
     /// 1 Wasaq is approximately 130.6 kg.
     pub fn from_wasaq(
-        wasaq: impl Into<Decimal>,
-        price_per_kg: impl Into<Decimal>,
+        wasaq: impl IntoZakatDecimal,
+        price_per_kg: impl IntoZakatDecimal,
         irrigation: IrrigationMethod,
     ) -> Result<Self, ZakatError> {
-        let wasaq_value = wasaq.into();
+        let wasaq_value = wasaq.into_zakat_decimal()?;
         let wasaq_in_kg = dec!(130.6);
         let weight_kg = wasaq_value * wasaq_in_kg;
         Self::new(weight_kg, price_per_kg, irrigation)
     }
 
-    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
-        self.liabilities_due_now = debt.into();
-        self
+    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.liabilities_due_now = debt.into_zakat_decimal()?;
+        Ok(self)
     }
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
@@ -112,7 +113,7 @@ impl CalculateZakat for AgricultureAssets {
             wealth_type: crate::types::WealthType::Agriculture,
             status_reason: None,
             label: self.label.clone(),
-            extra_data: None,
+            payload: crate::types::PaymentPayload::Monetary(zakat_due),
         })
     }
 }

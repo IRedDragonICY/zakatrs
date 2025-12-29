@@ -3,6 +3,7 @@ use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
+use crate::inputs::IntoZakatDecimal;
 
 pub enum IncomeCalculationMethod {
     Gross,
@@ -20,12 +21,12 @@ pub struct IncomeZakatCalculator {
 
 impl IncomeZakatCalculator {
     pub fn new(
-        total_income: impl Into<Decimal>,
-        basic_expenses: impl Into<Decimal>,
+        total_income: impl IntoZakatDecimal,
+        basic_expenses: impl IntoZakatDecimal,
         method: IncomeCalculationMethod,
     ) -> Result<Self, ZakatError> {
-        let income = total_income.into();
-        let expenses = basic_expenses.into();
+        let income = total_income.into_zakat_decimal()?;
+        let expenses = basic_expenses.into_zakat_decimal()?;
 
         if income < Decimal::ZERO || expenses < Decimal::ZERO {
             return Err(ZakatError::InvalidInput("Income and expenses must be non-negative".to_string()));
@@ -41,9 +42,9 @@ impl IncomeZakatCalculator {
         })
     }
 
-    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
-        self.liabilities_due_now = debt.into();
-        self
+    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.liabilities_due_now = debt.into_zakat_decimal()?;
+        Ok(self)
     }
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
@@ -62,7 +63,7 @@ impl CalculateZakat for IncomeZakatCalculator {
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(
             config.cash_nisab_standard,
-            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
+            crate::madhab::NisabStandard::Silver | crate::madhab::NisabStandard::LowerOfTwo
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {

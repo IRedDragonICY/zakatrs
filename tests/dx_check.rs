@@ -7,8 +7,8 @@ fn test_dx_prelude_and_ergonomics() {
     
     // 2. Verify Ergonomic Inputs (Integers)
     // ZakatConfig: Passing integers
-    let config = ZakatConfig::new(100, 1) // i32, i32
-        .with_gold_nisab(85); // i32
+    let config = ZakatConfig::new(100, 1).unwrap() // i32, i32
+        .with_gold_nisab(85).unwrap(); // i32
         
     assert_eq!(config.gold_price_per_gram, dec!(100.0));
     assert_eq!(config.silver_price_per_gram, dec!(1.0));
@@ -30,7 +30,7 @@ fn test_dx_prelude_and_ergonomics() {
         IncomeCalculationMethod::Net
     ).expect("Config valid");
     
-    let res = income.with_debt_due_now(500).calculate_zakat(&config).unwrap();
+    let res = income.with_debt_due_now(500).unwrap().calculate_zakat(&config).unwrap();
     // Net: 12000 - 4000 - 500 = 7500.
     // Nisab: 85 * 100 = 8500.
     // Not payable.

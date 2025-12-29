@@ -2,6 +2,7 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
+use crate::inputs::IntoZakatDecimal;
 
 pub enum LivestockType {
     Camel,
@@ -34,9 +35,9 @@ pub struct LivestockPrices {
 
 impl LivestockPrices {
     pub fn new(
-        sheep_price: impl Into<Decimal>,
-        cow_price: impl Into<Decimal>,
-        camel_price: impl Into<Decimal>,
+        sheep_price: impl IntoZakatDecimal,
+        cow_price: impl IntoZakatDecimal,
+        camel_price: impl IntoZakatDecimal,
     ) -> Result<Self, ZakatError> {
         let mut prices = Self::default();
         prices = prices.with_sheep_price(sheep_price)?;
@@ -45,8 +46,8 @@ impl LivestockPrices {
         Ok(prices)
     }
 
-    pub fn with_sheep_price(mut self, price: impl Into<Decimal>) -> Result<Self, ZakatError> {
-        let p = price.into();
+    pub fn with_sheep_price(mut self, price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        let p = price.into_zakat_decimal()?;
         if p < Decimal::ZERO {
              return Err(ZakatError::InvalidInput("Sheep price must be non-negative".to_string()));
          }
@@ -54,8 +55,8 @@ impl LivestockPrices {
         Ok(self)
     }
 
-    pub fn with_cow_price(mut self, price: impl Into<Decimal>) -> Result<Self, ZakatError> {
-        let p = price.into();
+    pub fn with_cow_price(mut self, price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        let p = price.into_zakat_decimal()?;
         if p < Decimal::ZERO {
              return Err(ZakatError::InvalidInput("Cow price must be non-negative".to_string()));
          }
@@ -63,8 +64,8 @@ impl LivestockPrices {
         Ok(self)
     }
 
-    pub fn with_camel_price(mut self, price: impl Into<Decimal>) -> Result<Self, ZakatError> {
-        let p = price.into();
+    pub fn with_camel_price(mut self, price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        let p = price.into_zakat_decimal()?;
         if p < Decimal::ZERO {
              return Err(ZakatError::InvalidInput("Camel price must be non-negative".to_string()));
          }
@@ -90,9 +91,9 @@ impl LivestockAssets {
         }
     }
 
-    pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
-        self.liabilities_due_now = debt.into();
-        self
+    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        self.liabilities_due_now = debt.into_zakat_decimal()?;
+        Ok(self)
     }
 
     pub fn with_hawl(mut self, satisfied: bool) -> Self {
@@ -138,7 +139,7 @@ impl CalculateZakat for LivestockAssets {
                 .with_label(self.label.clone().unwrap_or_default()));
         }
 
-        let (zakat_value, nisab_count, description) = match self.animal_type {
+        let (zakat_value, nisab_count, heads_due) = match self.animal_type {
             LivestockType::Sheep => calculate_sheep_zakat(self.count, self.prices.sheep_price),
             LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price),
             LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices),
@@ -150,13 +151,11 @@ impl CalculateZakat for LivestockAssets {
         let total_value = Decimal::from(self.count) * single_price;
         let is_payable = zakat_value > Decimal::ZERO;
 
-        let mut extra_data = std::collections::HashMap::new();
-        if is_payable {
-            extra_data.insert("animals_due_description".to_string(), description);
-            // Rough count estimation logic if needed, or just putting "N/A" for count if complex
-            // But we can extract count from description or just not set it if it's mixed.
-            // For now, let's just use the description.
-        }
+        // Generate description string from heads_due
+        let description_parts: Vec<String> = heads_due.iter()
+            .map(|(name, count)| format!("{} {}", count, name))
+            .collect();
+        let description = description_parts.join(", ");
 
         Ok(ZakatDetails {
             total_assets: total_value,
@@ -168,15 +167,18 @@ impl CalculateZakat for LivestockAssets {
             wealth_type: crate::types::WealthType::Livestock,
             status_reason: None,
             label: self.label.clone(),
-            extra_data: Some(extra_data),
+            payload: crate::types::PaymentPayload::Livestock { 
+                description: description.clone(), 
+                heads_due 
+            },
         })
     }
 }
 
-fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32, String) {
+fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(String, u32)>) {
     let nisab = 40;
     if count < 40 {
-        return (Decimal::ZERO, nisab, "".to_string());
+        return (Decimal::ZERO, nisab, vec![]);
     }
     
     let sheep_due = if count <= 120 {
@@ -190,14 +192,13 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32, String) {
         count / 100
     };
 
-    let description = format!("{} Sheep", sheep_due);
-    (Decimal::from(sheep_due) * price, nisab, description)
+    (Decimal::from(sheep_due) * price, nisab, vec![("Sheep".to_string(), sheep_due)])
 }
 
-fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32, String) {
+fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(String, u32)>) {
     let nisab = 30;
     if count < 30 {
-        return (Decimal::ZERO, nisab, "".to_string());
+        return (Decimal::ZERO, nisab, vec![]);
     }
 
     // Cows Zakat Logic:
@@ -256,17 +257,16 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32, String) {
     let total_zakat_val = (Decimal::from(tabi) * val_tabi) + (Decimal::from(musinnah) * val_musinnah);
     
     let mut parts = Vec::new();
-    if tabi > 0 { parts.push(format!("{} Tabi'", tabi)); }
-    if musinnah > 0 { parts.push(format!("{} Musinnah", musinnah)); }
-    let description = parts.join(", ");
+    if tabi > 0 { parts.push(("Tabi'".to_string(), tabi)); }
+    if musinnah > 0 { parts.push(("Musinnah".to_string(), musinnah)); }
 
-    (total_zakat_val, nisab, description)
+    (total_zakat_val, nisab, parts)
 }
 
-fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32, String) {
+fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32, Vec<(String, u32)>) {
     let nisab = 5;
     if count < 5 {
-        return (Decimal::ZERO, nisab, "".to_string());
+        return (Decimal::ZERO, nisab, vec![]);
     }
     
     // 5-9: 1 Sheep
@@ -331,14 +331,13 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32,
         + (Decimal::from(jazaah) * v_jz);
         
     let mut parts = Vec::new();
-    if sheep > 0 { parts.push(format!("{} Sheep", sheep)); }
-    if b_makhad > 0 { parts.push(format!("{} Bint Makhad", b_makhad)); }
-    if b_labun > 0 { parts.push(format!("{} Bint Labun", b_labun)); }
-    if hiqqah > 0 { parts.push(format!("{} Hiqqah", hiqqah)); }
-    if jazaah > 0 { parts.push(format!("{} Jaza'ah", jazaah)); }
-    let description = parts.join(", ");
+    if sheep > 0 { parts.push(("Sheep".to_string(), sheep)); }
+    if b_makhad > 0 { parts.push(("Bint Makhad".to_string(), b_makhad)); }
+    if b_labun > 0 { parts.push(("Bint Labun".to_string(), b_labun)); }
+    if hiqqah > 0 { parts.push(("Hiqqah".to_string(), hiqqah)); }
+    if jazaah > 0 { parts.push(("Jaza'ah".to_string(), jazaah)); }
 
-    (total, nisab, description)
+    (total, nisab, parts)
 }
 
 #[cfg(test)]

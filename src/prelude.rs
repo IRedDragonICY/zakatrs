@@ -10,10 +10,12 @@
 //! ```
 
 // Core exports
-pub use crate::config::{ZakatConfig, Madhab, NisabStandard};
-pub use crate::portfolio::{ZakatPortfolio, PortfolioResult};
+pub use crate::config::ZakatConfig;
+pub use crate::madhab::{Madhab, NisabStandard};
+pub use crate::portfolio::{ZakatPortfolio, PortfolioReport};
 pub use crate::traits::CalculateZakat;
 pub use crate::types::{WealthType, ZakatDetails, ZakatError};
+pub use crate::inputs::IntoZakatDecimal;
 
 // Re-export specific calculators and types
 pub use crate::maal::business::{BusinessAssets, BusinessZakatCalculator};

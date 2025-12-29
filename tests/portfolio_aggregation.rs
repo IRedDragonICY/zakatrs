@@ -15,22 +15,22 @@ fn test_portfolio_aggregation_mix_gold_and_cash() {
     // Zakat Due = $9,000 * 0.025 = $225.
 
     let config = ZakatConfig::new(
-        dec!(100.0), // Gold price
-        dec!(1.0)    // Silver price (irrelevant here if using Gold standard or if Gold is higher)
-    ).with_madhab(Madhab::Shafi); // Explicitly Gold standard for simplicity
+        100.0, // Gold price
+        1.0    // Silver price (irrelevant here if using Gold standard or if Gold is higher)
+    ).unwrap().with_madhab(Madhab::Shafi); // Explicitly Gold standard for simplicity
 
     let gold_asset = PreciousMetals::new(
-        dec!(50.0), 
+        50.0, 
         WealthType::Gold
     ).expect("Valid gold input");
 
     // Using BusinessAssets to represent Cash roughly, or closest equivalent if Cash isn't explicit
     // Actually, BusinessAssets::new(cash, inventory, ...)
     let cash_assets_data = BusinessAssets::new(
-            dec!(4000.0), // Cash equivalent
-            dec!(0), 
-            dec!(0), 
-            dec!(0)
+            4000.0, // Cash equivalent
+            0, 
+            0, 
+            0
     ).expect("Valid assets");
     let cash_calculator = BusinessZakatCalculator::new(cash_assets_data)
         .with_hawl(true); // Ensure hawl is met
@@ -39,7 +39,8 @@ fn test_portfolio_aggregation_mix_gold_and_cash() {
         .add(gold_asset)
         .add(cash_calculator);
 
-    let result = portfolio.calculate_total(&config).expect("Calculation success");
+    let result = portfolio.calculate_total(&config);
+    assert!(result.errors.is_empty(), "Result should not have errors");
 
     // Verify Total Assets
     // Gold: 50 * 100 = 5000
@@ -70,10 +71,10 @@ fn test_portfolio_no_aggregation_if_total_below_nisab() {
     // Total = $5,000 < $8,500.
     // Zakat Due = 0.
 
-    let config = ZakatConfig::new(dec!(100.0), dec!(1.0));
+    let config = ZakatConfig::new(100.0, 1.0).unwrap();
     
-    let gold_asset = PreciousMetals::new(dec!(30.0), WealthType::Gold).unwrap();
-    let cash_assets_data = BusinessAssets::new(dec!(2000.0), dec!(0), dec!(0), dec!(0)).expect("Valid");
+    let gold_asset = PreciousMetals::new(30.0, WealthType::Gold).unwrap();
+    let cash_assets_data = BusinessAssets::new(2000.0, 0, 0, 0).expect("Valid");
     let cash_calculator = BusinessZakatCalculator::new(cash_assets_data)
         .with_hawl(true);
 
@@ -81,7 +82,8 @@ fn test_portfolio_no_aggregation_if_total_below_nisab() {
         .add(gold_asset)
         .add(cash_calculator);
 
-    let result = portfolio.calculate_total(&config).unwrap();
+    let result = portfolio.calculate_total(&config);
+    assert!(result.errors.is_empty());
 
     assert_eq!(result.total_assets, dec!(5000.0));
     assert_eq!(result.total_zakat_due, dec!(0.0));

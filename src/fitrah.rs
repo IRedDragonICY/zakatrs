@@ -1,13 +1,76 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
+use crate::traits::CalculateZakat;
+use crate::config::ZakatConfig;
+use crate::inputs::IntoZakatDecimal;
+
+pub struct FitrahCalculator {
+    pub person_count: u32,
+    pub price_per_unit: Decimal,
+    pub unit_amount: Decimal,
+    pub label: Option<String>,
+}
+
+impl FitrahCalculator {
+    pub fn new(
+        person_count: u32,
+        price_per_unit: impl IntoZakatDecimal,
+        unit_amount: Option<impl IntoZakatDecimal>,
+    ) -> Result<Self, ZakatError> {
+        let price = price_per_unit.into_zakat_decimal()?;
+        let amount = match unit_amount {
+            Some(v) => v.into_zakat_decimal()?,
+            None => dec!(2.5), // Default 2.5kg
+        };
+
+        if person_count == 0 {
+            return Err(ZakatError::InvalidInput("Person count must be greater than 0".to_string()));
+        }
+        if price < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Price per unit must be non-negative".to_string()));
+        }
+
+        Ok(Self {
+            person_count,
+            price_per_unit: price,
+            unit_amount: amount,
+            label: None,
+        })
+    }
+
+    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+}
+
+impl CalculateZakat for FitrahCalculator {
+    fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        let total_people_decimal: Decimal = self.person_count.into();
+        let total_value = total_people_decimal * self.unit_amount * self.price_per_unit;
+
+        Ok(ZakatDetails {
+            total_assets: total_value,
+            liabilities_due_now: Decimal::ZERO,
+            net_assets: total_value,
+            nisab_threshold: Decimal::ZERO, 
+            is_payable: true, // Fitrah is obligatory
+            zakat_due: total_value,
+            wealth_type: crate::types::WealthType::Fitrah,
+            status_reason: None,
+            label: self.label.clone(),
+            payload: crate::types::PaymentPayload::Monetary(total_value),
+        })
+    }
+}
 
 /// Calculates Zakat Fitrah.
 ///
 /// # Arguments
 ///
 /// * `person_count` - Number of people to pay for.
-/// * `price_per_unit` - Price of the staple food per unit (kg or liter) defined by the local authority.
+/// * `price_per_unit` - Price of the staple food per unit (kg or liter).
 /// * `unit_amount` - Amount per person. Defaults to 2.5 (kg) if None.
 ///
 /// # Returns
@@ -15,41 +78,12 @@ use crate::types::{ZakatDetails, ZakatError};
 /// `ZakatDetails` where `zakat_due` is the total monetary value.
 pub fn calculate_fitrah(
     person_count: u32,
-    price_per_unit: impl Into<Decimal>,
+    price_per_unit: impl IntoZakatDecimal,
     unit_amount: Option<Decimal>,
 ) -> Result<ZakatDetails, ZakatError> {
-    let price_per_unit = price_per_unit.into();
-    if person_count == 0 {
-        return Err(ZakatError::InvalidInput("Person count must be greater than 0".to_string()));
-    }
-    if price_per_unit <= Decimal::ZERO {
-        return Err(ZakatError::InvalidInput("Price per unit must be positive".to_string()));
-    }
-
-    let amount_per_person = unit_amount.unwrap_or(dec!(2.5)); // Default 2.5kg
-    let total_people_decimal: Decimal = person_count.into();
-    
-    // Total assets in this context is just the total quantity needed in units, but ZakatDetails
-    // is financial, so we represent everything in currency.
-    // Total Value = person * amount_per_person * price
-    let total_value = total_people_decimal * amount_per_person * price_per_unit;
-
-    // Zakat Fitrah is obligatory on every individual who has sustenance for the day of Eid,
-    // regardless of wealth thresholds (Nisab) applicable to Zakat Maal.
-    // Therefore, we set Nisab to 0 to reflect that it is payable if the person has the means.
-    
-    Ok(ZakatDetails {
-        total_assets: total_value,
-        liabilities_due_now: Decimal::ZERO,
-        net_assets: total_value,
-        nisab_threshold: Decimal::ZERO, // Fitrah is obligatory, no wealth nisab in the same sense as Maal
-        is_payable: true,
-        zakat_due: total_value,
-        wealth_type: crate::types::WealthType::Fitrah,
-        status_reason: None,
-        label: None,
-        extra_data: None,
-    })
+    let calculator = FitrahCalculator::new(person_count, price_per_unit, unit_amount)?;
+    // We pass a default config because Fitrah doesn't need nisab
+    calculator.calculate_zakat(&ZakatConfig::default())
 }
 
 #[cfg(test)]
@@ -74,5 +108,12 @@ mod tests {
         // 1 * 3.5 * 2 = 7
         let result = calculate_fitrah(people, price, Some(amount)).unwrap();
         assert_eq!(result.zakat_due, dec!(7.0));
+    }
+    
+    #[test]
+    fn test_fitrah_calculator_usage() {
+        let calc = FitrahCalculator::new(2, dec!(5.0), None::<Decimal>).unwrap();
+        let res = calc.calculate_zakat(&ZakatConfig::default()).unwrap();
+        assert_eq!(res.zakat_due, dec!(25.0)); // 2 * 2.5 * 5 = 25
     }
 }

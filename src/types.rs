@@ -2,6 +2,15 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum PaymentPayload {
+    Monetary(Decimal),
+    Livestock {
+        description: String,
+        heads_due: Vec<(String, u32)>, 
+    },
+}
+
 /// Represents the detailed breakdown of the Zakat calculation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct ZakatDetails {
@@ -23,8 +32,8 @@ pub struct ZakatDetails {
     pub status_reason: Option<String>,
     /// Optional label for the asset (e.g. "Main Store", "Gold Necklace").
     pub label: Option<String>,
-    /// Additional metadata for reporting (e.g. "2 Sheep due").
-    pub extra_data: Option<std::collections::HashMap<String, String>>,
+    /// Detailed payment payload (Monetary amount or specific assets like Livestock heads).
+    pub payload: PaymentPayload,
 }
 
 impl ZakatDetails {
@@ -57,7 +66,7 @@ impl ZakatDetails {
             wealth_type,
             status_reason: None,
             label: None,
-            extra_data: None,
+            payload: PaymentPayload::Monetary(zakat_due),
         }
     }
 
@@ -73,8 +82,13 @@ impl ZakatDetails {
             wealth_type,
             status_reason: Some(reason.to_string()),
             label: None,
-            extra_data: None,
+            payload: PaymentPayload::Monetary(Decimal::ZERO),
         }
+    }
+
+    pub fn with_payload(mut self, payload: PaymentPayload) -> Self {
+        self.payload = payload;
+        self
     }
 
     pub fn with_label(mut self, label: impl Into<String>) -> Self {
@@ -82,10 +96,7 @@ impl ZakatDetails {
         self
     }
 
-    pub fn with_extra_data(mut self, data: std::collections::HashMap<String, String>) -> Self {
-        self.extra_data = Some(data);
-        self
-    }
+
 
     /// Returns the Zakat due formatted as a string with 2 decimal places.
     pub fn format_amount(&self) -> String {

@@ -35,7 +35,7 @@ fn print_case(title: &str, result: Result<zakat::ZakatDetails, zakat::ZakatError
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // NEW ERGONOMIC API: No more dec!() needed for simple integers!
-    let config = ZakatConfig::new(65, 1); // Gold $65/g, Silver $1/g
+    let config = ZakatConfig::new(65, 1)?; // Gold $65/g, Silver $1/g
     println!("Global Config: Gold Price ${}/g", config.gold_price_per_gram);
 
     // CASE 1: The Freelancer (Professional Income)

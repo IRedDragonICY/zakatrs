@@ -14,22 +14,9 @@ pub struct PortfolioResult {
 
 pub struct ZakatPortfolio {
     calculators: Vec<Box<dyn CalculateZakat + Send + Sync>>,
-    // We might want to store specific debts for the portfolio if global? 
-    // Or just rely on individual calculators having debts passed in?
-    // The requirement says: "ZakatPortfolio::new().add_income(...).build()"
-    // And "calculate_total(&self, config) -> PortfolioResult"
-    // But `CalculateZakat::calculate_zakat` takes `debts`.
-    // If we want to support debts per item, we should probably wrap them with their debts?
-    // Or allow the user to pass debts during `add` phase.
-    // For now, let's assume `add_*(..., debt)` or adhering to the simple signature.
-    // Let's store closures or boxed structs that ALREADY have everything needed?
-    // But commonly, `CalculateZakat` implementation needs `debts` passed at calc time.
-    // Let's wrap the logic.
 }
 
-// Check design: trait `calculate_zakat(&self, debts: Option<Decimal>)`.
-// If we want to automate this, we need to know what debts to pass.
-// Maybe we can store `(Box<dyn CalculateZakat>, Option<Decimal>)`.
+// Wrapper handles storing the item-specific debt context if provided.
 
 impl ZakatPortfolio {
     pub fn new() -> Self {
@@ -39,11 +26,8 @@ impl ZakatPortfolio {
     }
 
     pub fn add_calculator<T: CalculateZakat + Send + Sync + 'static>(mut self, calculator: T) -> Self {
-         // This assumes no extra debt passed at calc time, or debt is handled inside calculator if possible?
-         // Actually, our calculators don't store debt (except Business which stores liabilities).
-         // Most rely on `calculate_zakat(debts)`.
-         // If we use this generic list, we can't easily pass different debts to different items unless we wrap them.
-         // Let's create a wrapper that holds the calculator AND the specific debt to be deducted.
+         // Wraps the calculator with no specific debt (None).
+         // The debt handled here is specific to this portfolio item.
          self.calculators.push(Box::new(PortfolioItemWrapper { calculator, debt: None }));
          self
     }
@@ -53,9 +37,7 @@ impl ZakatPortfolio {
          self
     }
 
-    // Specific helpers to make it "Developer Friendly" as requested
-    // "add_income(...)", "add_gold(...)"
-    // These require constructing the structs.
+    // Helper methods for specific calculator types can be added here.
     
     pub fn calculate_total(&self) -> Result<PortfolioResult, ZakatError> {
         let mut details = Vec::new();

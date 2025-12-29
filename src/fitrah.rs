@@ -34,11 +34,9 @@ pub fn calculate_fitrah(
     // Total Value = person * amount_per_person * price
     let total_value = total_people_decimal * amount_per_person * price_per_unit;
 
-    // Fitrah has no Nisab (it's obligatory per person regardless of wealth, simplified here),
-    // strictly speaking it falls on those who have sustenance for the day.
-    // But for the calculator, if you ask to calculate, we assume you want to pay.
-    // We set Nisab to 0 for this specific calculator context or handle it differently.
-    // However, to fit ZakatDetails, let's say total_assets = total_value, zakat_due = total_value.
+    // Zakat Fitrah is obligatory on every individual who has sustenance for the day of Eid,
+    // regardless of wealth thresholds (Nisab) applicable to Zakat Maal.
+    // Therefore, we set Nisab to 0 to reflect that it is payable if the person has the means.
     
     Ok(ZakatDetails {
         total_assets: total_value,

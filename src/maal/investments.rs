@@ -22,11 +22,20 @@ impl InvestmentAssets {
         investment_type: InvestmentType,
         config: &ZakatConfig,
     ) -> Result<Self, ZakatError> {
-         if config.gold_price_per_gram <= Decimal::ZERO {
+        // For LowerOfTwo or Silver standard, we need silver price too
+        let needs_silver = matches!(
+            config.cash_nisab_standard,
+            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
+        );
+        
+        if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
             return Err(ZakatError::ConfigurationError("Gold price needed for Investment Nisab".to_string()));
         }
+        if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
+            return Err(ZakatError::ConfigurationError("Silver price needed for Investment Nisab with current standard".to_string()));
+        }
         
-        let nisab_threshold_value = config.gold_price_per_gram * config.get_nisab_gold_grams();
+        let nisab_threshold_value = config.get_monetary_nisab_threshold();
         
         Ok(Self {
             market_value: market_value.into(),
@@ -40,7 +49,7 @@ impl CalculateZakat for InvestmentAssets {
     fn calculate_zakat(&self, extra_debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError> {
         // Requirement: 
         // Crypto: Treated as Trade Goods (2.5% if > Nisab).
-        // Stocks: Market Value * 2.5% (MVP).
+        // Stocks: Market Value * 2.5% (Zakah on Principal + Profit).
         
         let total_assets = self.market_value;
         let liabilities = extra_debts.unwrap_or(Decimal::ZERO);

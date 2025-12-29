@@ -4,6 +4,7 @@ use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BusinessAssets {
     pub cash_on_hand: Decimal,
     pub inventory_value: Decimal,
@@ -39,22 +40,8 @@ impl CalculateZakat for BusinessAssets {
              return Err(ZakatError::InvalidInput("Assets cannot be negative".to_string()));
         }
 
-        // Nisab is 85g Gold
-        // We need a way to get the gold price.
-        // The trait calculate_zakat doesn't take config.
-        // Design flaw in my hasty trait definition? 
-        // Solved by refactoring: The Struct should hold the config or the Nisab value directly needed.
-        // Let's assume the caller configures the BusinessAssets struct WITH the nisab threshold or config,
-        // OR we change the trait (breaking change).
-        // Since I can't easily change the trait signature across all files without big diffs, 
-        // I'll assume the struct must be initialized with the Nisab threshold.
-        // Wait, I can't pass config to calculate_zakat.
-        // I will adhere to the trait: fn calculate_zakat(&self, debts: Option<Decimal>)
-        // So BusinessAssets needs to know the Nisab value upon creation.
-        
-        // BUT wait, I haven't implemented the trait in a way that requires config in the struct yet for others except PreciousMetal which took it in 'new'.
-        // So I will replicate that pattern: Pass config to `new` and store the nisab threshold.
-        // Actually, storing the Threshold is better than storing the Config, decoupling it.
+        // Since BusinessAssets is a data struct, it doesn't hold the configuration needed for calculations.
+        // Users should use the BusinessZakatCalculator wrapper instead.
         Err(ZakatError::ConfigurationError("Please use BusinessZakatCalculator wrapper or similar".to_string()))
     }
 }
@@ -68,12 +55,20 @@ pub struct BusinessZakatCalculator {
 
 impl BusinessZakatCalculator {
     pub fn new(assets: BusinessAssets, config: &ZakatConfig) -> Result<Self, ZakatError> {
-        if config.gold_price_per_gram <= Decimal::ZERO {
+        // For LowerOfTwo or Silver standard, we need silver price too
+        let needs_silver = matches!(
+            config.cash_nisab_standard,
+            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
+        );
+        
+        if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
             return Err(ZakatError::ConfigurationError("Gold price needed for Business Nisab".to_string()));
         }
+        if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
+            return Err(ZakatError::ConfigurationError("Silver price needed for Business Nisab with current standard".to_string()));
+        }
         
-        // Nisab for Business is 85g Gold equivalent (or Silver, but standard is Gold).
-        let nisab_threshold_value = config.gold_price_per_gram * config.get_nisab_gold_grams();
+        let nisab_threshold_value = config.get_monetary_nisab_threshold();
         
         Ok(Self {
             assets,
@@ -158,5 +153,41 @@ mod tests {
         
         assert!(!result.is_payable);
         assert_eq!(result.net_assets, dec!(80000000.0));
+    }
+
+    #[test]
+    fn test_business_madhab_affects_nisab() {
+        use crate::config::Madhab;
+        
+        // Setup:
+        // Gold: $100/g → Nisab = 85 * 100 = $8,500
+        // Silver: $2/g -> Nisab = 595 * 2 = $1,190
+        // Net Assets: $5,000
+        
+        // Logic:
+        // If Madhab is Shafi (Gold Standard): $5,000 < $8,500 -> Not Payable
+        // If Madhab is Hanafi (LowerOfTwo -> Silver): $5,000 > $1,190 -> Payable
+        
+        let assets = BusinessAssets::new(dec!(5000.0), dec!(0.0), dec!(0.0), dec!(0.0));
+        
+        // 1. Test Shafi (Gold)
+        let shafi_config = ZakatConfig::new(dec!(100.0), dec!(2.0))
+            .with_madhab(Madhab::Shafi);
+            
+        let shafi_calc = BusinessZakatCalculator::new(assets.clone(), &shafi_config).unwrap();
+        let shafi_res = shafi_calc.calculate_zakat(None).unwrap();
+        
+        assert!(!shafi_res.is_payable, "Shafi (Gold) should not be payable as 5000 < 8500");
+        assert_eq!(shafi_res.nisab_threshold, dec!(8500.0));
+
+        // 2. Test Hanafi (LowerOfTwo)
+        let hanafi_config = ZakatConfig::new(dec!(100.0), dec!(2.0))
+            .with_madhab(Madhab::Hanafi);
+            
+        let hanafi_calc = BusinessZakatCalculator::new(assets, &hanafi_config).unwrap();
+        let hanafi_res = hanafi_calc.calculate_zakat(None).unwrap();
+        
+        assert!(hanafi_res.is_payable, "Hanafi (LowerOfTwo) should be payable as 5000 > 1190");
+        assert_eq!(hanafi_res.nisab_threshold, dec!(1190.0));
     }
 }

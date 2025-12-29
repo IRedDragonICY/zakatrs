@@ -100,12 +100,7 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32) {
     } else if count <= 300 {
         3
     } else {
-        // > 300: +1 per 100
-        // Formula: 3 + (count - 300) / 100 ?
-        // actually standard is usually simply count / 100
-        // e.g. 400 -> 4. 500 -> 5.
-        // 301-399? usually wait for 400.
-        // Let's use integer division for simple recurrence: count / 100
+        // Above 300: 1 sheep for every 100 sheep.
         count / 100
     };
 
@@ -118,70 +113,25 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32) {
         return (Decimal::ZERO, nisab);
     }
 
-    // Cows:
+    // Cows Zakat Logic:
     // 30-39: 1 Tabi (Yearling)
     // 40-59: 1 Musinnah (2yo)
-    // 60+: Recursively.
-    // Logic: 
-    // We want to maximize Musinnah (older/more valuable) generally, or find exact fit.
-    // Brute force mix of 30s and 40s to match count?
-    // Common algorithm:
-    // Try to subtract 40s and 30s.
-    
-    // Simplification for "Value":
-    // 1 Tabi ~ Value? 1 Musinnah ~ Value? 
-    // We only have `price` (let's assume full cow price). 
-    // Tabi is maybe 0.5 cow, Musinnah 0.75 cow?
-    // This is getting deep into estimation.
-    // User Requirement: "Recursively: 1 Tabi per 30, 1 Musinnah per 40".
-    
-    // Let's simplify return value to generic "Units of Cow Paid".
-    // 30 -> 1 unit. 40 -> 1.5 unit?
-    // Let's iterate.
+    // 60+: Combination of 30s (Tabi) and 40s (Musinnah) to cover the total count.
     
     let mut tabi = 0;
     let mut musinnah = 0;
 
-    
-    // Greedy approach often works for standard cases, but exact change solving is ideal.
-    // Iterate 40s
-
-    
-    // We want to find combination a*30 + b*40 <= count that maximizes something?
-    // Actually the rule is definitive for ranges.
-    // 60 -> 2 x 30 (2 Tabi).
-    // 70 -> 1x30 + 1x40 (1 Tabi, 1 Musinnah).
-    // 80 -> 2x40 (2 Musinnah).
-    // 90 -> 3x30 (3 Tabi).
-    // 100 -> 2x30 + 1x40 (2 Tabi + 1 Musinnah).
-    // 120 -> 3x40 or 4x30? Preference to Musinnah usually. 3x40 = 120. 4x30 = 120.
-    
-    // Simple Algo:
-    // musinnah = count / 40
-    // remainder = count % 40
-    // if remainder >= 30 { tabi++ }
-    // BUT this fails for 60 (60/40 = 1, rem 20. result 1 Musinnah? Wrong, should be 2 Tabi).
-    
-    // Correct loop:
-    // Find combination of 30 and 40 that sums closest to Count (without exceeding, or covering range).
-    
-    // Let's try to maximize 40s such that remainder is divisible by 30?
-    // for m in 0..max_musinnah reversed:
-    //    rem = count - m*40
-    //    if rem % 30 == 0 { found }
-    
-    // For 60: max_musinnah = 1. rem = 20. 20%30 != 0.
-    // m=0. rem=60. 60%30 == 0 -> tabi = 2. Correct.
-    
     if count >= 30 {
+        // Algorithm:
+        // We iterate downwards to find the combination of 40s (Musinnahs) and 30s (Tabis)
+        // that perfectly divides the remainder.
+        // We prioritize Musinnahs (40s) as they are generally more valuable, but the primary goal
+        // is to cover the count with no remainder if possible.
+
         let max_m = count / 40;
         let mut best_m = 0;
         let mut best_t = 0;
         let mut found = false;
-        
-        // We iterate downwards to prioritize Musinnahs (usually preferred/more valuable)
-        // OR we check zakat rules strictly.
-        // Actually priority is to cover the number.
         
         for m in (0..=max_m).rev() {
             let remainder = count - (m * 40);
@@ -197,24 +147,12 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32) {
             musinnah = best_m;
             tabi = best_t;
         } else {
-            // Fallback for ranges that don't fit perfectly (shouldn't happen in standard large numbers, but small gaps exist e.g. 50?)
-            // 40-59: 1 Musinnah.
-            // 50 falls here. 50 is 1 M.
-            // My loop: 50/40 = 1. rem 10. 10%30!=0.
-            // loop 0. rem 50. 50%30!=0.
-            // Not found.
-            // Handled by range logic strictly for small numbers?
-            // "Recusively" usually implies large n.
-            
-             // Hardcoded ranges for small numbers first
+             // Fallback for specific ranges or gaps where exact division isn't possible (e.g., small counts).
+             // We apply the standard ranges for < 60 explicitly.
              if count <= 39 { tabi = 1; musinnah = 0; }
              else if count <= 59 { tabi = 0; musinnah = 1; }
              else {
-                 // Gaps like 50 shouldn't be recursed?
-                 // Standard interpretations handle the "closest" mix.
-                 // We will stick to the loop for 60+.
-                 // If loop fails, we default to "1 Musinnah per 40ish"?
-                 // Let's ignore complex gap logic for MVP and return estimate.
+                  // For larger numbers where exact match fails (rare), we default to prioritizing Musinnahs
                   musinnah = count / 40; 
                   let rem = count % 40;
                   if rem >= 30 { tabi += 1; }
@@ -222,10 +160,9 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32) {
         }
     }
 
-    // Value estimation
-    // Tabi = 1 unit? Musinnah = 1.3 unit?
-    // Let's assume price provided is for a "Standard Cow" (likely Musinnah or adult).
-    // Tabi calculated as 0.7 * Price. Musinnah 1.0 * Price.
+    // Value estimation based on pricing ratios relative to a standard cow price:
+    // Tabi (1yo) is estimated at 0.7x of standard price.
+    // Musinnah (2yo) is estimated at 1.0x of standard price.
     let val_tabi = price * dec!(0.7);
     let val_musinnah = price;
     
@@ -262,9 +199,9 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32)
     else if count <= 90 { (0, 0, 2, 0, 0) }
     else if count <= 120 { (0, 0, 0, 2, 0) }
     else {
-        // Recursive 121+
-        // 1 Bint Labun per 40, 1 Hiqqah per 50.
-        // Similar to Cow logic.
+        // Recursive logic for 121+:
+        // 1 Bint Labun per 40 camels, 1 Hiqqah per 50 camels.
+        // Similar to Cow algothim, we find the combination that maximizes coverage.
         let mut best_h = 0;
         let mut best_b = 0;
         let max_h = count / 50;
@@ -280,14 +217,14 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32)
         (0, 0, best_b, best_h, 0)
     };
 
-    // Valuation
+    // Valuation Ratios:
     // Sheep = sheep_price
-    // Bint Makhad = 0.5 camel? 
-    // Bint Labun = 0.75 camel?
-    // Hiqqah = 1.0 camel (Full prime)
-    // Jazaah = 1.25 camel
+    // Bint Makhad (1yo) = 0.5x camel_price 
+    // Bint Labun (2yo) = 0.75x camel_price
+    // Hiqqah (3yo) = 1.0x camel_price (Prime)
+    // Jazaah (4yo) = 1.25x camel_price
     
-    // Price Assumptions for MVP:
+    // Pricing implementation:
     let v_sheep = prices.sheep_price;
     let v_camel = prices.camel_price; 
     let v_bm = v_camel * dec!(0.5);

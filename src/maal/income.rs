@@ -23,11 +23,20 @@ impl IncomeZakatCalculator {
         method: IncomeCalculationMethod,
         config: &ZakatConfig,
     ) -> Result<Self, ZakatError> {
-         if config.gold_price_per_gram <= Decimal::ZERO {
+        // For LowerOfTwo or Silver standard, we need silver price too
+        let needs_silver = matches!(
+            config.cash_nisab_standard,
+            crate::config::NisabStandard::Silver | crate::config::NisabStandard::LowerOfTwo
+        );
+        
+        if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
             return Err(ZakatError::ConfigurationError("Gold price needed for Income Nisab".to_string()));
         }
+        if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
+            return Err(ZakatError::ConfigurationError("Silver price needed for Income Nisab with current standard".to_string()));
+        }
         
-        let nisab_threshold_value = config.gold_price_per_gram * config.get_nisab_gold_grams();
+        let nisab_threshold_value = config.get_monetary_nisab_threshold();
         
         Ok(Self {
             total_income: total_income.into(),
@@ -45,13 +54,9 @@ impl CalculateZakat for IncomeZakatCalculator {
 
         let (total_assets, liabilities) = match self.method {
             IncomeCalculationMethod::Gross => {
-                // Gross means we take 2.5% of the Total Income directly. 
-                // Any debts passed in would technically reduce the "Wealth" context if we treat it as "Assets",
-                // but strictly speaking Gross method usually ignores expenses.
-                // However, to keep it consistent with ZakatDetails structure:
-                // We'll treat total_income as assets, and if the user supplied extra_debts, we deduct them 
-                // ONLY if logical. In Gross method, usually no deductions.
-                // But let's support debt deduction if explicitly passed via CalculateZakat.
+                // Gross Method: 2.5% of Total Income.
+                // Deducting debts is generally not standard in the Gross method (similar to agriculture),
+                // but we deduct external_debt if provided to support flexible user requirements.
                 (self.total_income, external_debt)
             },
             IncomeCalculationMethod::Net => {

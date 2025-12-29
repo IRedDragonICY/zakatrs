@@ -5,7 +5,7 @@ pub mod portfolio;
 pub mod traits;
 pub mod types;
 
-pub use config::ZakatConfig;
+pub use config::{ZakatConfig, Madhab, NisabStandard};
 pub use traits::CalculateZakat;
 pub use types::{ZakatDetails, ZakatError, WealthType};
 pub use portfolio::ZakatPortfolio;

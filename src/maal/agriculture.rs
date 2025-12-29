@@ -73,11 +73,11 @@ impl CalculateZakat for AgricultureAssets {
              // but if we support debt deduction, we might apply to net.
              // Given the complexity of Fiqh here, the safest implementation of "Deductible Rule" requested:
              // "Allow passing ... deducted from assets before checking Nisab"
-             // Implementation: (Gross - Debt) >= Nisab ? 
-             // Wait, mixing weight and value. Debt is Value. Harvest is Weight.
-             // We convert Harvest to Value to check Nisab? 
-             // Or we deduct equivalent weight?
-             // Simplest interpretation: Deduct debt value from Total Value, then check if remaining Value >= Nisab Value.
+             // Implementation Note:
+             // While traditional Fiqh often checks Nisab by weight before debt, the requirement
+             // here allows for flexible debt deduction. We treat the debt as a monetary value
+             // deducted from the total harvest value.
+             // Logic: If (Total Harvest Value - Debt Value) >= Nisab Value, then Zakat is due on the Net Value.
              
              if net_value >= nisab_value {
                  net_value * rate

@@ -31,6 +31,64 @@ impl BusinessAssets {
             .build()
     }
 
+    /// Creates a `BusinessAssets` instance with only cash on hand.
+    ///
+    /// # Arguments
+    /// * `amount` - The amount of cash on hand.
+    ///
+    /// # Example
+    /// ```
+    /// use zakat::prelude::*;
+    /// use rust_decimal_macros::dec;
+    ///
+    /// let assets = BusinessAssets::from_cash(dec!(10000)).unwrap();
+    /// assert_eq!(assets.cash_on_hand, dec!(10000));
+    /// assert_eq!(assets.inventory_value, dec!(0));
+    /// ```
+    pub fn from_cash(amount: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        Self::builder().cash(amount).build()
+    }
+
+    /// Creates a `BusinessAssets` instance with only inventory value.
+    ///
+    /// # Arguments
+    /// * `amount` - The value of the inventory (at current mark-to-market prices).
+    ///
+    /// # Example
+    /// ```
+    /// use zakat::prelude::*;
+    /// use rust_decimal_macros::dec;
+    ///
+    /// let assets = BusinessAssets::from_inventory(dec!(50000)).unwrap();
+    /// assert_eq!(assets.inventory_value, dec!(50000));
+    /// assert_eq!(assets.cash_on_hand, dec!(0));
+    /// ```
+    pub fn from_inventory(amount: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        Self::builder().inventory(amount).build()
+    }
+
+    /// Creates a `BusinessAssets` instance with both cash and inventory (Trading Goods).
+    ///
+    /// # Arguments
+    /// * `cash` - The amount of cash on hand.
+    /// * `inventory` - The value of the inventory.
+    ///
+    /// # Example
+    /// ```
+    /// use zakat::prelude::*;
+    /// use rust_decimal_macros::dec;
+    ///
+    /// let assets = BusinessAssets::trading_goods(dec!(10000), dec!(5000)).unwrap();
+    /// assert_eq!(assets.cash_on_hand, dec!(10000));
+    /// assert_eq!(assets.inventory_value, dec!(5000));
+    /// ```
+    pub fn trading_goods(
+        cash: impl IntoZakatDecimal,
+        inventory: impl IntoZakatDecimal,
+    ) -> Result<Self, ZakatError> {
+        Self::builder().cash(cash).inventory(inventory).build()
+    }
+
     pub fn builder() -> BusinessAssetsBuilder {
         BusinessAssetsBuilder::default()
     }
@@ -312,5 +370,59 @@ mod tests {
         
         assert!(hanafi_res.is_payable, "Hanafi (LowerOfTwo) should be payable as 5000 > 1190");
         assert_eq!(hanafi_res.nisab_threshold, dec!(1190.0));
+    }
+}
+
+#[cfg(test)]
+mod tests_dx {
+    use super::*;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn test_from_cash() {
+        let assets = BusinessAssets::from_cash(10_000).expect("Should create from cash");
+        assert_eq!(assets.cash_on_hand, dec!(10000));
+        assert_eq!(assets.inventory_value, dec!(0));
+        assert_eq!(assets.receivables, dec!(0));
+        assert_eq!(assets.short_term_liabilities, dec!(0));
+    }
+
+    #[test]
+    fn test_from_inventory() {
+        let assets = BusinessAssets::from_inventory(50_000).expect("Should create from inventory");
+        assert_eq!(assets.inventory_value, dec!(50000));
+        assert_eq!(assets.cash_on_hand, dec!(0));
+    }
+
+    #[test]
+    fn test_trading_goods() {
+        let assets = BusinessAssets::trading_goods(10_000, 5000).expect("Should create trading goods");
+        assert_eq!(assets.cash_on_hand, dec!(10000));
+        assert_eq!(assets.inventory_value, dec!(5000));
+        assert_eq!(assets.receivables, dec!(0));
+    }
+
+    #[test]
+    fn test_dx_validation() {
+        // Validation should still work because it delegates to builder
+        let err = BusinessAssets::from_cash(-100);
+        assert!(err.is_err());
+        
+        let err = BusinessAssets::from_inventory(-50);
+        assert!(err.is_err());
+
+        let err = BusinessAssets::trading_goods(100, -10);
+        assert!(err.is_err());
+    }
+
+    #[test]
+    fn test_ergonomic_usage() {
+        // Ensure we can use various numerical types thanks to IntoZakatDecimal
+        let _ = BusinessAssets::from_cash(1000u32).unwrap();
+        let _ = BusinessAssets::from_cash(1000.0f64).unwrap();
+        let _ = BusinessAssets::from_cash(dec!(1000)).unwrap();
+        
+        // Trading goods with mixed types
+        let _ = BusinessAssets::trading_goods(1000, 500.50).unwrap();
     }
 }

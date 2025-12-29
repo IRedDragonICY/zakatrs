@@ -116,7 +116,7 @@ impl AssetBuilder<LivestockPrices> for LivestockPricesBuilder {
     }
 }
 
-const MAX_ITERATIONS: u32 = 1000;
+
 
 impl LivestockAssets {
     pub fn new(
@@ -185,8 +185,8 @@ impl CalculateZakat for LivestockAssets {
 
         let (zakat_value, nisab_count, heads_due) = match self.animal_type {
             LivestockType::Sheep => calculate_sheep_zakat(self.count, self.prices.sheep_price),
-            LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price)?,
-            LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices)?,
+            LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price),
+            LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices),
         };
 
         // We construct ZakatDetails.
@@ -268,10 +268,10 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(Stri
 
 #[allow(clippy::type_complexity)]
 #[allow(clippy::manual_is_multiple_of)]
-fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
+fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(String, u32)>) {
     let nisab = 30;
     if count < 30 {
-        return Ok((Decimal::ZERO, nisab, vec![]));
+        return (Decimal::ZERO, nisab, vec![]);
     }
 
     // Cows Zakat Logic:
@@ -282,48 +282,52 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<
     let mut tabi = 0;
     let mut musinnah = 0;
 
-    if count >= 30 {
-        // Algorithm:
-        // We iterate downwards to find the combination of 40s (Musinnahs) and 30s (Tabis)
-        // that perfectly divides the remainder.
-        // We prioritize Musinnahs (40s) as they are generally more valuable, but the primary goal
-        // is to cover the count with no remainder if possible.
-
-        let max_m = count / 40;
-        let mut best_m = 0;
+    if count < 60 {
+        if count <= 39 { tabi = 1; }
+        else { musinnah = 1; }
+    } else {
+        // O(1) Optimization: Swap Strategy
+        // We want to maximize Musinnah (40s) as they are valuable (and cover more heads),
+        // but we need to solve: 40*m + 30*t <= count such that (count - (40*m + 30*t)) < 30 ??
+        // No, actually the rule for > 60 is to cover the ENTIRE count using combination of 30s and 40s.
+        // It's a partition problem.
+        
+        // Start with max possible Musinnahs (40s)
+        let mut best_m = count / 40;
         let mut best_t = 0;
         let mut found = false;
-        
-        let mut iterations = 0;
-        for m in (0..=max_m).rev() {
-            iterations += 1;
-            if iterations > MAX_ITERATIONS {
-                return Err(ZakatError::CalculationError("Cow Zakat complexity limit exceeded".to_string(), None));
-            }
 
-            let remainder = count - (m * 40);
-            if remainder % 30 == 0 {
-                best_m = m;
-                best_t = remainder / 30;
-                found = true;
-                break;
-            }
-        }
+        // We check if the remainder is divisible by 30.
+        // If not, we "swap" one Musinnah (40) into the remainder pool (adding 40 to rem)
+        // and check if the new remainder is divisible by 30.
+        // Since 3 * 40 = 120 = 4 * 30, we only need to check at most 3 swaps before the pattern repeats/cycles.
         
+        for _ in 0..=3 {
+            let used_count = best_m * 40;
+            if used_count <= count {
+                let rem = count - used_count;
+                if rem % 30 == 0 {
+                    best_t = rem / 30;
+                    found = true;
+                    break;
+                }
+            }
+            
+            if best_m == 0 { break; } // Cannot swap further
+            best_m -= 1;
+        }
+
         if found {
             musinnah = best_m;
             tabi = best_t;
         } else {
-             // Fallback for specific ranges or gaps where exact division isn't possible (e.g., small counts).
-             // We apply the standard ranges for < 60 explicitly.
-             if count <= 39 { tabi = 1; musinnah = 0; }
-             else if count <= 59 { tabi = 0; musinnah = 1; }
-             else {
-                  // For larger numbers where exact match fails (rare), we default to prioritizing Musinnahs
-                  musinnah = count / 40; 
-                  let rem = count % 40;
-                  if rem >= 30 { tabi += 1; }
-             }
+            // Fallback: If no perfect partition exists (rare/impossible for large numbers),
+            // we default to prioritizing 40s and covering remainder logic or just best effort.
+            // For standard Zakat rules, large herds are usually partitioned.
+            // Default best effort: Max 40s.
+            musinnah = count / 40;
+            let rem = count % 40;
+            if rem >= 30 { tabi = 1; }
         }
     }
 
@@ -341,27 +345,19 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<
     if tabi > 0 { parts.push(("Tabi'".to_string(), tabi)); }
     if musinnah > 0 { parts.push(("Musinnah".to_string(), musinnah)); }
 
-    Ok((total_zakat_val, nisab, parts))
+    (total_zakat_val, nisab, parts)
 }
 
 #[allow(clippy::type_complexity)]
 #[allow(clippy::manual_is_multiple_of)]
-fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
+fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32, Vec<(String, u32)>) {
     let nisab = 5;
     if count < 5 {
-        return Ok((Decimal::ZERO, nisab, vec![]));
+        return (Decimal::ZERO, nisab, vec![]);
     }
     
-    // 5-9: 1 Sheep
-    // 10-14: 2 Sheep
-    // 15-19: 3 Sheep
-    // 20-24: 4 Sheep
-    // 25-35: 1 Bint Makhad (Camel 1yo).
-    // 36-45: 1 Bint Labun (Camel 2yo).
-    // 46-60: 1 Hiqqah (Camel 3yo).
-    // 61-75: 1 Jaza'ah (Camel 4yo).
-    // 76-90: 2 Bint Labun.
-    // 91-120: 2 Hiqqah.
+    // 5-24: Sheep logic (standard)
+    // 25-120: Discrete Camel ranges
     // 121+: 1 Bint Labun per 40, 1 Hiqqah per 50.
     
     let (sheep, b_makhad, b_labun, hiqqah, jazaah) = if count < 25 {
@@ -375,26 +371,39 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decima
     else if count <= 120 { (0, 0, 0, 2, 0) }
     else {
         // Recursive logic for 121+:
-        // 1 Bint Labun per 40 camels, 1 Hiqqah per 50 camels.
-        // Similar to Cow algothim, we find the combination that maximizes coverage.
-        let mut best_h = 0;
-        let mut best_b = 0;
-        let max_h = count / 50;
+        // 1 Bint Labun (40s), 1 Hiqqah (50s).
+        // Maximize Hiqqah (50s) as they are larger/more valuable.
         
-        let mut iterations = 0;
-        for h in (0..=max_h).rev() {
-             iterations += 1;
-            if iterations > MAX_ITERATIONS {
-                return Err(ZakatError::CalculationError("Camel Zakat complexity limit exceeded".to_string(), None));
-            }
+        let mut best_h = count / 50;
+        let mut best_b = 0;
+        let mut found = false;
 
-            let rem = count - (h * 50);
-            if rem % 40 == 0 {
-                best_h = h;
-                best_b = rem / 40;
-                break;
+        // Swap Strategy O(1): Try converting a 50 into 40s.
+        // 4 * 50 = 200 = 5 * 40. Relies on LCM(40, 50) = 200.
+        // Max swaps needed = 4.
+        
+        for _ in 0..=4 {
+            let used_count = best_h * 50;
+            if used_count <= count {
+                let rem = count - used_count;
+                if rem % 40 == 0 {
+                    best_b = rem / 40;
+                    found = true;
+                    break;
+                }
             }
+            if best_h == 0 { break; }
+            best_h -= 1;
         }
+        
+        // Fallback or found
+        if !found {
+            // Default approach for non-perfect fit
+             best_h = count / 50;
+             let rem = count % 50;
+             if rem >= 40 { best_b = 1; }
+        }
+
         (0, 0, best_b, best_h, 0)
     };
 
@@ -426,7 +435,7 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decima
     if hiqqah > 0 { parts.push(("Hiqqah".to_string(), hiqqah)); }
     if jazaah > 0 { parts.push(("Jaza'ah".to_string(), jazaah)); }
 
-    Ok((total, nisab, parts))
+    (total, nisab, parts)
 }
 
 #[cfg(test)]
@@ -508,28 +517,28 @@ mod tests {
     }
 
     #[test]
-    fn test_complexity_limit() {
+    fn test_large_number_success() {
         let prices = LivestockPrices::builder()
             .cow_price(dec!(500.0))
             .build().unwrap();
 
-        // 100,000,001 is not divisible by 10.
-        // 40x + 30y = 100,000,001 has no integer solution? 
-        // Actually gcd(30, 40) = 10.
-        // For integer solution to exist, N must be divisible by 10.
-        // 100,000,001 is NOT divisible by 10.
-        // So the loop will search exhaustively.
-        // Max m = ~2.5 million.
-        // Limit = 1000.
-        // Should error.
+        // 100M + 1 cows. Previously failed due to complexity/iteration limit.
+        // Now should pass instantly with O(1) logic.
         
-        let stock_fail = LivestockAssets::new(100_000_001, LivestockType::Cow, prices);
-        let res_fail = stock_fail.calculate_zakat(&ZakatConfig::default());
+        let stock_large = LivestockAssets::new(100_000_001, LivestockType::Cow, prices);
+        let res_large = stock_large.calculate_zakat(&ZakatConfig::default());
         
-        assert!(res_fail.is_err());
-        match res_fail {
-             Err(ZakatError::CalculationError(msg, _)) => assert_eq!(msg, "Cow Zakat complexity limit exceeded"),
-             _ => panic!("Expected complexity error, got {:?}", res_fail),
-        }
+        // Should NOT be an error now
+        assert!(res_large.is_ok()); 
+        let details = res_large.unwrap();
+        assert!(details.is_payable);
+        assert!(details.zakat_due > dec!(0));
+        
+        // Value sanity check: 100M cows * $500 = $50B. Zakat should be roughly 2.5% value?
+        // Actually Livestock Zakat is approx 2.5% value but calculated via heads.
+        // 100M cows -> ~2.5M heads due. 
+        // 2.5M * $500 = $1.25B approx.
+        // Let's just ensure it calculated "something" reasonable.
+        assert!(details.zakat_due > dec!(1_000_000_000));
     }
 }

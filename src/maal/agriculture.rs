@@ -144,7 +144,11 @@ impl CalculateZakat for AgricultureAssets {
             wealth_type: crate::types::WealthType::Agriculture,
             status_reason: None,
             label: self.label.clone(),
-            payload: crate::types::PaymentPayload::Monetary(zakat_due),
+            payload: crate::types::PaymentPayload::Agriculture {
+                harvest_weight: self.harvest_weight_kg,
+                irrigation_method: irrigation_desc.to_string(),
+                crop_value: zakat_due,
+            },
             calculation_trace: trace,
         })
     }
@@ -202,5 +206,20 @@ mod tests {
          let res = agri.with_hawl(true).calculate_zakat(&config).unwrap();
          
          assert!(!res.is_payable);
+    }
+    #[test]
+    fn test_agriculture_payload() {
+        let config = ZakatConfig::default();
+        let agri = AgricultureAssets::new(dec!(1000.0), dec!(1.0), IrrigationMethod::Rain).unwrap();
+        let res = agri.with_hawl(true).calculate_zakat(&config).unwrap();
+        
+        match res.payload {
+            crate::types::PaymentPayload::Agriculture { harvest_weight, irrigation_method, crop_value } => {
+                assert_eq!(harvest_weight, dec!(1000.0));
+                assert_eq!(irrigation_method, "Rain-fed (10%)");
+                assert_eq!(crop_value, dec!(100.0));
+            },
+            _ => panic!("Expected Agriculture payload"),
+        }
     }
 }

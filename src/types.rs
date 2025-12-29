@@ -16,6 +16,12 @@ pub enum PaymentPayload {
         description: String,
         heads_due: Vec<(String, u32)>, 
     },
+    /// In-kind agriculture payment specifying harvest details.
+    Agriculture {
+        harvest_weight: Decimal,
+        irrigation_method: String,
+        crop_value: Decimal,
+    },
 }
 
 /// Represents a single step in the Zakat calculation process.

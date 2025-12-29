@@ -51,31 +51,42 @@ serde_json = "1.0"
 > **Note:** You can pass standard Rust types (`i32`, `f64`, `&str`) directly to all constructors. There is no need to manually convert to `Decimal` or use the `dec!()` macro anymore.
 
 ```rust
-use zakat::{ZakatConfig, CalculateZakat, AssetBuilder};
-use zakat::maal::business::{BusinessAssets, BusinessZakatCalculator};
+use zakat::{ZakatConfig, CalculateZakat};
+use zakat::maal::business::BusinessAssets;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ZakatConfig::new(65, 1)?; // gold $65/g, silver $1/g
 
-    // Use Builder Pattern for clearer asset definition
-    let assets = BusinessAssets::builder()
-        .cash(50000)
-        .inventory(20000)
-        .receivables(5000)
-        .liabilities(1000) // Deductible short-term debts
-        .build()?;
+    // 1. Simple Case: Trading Goods (Cash + Inventory)
+    let assets = BusinessAssets::trading_goods(10_000, 50_000)?;
+    
+    // 2. Or specialized: Cash-only business
+    // let assets = BusinessAssets::from_cash(100_000)?;
 
-    let calc = BusinessZakatCalculator::new(assets, &config)?
-                     .with_label("Main Store")
-                     .with_hawl(true);
-
-    let result = calc.calculate_zakat()?;
+    // Calculate with labeling and Hawl
+    let result = zakat::maal::business::BusinessZakatCalculator::new(assets)
+        .with_label("Main Store")
+        .with_hawl(true)
+        .calculate_zakat(&config)?;
 
     if result.is_payable {
         println!("Zakat for {}: ${}", result.label.unwrap_or_default(), result.zakat_due);
     }
     Ok(())
 }
+```
+
+### Advanced Usage (Builder Pattern)
+
+For complex scenarios involving debts and receivables:
+
+```rust
+let assets = BusinessAssets::builder()
+    .cash(50000)
+    .inventory(20000)
+    .receivables(5000)
+    .liabilities(1000)
+    .build()?;
 ```
 
 ### Portfolio

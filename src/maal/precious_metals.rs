@@ -2,12 +2,20 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError, WealthType};
 use crate::traits::CalculateZakat;
-use crate::config::ZakatConfig;
+use crate::config::{ZakatConfig, NisabStandard};
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum JewelryUsage {
+    Investment,    // Always Zakatable
+    PersonalUse,   // Exempt in Shafi/Maliki/Hanbali usually
+}
 
 pub struct PreciousMetal {
     pub weight_grams: Decimal,
     pub metal_type: WealthType, // Gold or Silver
     pub purity: u32, // Karat for Gold (e.g. 24, 21, 18). Ignored for Silver (assumed pure).
+    pub usage: JewelryUsage,
     pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
@@ -29,6 +37,7 @@ impl PreciousMetal {
             weight_grams: weight,
             metal_type,
             purity: 24, // Default to 24K (Pure)
+            usage: JewelryUsage::Investment, // Default to safer option (Zakatable)
             liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
@@ -50,6 +59,11 @@ impl PreciousMetal {
         self
     }
 
+    pub fn with_usage(mut self, usage: JewelryUsage) -> Self {
+        self.usage = usage;
+        self
+    }
+
     pub fn with_label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
@@ -58,6 +72,23 @@ impl PreciousMetal {
 
 impl CalculateZakat for PreciousMetal {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        // Check for personal usage exemption first
+        if self.usage == JewelryUsage::PersonalUse {
+            match config.cash_nisab_standard {
+                // Gold Standard -> Implies Shafi/Maliki -> Exempt
+                NisabStandard::Gold => {
+                     return Ok(ZakatDetails::not_payable(
+                         Decimal::ZERO, 
+                         self.metal_type, 
+                         "Personal jewelry is exempt in this Madhab"
+                     ).with_label(self.label.clone().unwrap_or_default()));
+                },
+                // LowerOfTwo (Hanafi) -> Payable
+                // Silver -> Conservative -> Payable
+                _ => {} 
+            }
+        }
+
         let (price_per_gram, nisab_threshold_grams) = match self.metal_type {
             WealthType::Gold => (config.gold_price_per_gram, config.get_nisab_gold_grams()),
             WealthType::Silver => (config.silver_price_per_gram, config.get_nisab_silver_grams()),
@@ -157,5 +188,38 @@ mod tests {
             .with_purity(24);
         let zakat24 = metal24.with_hawl(true).calculate_zakat(&config).unwrap();
         assert!(zakat24.is_payable);
+    }
+    #[test]
+    fn test_personal_jewelry_hanafi_payable() {
+        // Hanafi uses LowerOfTwo. Personal jewelry is Zakatable.
+        let config = ZakatConfig { 
+            gold_price_per_gram: dec!(100.0), 
+            cash_nisab_standard: NisabStandard::LowerOfTwo,
+            ..Default::default() 
+        };
+        
+        // 100g > 85g Nisab
+        let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap()
+            .with_usage(JewelryUsage::PersonalUse);
+            
+        let zakat = metal.with_hawl(true).calculate_zakat(&config).unwrap();
+        assert!(zakat.is_payable);
+    }
+
+    #[test]
+    fn test_personal_jewelry_shafi_exempt() {
+        // Shafi uses Gold Standard. Personal jewelry is Exempt.
+        let config = ZakatConfig { 
+            gold_price_per_gram: dec!(100.0), 
+            cash_nisab_standard: NisabStandard::Gold,
+            ..Default::default() 
+        };
+        
+        let metal = PreciousMetal::new(dec!(100.0), WealthType::Gold).unwrap()
+            .with_usage(JewelryUsage::PersonalUse);
+            
+        let zakat = metal.with_hawl(true).calculate_zakat(&config).unwrap();
+        assert!(!zakat.is_payable);
+        assert_eq!(zakat.status_reason, Some("Personal jewelry is exempt in this Madhab".to_string()));
     }
 }

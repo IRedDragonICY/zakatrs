@@ -23,6 +23,8 @@ pub struct ZakatDetails {
     pub status_reason: Option<String>,
     /// Optional label for the asset (e.g. "Main Store", "Gold Necklace").
     pub label: Option<String>,
+    /// Additional metadata for reporting (e.g. "2 Sheep due").
+    pub extra_data: Option<std::collections::HashMap<String, String>>,
 }
 
 impl ZakatDetails {
@@ -55,6 +57,7 @@ impl ZakatDetails {
             wealth_type,
             status_reason: None,
             label: None,
+            extra_data: None,
         }
     }
 
@@ -70,11 +73,17 @@ impl ZakatDetails {
             wealth_type,
             status_reason: Some(reason.to_string()),
             label: None,
+            extra_data: None,
         }
     }
 
     pub fn with_label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    pub fn with_extra_data(mut self, data: std::collections::HashMap<String, String>) -> Self {
+        self.extra_data = Some(data);
         self
     }
 }

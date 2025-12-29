@@ -1,5 +1,8 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use std::env;
+use std::fs;
+use crate::types::ZakatError;
 
 /// Islamic school of thought (Madhab) for Zakat calculation.
 /// 
@@ -76,6 +79,36 @@ impl ZakatConfig {
             silver_price_per_gram: silver_price.into(),
             ..Default::default()
         }
+    }
+
+    /// Attempts to load configuration from environment variables.
+    /// 
+    /// Looks for:
+    /// - `ZAKAT_GOLD_PRICE`
+    /// - `ZAKAT_SILVER_PRICE`
+    pub fn from_env() -> Result<Self, ZakatError> {
+        let gold_str = env::var("ZAKAT_GOLD_PRICE")
+            .map_err(|_| ZakatError::ConfigurationError("ZAKAT_GOLD_PRICE env var not set".to_string()))?;
+        let silver_str = env::var("ZAKAT_SILVER_PRICE")
+            .map_err(|_| ZakatError::ConfigurationError("ZAKAT_SILVER_PRICE env var not set".to_string()))?;
+
+        let gold_price = gold_str.parse::<Decimal>()
+            .map_err(|e| ZakatError::ConfigurationError(format!("Invalid gold price format: {}", e)))?;
+        let silver_price = silver_str.parse::<Decimal>()
+            .map_err(|e| ZakatError::ConfigurationError(format!("Invalid silver price format: {}", e)))?;
+
+        Ok(Self::new(gold_price, silver_price))
+    }
+
+    /// Attempts to load configuration from a JSON file.
+    pub fn try_from_json(path: &str) -> Result<Self, ZakatError> {
+        let content = fs::read_to_string(path)
+            .map_err(|e| ZakatError::ConfigurationError(format!("Failed to read config file: {}", e)))?;
+        
+        let config: ZakatConfig = serde_json::from_str(&content)
+            .map_err(|e| ZakatError::ConfigurationError(format!("Failed to parse config JSON: {}", e)))?;
+            
+        Ok(config)
     }
 
     // ========== Fluent Builder Methods ==========
@@ -245,6 +278,28 @@ mod tests {
         
         assert_eq!(config.cash_nisab_standard, NisabStandard::Silver);
         assert_eq!(config.get_monetary_nisab_threshold(), dec!(595.0));
+    }
+
+    #[test]
+    fn test_from_env_loads_correctly() {
+        // Warning: Environment variables are shared global state.
+        // This test might conflict with others if run in parallel without care.
+        // We use unique values to minimize risk of false positives.
+        // set_var is unsafe in 2024 edition due to threading races
+        unsafe {
+            std::env::set_var("ZAKAT_GOLD_PRICE", "999.99");
+            std::env::set_var("ZAKAT_SILVER_PRICE", "8.88");
+        }
+        
+        let config = ZakatConfig::from_env().expect("Should load from env");
+        assert_eq!(config.gold_price_per_gram, dec!(999.99));
+        assert_eq!(config.silver_price_per_gram, dec!(8.88));
+        
+        // Clean up
+        unsafe {
+            std::env::remove_var("ZAKAT_GOLD_PRICE");
+            std::env::remove_var("ZAKAT_SILVER_PRICE");
+        }
     }
 }
 

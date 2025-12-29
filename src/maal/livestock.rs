@@ -118,13 +118,8 @@ impl CalculateZakat for LivestockAssets {
              return Ok(ZakatDetails::not_payable(nisab_count_val, crate::types::WealthType::Livestock, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
-        // Note: Livestock Zakat is generally strict on counts and tiers, simplified here for "Value" return.
-        // We will calculate 'animals due' then multiply by price.
-        // Debt deduction is generally not applied to Livestock count directly (Nisab is physical count),
-        // but can be applied to final liability or ignore it. 
-        // We will IGNORE debts for Livestock count Nisab check as it's physical.
 
-        let (zakat_value, nisab_count) = match self.animal_type {
+        let (zakat_value, nisab_count, description) = match self.animal_type {
             LivestockType::Sheep => calculate_sheep_zakat(self.count, self.prices.sheep_price),
             LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price),
             LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices),
@@ -136,6 +131,14 @@ impl CalculateZakat for LivestockAssets {
         let total_value = Decimal::from(self.count) * single_price;
         let is_payable = zakat_value > Decimal::ZERO;
 
+        let mut extra_data = std::collections::HashMap::new();
+        if is_payable {
+            extra_data.insert("animals_due_description".to_string(), description);
+            // Rough count estimation logic if needed, or just putting "N/A" for count if complex
+            // But we can extract count from description or just not set it if it's mixed.
+            // For now, let's just use the description.
+        }
+
         Ok(ZakatDetails {
             total_assets: total_value,
             liabilities_due_now: self.liabilities_due_now,
@@ -146,14 +149,15 @@ impl CalculateZakat for LivestockAssets {
             wealth_type: crate::types::WealthType::Livestock,
             status_reason: None,
             label: self.label.clone(),
+            extra_data: Some(extra_data),
         })
     }
 }
 
-fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32) {
+fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32, String) {
     let nisab = 40;
     if count < 40 {
-        return (Decimal::ZERO, nisab);
+        return (Decimal::ZERO, nisab, "".to_string());
     }
     
     let sheep_due = if count <= 120 {
@@ -167,13 +171,14 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32) {
         count / 100
     };
 
-    (Decimal::from(sheep_due) * price, nisab)
+    let description = format!("{} Sheep", sheep_due);
+    (Decimal::from(sheep_due) * price, nisab, description)
 }
 
-fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32) {
+fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32, String) {
     let nisab = 30;
     if count < 30 {
-        return (Decimal::ZERO, nisab);
+        return (Decimal::ZERO, nisab, "".to_string());
     }
 
     // Cows Zakat Logic:
@@ -231,13 +236,18 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> (Decimal, u32) {
     
     let total_zakat_val = (Decimal::from(tabi) * val_tabi) + (Decimal::from(musinnah) * val_musinnah);
     
-    (total_zakat_val, nisab)
+    let mut parts = Vec::new();
+    if tabi > 0 { parts.push(format!("{} Tabi'", tabi)); }
+    if musinnah > 0 { parts.push(format!("{} Musinnah", musinnah)); }
+    let description = parts.join(", ");
+
+    (total_zakat_val, nisab, description)
 }
 
-fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32) {
+fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32, String) {
     let nisab = 5;
     if count < 5 {
-        return (Decimal::ZERO, nisab);
+        return (Decimal::ZERO, nisab, "".to_string());
     }
     
     // 5-9: 1 Sheep
@@ -301,7 +311,15 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> (Decimal, u32)
         + (Decimal::from(hiqqah) * v_hq)
         + (Decimal::from(jazaah) * v_jz);
         
-    (total, nisab)
+    let mut parts = Vec::new();
+    if sheep > 0 { parts.push(format!("{} Sheep", sheep)); }
+    if b_makhad > 0 { parts.push(format!("{} Bint Makhad", b_makhad)); }
+    if b_labun > 0 { parts.push(format!("{} Bint Labun", b_labun)); }
+    if hiqqah > 0 { parts.push(format!("{} Hiqqah", hiqqah)); }
+    if jazaah > 0 { parts.push(format!("{} Jaza'ah", jazaah)); }
+    let description = parts.join(", ");
+
+    (total, nisab, description)
 }
 
 #[cfg(test)]

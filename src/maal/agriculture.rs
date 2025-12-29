@@ -42,6 +42,19 @@ impl AgricultureAssets {
         })
     }
 
+    /// Creates a new AgricultureAssets instance from Wasaq units.
+    /// 1 Wasaq is approximately 130.6 kg.
+    pub fn from_wasaq(
+        wasaq: impl Into<Decimal>,
+        price_per_kg: impl Into<Decimal>,
+        irrigation: IrrigationMethod,
+    ) -> Result<Self, ZakatError> {
+        let wasaq_value = wasaq.into();
+        let wasaq_in_kg = dec!(130.6);
+        let weight_kg = wasaq_value * wasaq_in_kg;
+        Self::new(weight_kg, price_per_kg, irrigation)
+    }
+
     pub fn with_debt_due_now(mut self, debt: impl Into<Decimal>) -> Self {
         self.liabilities_due_now = debt.into();
         self
@@ -99,6 +112,7 @@ impl CalculateZakat for AgricultureAssets {
             wealth_type: crate::types::WealthType::Agriculture,
             status_reason: None,
             label: self.label.clone(),
+            extra_data: None,
         })
     }
 }

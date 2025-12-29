@@ -48,6 +48,7 @@ pub fn calculate_fitrah(
         wealth_type: crate::types::WealthType::Fitrah,
         status_reason: None,
         label: None,
+        extra_data: None,
     })
 }
 

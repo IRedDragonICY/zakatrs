@@ -30,7 +30,7 @@ fn test_dx_prelude_and_ergonomics() {
         IncomeCalculationMethod::Net
     ).expect("Config valid");
     
-    let res = income.with_debt(500).calculate_zakat(&config).unwrap();
+    let res = income.with_debt_due_now(500).calculate_zakat(&config).unwrap();
     // Net: 12000 - 4000 - 500 = 7500.
     // Nisab: 85 * 100 = 8500.
     // Not payable.

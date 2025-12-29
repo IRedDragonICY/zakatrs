@@ -1,4 +1,5 @@
 <div align="center">
+<h1>بِسْمِ اللهِ الرَّحْمٰنِ الرَّحِيْمِ</h1>
 <h1>السلام عليكم</h1>
 </div>
 
@@ -29,14 +30,20 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Portfolio aggregation
 - **Asset Labeling** (e.g., "Main Store", "Crypto Wallet")
 - **Input Sanitization** (Rejects negative values)
+- **Flexible Configuration** (Env Vars, JSON, Fluent Builder)
+- **Fiqh Compliance** (Jewelry exemptions, Madhab-specific rules)
+- **Detailed Reporting** (Livestock in-kind details, metadata support)
 
 ## Install
 
 ```toml
+```toml
 [dependencies]
-zakat = "0.1.3"
+zakat = "0.1.4"
 rust_decimal = "1.39"
 rust_decimal_macros = "1.39"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 ```
 
 ## Usage
@@ -107,14 +114,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### Configuration
+
+```rust
+use zakat::{ZakatConfig, Madhab};
+
+// Load from Environment Variables (ZAKAT_GOLD_PRICE, etc.)
+let config = ZakatConfig::from_env()?;
+
+// Or load from JSON
+let config = ZakatConfig::try_from_json("config.json")?;
+
+// Or fluent builder
+let config = ZakatConfig::new(dec!(100.0), dec!(1.0))
+    .with_madhab(Madhab::Hanafi); // Sets Nisab standard automatically (LowerOfTwo)
+```
+
+### Advanced Assets (Jewelry & Livestock)
+
+```rust
+use zakat::maal::precious_metals::{PreciousMetal, JewelryUsage};
+use zakat::maal::livestock::{LivestockAssets, LivestockType, LivestockPrices};
+
+// Personal Jewelry (Exempt in Shafi/Maliki, Payable in Hanafi)
+let necklace = PreciousMetal::new(dec!(100.0), WealthType::Gold)?
+    .with_usage(JewelryUsage::PersonalUse)
+    .with_label("Wife's Wedding Necklace");
+
+// Livestock Reporting
+let prices = LivestockPrices::new(dec!(200.0), dec!(1500.0), dec!(3000.0))?;
+let camels = LivestockAssets::new(30, LivestockType::Camel, prices);
+
+let result = camels.calculate_zakat(&config)?;
+
+if result.is_payable {
+    // Access detailed "in-kind" payment info
+    if let Some(extra) = result.extra_data {
+        println!("Pay Due: {}", extra.get("animals_due_description").unwrap_or(&"Unknown".to_string()));
+        // Output: "Pay Due: 1 Bint Makhad"
+    }
+}
+```
+
 ### Custom Nisab
 
 ```rust
 use zakat::ZakatConfig;
 
-let config = ZakatConfig::new(65, 1)
-    .with_gold_nisab(87)
-    .with_agriculture_nisab(700);
+let config = ZakatConfig::new(dec!(65.0), dec!(1.0))
+    .with_gold_nisab(dec!(87.0))
+    .with_agriculture_nisab(dec!(700.0));
 ```
 
 ## Modules

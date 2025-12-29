@@ -51,12 +51,14 @@ impl_into_zakat_decimal_float!(f32, f64);
 // Implement for Strings
 impl IntoZakatDecimal for &str {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
-        Decimal::from_str(self).map_err(|e| ZakatError::InvalidInput(format!("Invalid string format: {}", e), None))
+        let trimmed = self.trim();
+        Decimal::from_str(trimmed).map_err(|e| ZakatError::InvalidInput(format!("Invalid decimal '{}': {}", trimmed, e), None))
     }
 }
 
 impl IntoZakatDecimal for String {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
-        Decimal::from_str(&self).map_err(|e| ZakatError::InvalidInput(format!("Invalid string format: {}", e), None))
+        let trimmed = self.trim();
+        Decimal::from_str(trimmed).map_err(|e| ZakatError::InvalidInput(format!("Invalid decimal '{}': {}", trimmed, e), None))
     }
 }

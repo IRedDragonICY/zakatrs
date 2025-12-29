@@ -82,8 +82,12 @@ impl CalculateZakat for AgricultureAssets {
         
         let nisab_threshold_kg = config.get_nisab_agriculture_kg();
 
-        let total_value = self.harvest_weight_kg * self.price_per_kg;
-        let nisab_value = nisab_threshold_kg * self.price_per_kg; 
+        let total_value = self.harvest_weight_kg
+            .checked_mul(self.price_per_kg)
+            .ok_or(ZakatError::CalculationError("Overflow calculating agriculture total value".to_string(), None))?;
+        let nisab_value = nisab_threshold_kg
+            .checked_mul(self.price_per_kg)
+            .ok_or(ZakatError::CalculationError("Overflow calculating agriculture nisab value".to_string(), None))?; 
         
         let liabilities = self.liabilities_due_now;
         
@@ -93,10 +97,14 @@ impl CalculateZakat for AgricultureAssets {
         // But for Agriculture, usually checks yield quantity first.
         // Let's ensure ZakatDetails reflects the state correctly.
         
-        let net_value = total_value - liabilities; // Just for reporting
+        let net_value = total_value
+            .checked_sub(liabilities)
+            .ok_or(ZakatError::CalculationError("Underflow calculating agriculture net value".to_string(), None))?;
         
         let zakat_due = if net_value >= nisab_value {
-             net_value * rate
+             net_value
+                 .checked_mul(rate)
+                 .ok_or(ZakatError::CalculationError("Overflow calculating agriculture zakat due".to_string(), None))?
         } else {
              Decimal::ZERO
         };

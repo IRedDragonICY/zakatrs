@@ -73,7 +73,9 @@ impl CalculateZakat for MiningAssets {
                     .with_label(self.label.clone().unwrap_or_default()))
             },
             MiningType::Mines => {
-                let nisab_threshold = config.gold_price_per_gram * config.get_nisab_gold_grams();
+                let nisab_threshold = config.gold_price_per_gram
+                    .checked_mul(config.get_nisab_gold_grams())
+                    .ok_or(ZakatError::CalculationError("Overflow calculating mining nisab threshold".to_string(), None))?;
 
                 // Rate: 2.5%. Nisab: 85g Gold.
                 if !self.hawl_satisfied {

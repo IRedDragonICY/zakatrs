@@ -160,13 +160,17 @@ impl CalculateZakat for BusinessZakatCalculator {
             return Ok(ZakatDetails::below_threshold(nisab_threshold_value, crate::types::WealthType::Business, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
-        let gross_assets = self.assets.cash_on_hand + self.assets.inventory_value + self.assets.receivables;
+        let gross_assets = self.assets.cash_on_hand
+            .checked_add(self.assets.inventory_value)
+            .and_then(|v| v.checked_add(self.assets.receivables))
+            .ok_or(ZakatError::CalculationError("Overflow summing business assets".to_string(), None))?;
         let business_debt = self.assets.short_term_liabilities;
         
         let total_assets = gross_assets;
         
-        // Sum internal short term liabilities with any extra deductible liabilities set via builder
-        let total_liabilities = business_debt + self.liabilities_due_now;
+        let total_liabilities = business_debt
+            .checked_add(self.liabilities_due_now)
+            .ok_or(ZakatError::CalculationError("Overflow summing business liabilities".to_string(), None))?;
 
         let rate = dec!(0.025);
 

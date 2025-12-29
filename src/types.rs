@@ -1,9 +1,17 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
+/// Represents the type of Zakat payment due.
+///
+/// This enum distinguishes between:
+/// - **Monetary**: The default payment type, representing a currency value.
+/// - **Livestock**: In-kind payment of specific animals (e.g., "1 Bint Makhad").
+///   Used when Zakat is due as heads of livestock rather than cash.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PaymentPayload {
+    /// Currency-based Zakat payment (default for most wealth types).
     Monetary(Decimal),
+    /// In-kind livestock payment specifying animal types and counts.
     Livestock {
         description: String,
         heads_due: Vec<(String, u32)>, 

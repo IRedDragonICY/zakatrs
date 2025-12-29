@@ -48,7 +48,10 @@ impl FitrahCalculator {
 impl CalculateZakat for FitrahCalculator {
     fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         let total_people_decimal: Decimal = self.person_count.into();
-        let total_value = total_people_decimal * self.unit_amount * self.price_per_unit;
+        let total_value = total_people_decimal
+            .checked_mul(self.unit_amount)
+            .and_then(|v| v.checked_mul(self.price_per_unit))
+            .ok_or(ZakatError::CalculationError("Overflow calculating Fitrah total".to_string(), None))?;
 
         Ok(ZakatDetails {
             total_assets: total_value,

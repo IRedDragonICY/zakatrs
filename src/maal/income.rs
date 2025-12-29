@@ -95,7 +95,10 @@ impl CalculateZakat for IncomeZakatCalculator {
             IncomeCalculationMethod::Net => {
                 // Net means (Income - Basic Living Expenses).
                 // Then we also deduct any extra debts.
-                (self.total_income, self.basic_expenses + external_debt)
+                let combined_liabilities = self.basic_expenses
+                    .checked_add(external_debt)
+                    .ok_or(ZakatError::CalculationError("Overflow summing income liabilities".to_string(), None))?;
+                (self.total_income, combined_liabilities)
             }
         };
 

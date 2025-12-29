@@ -33,6 +33,24 @@ impl ZakatPortfolio {
 
     // Helper methods for specific calculator types can be added here.
     
+    /// Calculates Zakat for all assets in the portfolio.
+    ///
+    /// # Aggregation Logic (Dam' al-Amwal)
+    ///
+    /// This method implements the Fiqh principle of **"Dam' al-Amwal"** (ضم الأموال),
+    /// which means "combining wealth" for Nisab purposes.
+    ///
+    /// ## How It Works
+    /// 1. First, each asset is calculated individually against its own Nisab.
+    /// 2. Then, all **monetary assets** (Gold, Silver, Cash, Business, Investments)
+    ///    are aggregated and checked against a single monetary Nisab threshold.
+    /// 3. If the **combined total** meets the Nisab, all monetary assets become
+    ///    payable even if they individually fell below their thresholds.
+    ///
+    /// ## Fiqh Basis
+    /// This follows the scholarly position that similar wealth types should be
+    /// combined when determining Zakat eligibility, benefiting the recipients
+    /// of Zakat by ensuring wealth that collectively exceeds Nisab is not exempt.
     pub fn calculate_total(&self, config: &crate::config::ZakatConfig) -> PortfolioReport {
         let mut details = Vec::new();
         let mut errors = Vec::new();

@@ -237,7 +237,10 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> (Decimal, u32, Vec<(Stri
         count / 100
     };
 
-    (Decimal::from(sheep_due) * price, nisab, vec![("Sheep".to_string(), sheep_due)])
+    let zakat_value = Decimal::from(sheep_due)
+        .checked_mul(price)
+        .unwrap_or(Decimal::MAX);
+    (zakat_value, nisab, vec![("Sheep".to_string(), sheep_due)])
 }
 
 fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
@@ -302,10 +305,12 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<
     // Value estimation based on pricing ratios relative to a standard cow price:
     // Tabi (1yo) is estimated at 0.7x of standard price.
     // Musinnah (2yo) is estimated at 1.0x of standard price.
-    let val_tabi = price * dec!(0.7);
+    let val_tabi = price.checked_mul(dec!(0.7)).unwrap_or(Decimal::MAX);
     let val_musinnah = price;
     
-    let total_zakat_val = (Decimal::from(tabi) * val_tabi) + (Decimal::from(musinnah) * val_musinnah);
+    let tabi_total = Decimal::from(tabi).checked_mul(val_tabi).unwrap_or(Decimal::MAX);
+    let musinnah_total = Decimal::from(musinnah).checked_mul(val_musinnah).unwrap_or(Decimal::MAX);
+    let total_zakat_val = tabi_total.checked_add(musinnah_total).unwrap_or(Decimal::MAX);
     
     let mut parts = Vec::new();
     if tabi > 0 { parts.push(("Tabi'".to_string(), tabi)); }
@@ -376,16 +381,16 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decima
     // Pricing implementation:
     let v_sheep = prices.sheep_price;
     let v_camel = prices.camel_price; 
-    let v_bm = v_camel * dec!(0.5);
-    let v_bl = v_camel * dec!(0.75);
+    let v_bm = v_camel.checked_mul(dec!(0.5)).unwrap_or(Decimal::MAX);
+    let v_bl = v_camel.checked_mul(dec!(0.75)).unwrap_or(Decimal::MAX);
     let v_hq = v_camel;
-    let v_jz = v_camel * dec!(1.25);
+    let v_jz = v_camel.checked_mul(dec!(1.25)).unwrap_or(Decimal::MAX);
     
-    let total = (Decimal::from(sheep) * v_sheep)
-        + (Decimal::from(b_makhad) * v_bm)
-        + (Decimal::from(b_labun) * v_bl)
-        + (Decimal::from(hiqqah) * v_hq)
-        + (Decimal::from(jazaah) * v_jz);
+    let total = Decimal::from(sheep).checked_mul(v_sheep).unwrap_or(Decimal::MAX)
+        .checked_add(Decimal::from(b_makhad).checked_mul(v_bm).unwrap_or(Decimal::MAX)).unwrap_or(Decimal::MAX)
+        .checked_add(Decimal::from(b_labun).checked_mul(v_bl).unwrap_or(Decimal::MAX)).unwrap_or(Decimal::MAX)
+        .checked_add(Decimal::from(hiqqah).checked_mul(v_hq).unwrap_or(Decimal::MAX)).unwrap_or(Decimal::MAX)
+        .checked_add(Decimal::from(jazaah).checked_mul(v_jz).unwrap_or(Decimal::MAX)).unwrap_or(Decimal::MAX);
         
     let mut parts = Vec::new();
     if sheep > 0 { parts.push(("Sheep".to_string(), sheep)); }

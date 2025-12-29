@@ -44,11 +44,33 @@ impl Default for ZakatConfig {
 }
 
 // Ensure the caller can easily create a config
+impl std::str::FromStr for ZakatConfig {
+    type Err = ZakatError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        serde_json::from_str(s)
+            .map_err(|e| ZakatError::ConfigurationError(format!("Failed to parse config JSON: {}", e), None))
+    }
+}
+
 impl ZakatConfig {
     pub fn new(gold_price: impl IntoZakatDecimal, silver_price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
+        let gold = gold_price.into_zakat_decimal()?;
+        let silver = silver_price.into_zakat_decimal()?;
+
+        if gold < Decimal::ZERO || silver < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Prices must be non-negative".to_string(), None));
+        }
+        if gold == Decimal::ZERO && silver == Decimal::ZERO {
+            return Err(ZakatError::InvalidInput(
+                "At least one metal price (gold or silver) is required for monetary Nisab calculations".to_string(),
+                None,
+            ));
+        }
+
         Ok(Self {
-            gold_price_per_gram: gold_price.into_zakat_decimal()?,
-            silver_price_per_gram: silver_price.into_zakat_decimal()?,
+            gold_price_per_gram: gold,
+            silver_price_per_gram: silver,
             ..Default::default()
         })
     }

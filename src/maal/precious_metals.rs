@@ -96,7 +96,9 @@ impl CalculateZakat for PreciousMetals {
              return Err(ZakatError::ConfigurationError("Price for metal not set".to_string(), None));
         }
 
-        let nisab_value = nisab_threshold_grams * price_per_gram;
+        let nisab_value = nisab_threshold_grams
+            .checked_mul(price_per_gram)
+            .ok_or(ZakatError::CalculationError("Overflow calculating metal nisab value".to_string(), None))?;
         if !self.hawl_satisfied {
             return Ok(ZakatDetails::below_threshold(nisab_value, self.metal_type, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
@@ -105,12 +107,19 @@ impl CalculateZakat for PreciousMetals {
         // Normalize weight if it's Gold and not 24K
         let effective_weight = if self.metal_type == WealthType::Gold && self.purity < 24 {
             // formula: weight * (karat / 24)
-            self.weight_grams * (Decimal::from(self.purity) / Decimal::from(24))
+            let purity_ratio = Decimal::from(self.purity)
+                .checked_div(Decimal::from(24))
+                .ok_or(ZakatError::CalculationError("Error calculating purity ratio".to_string(), None))?;
+            self.weight_grams
+                .checked_mul(purity_ratio)
+                .ok_or(ZakatError::CalculationError("Overflow calculating effective gold weight".to_string(), None))?
         } else {
             self.weight_grams
         };
 
-        let total_value = effective_weight * price_per_gram;
+        let total_value = effective_weight
+            .checked_mul(price_per_gram)
+            .ok_or(ZakatError::CalculationError("Overflow calculating metal total value".to_string(), None))?;
         let liabilities = self.liabilities_due_now;
 
         let rate = dec!(0.025); // 2.5%

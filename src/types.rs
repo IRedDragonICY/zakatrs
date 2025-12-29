@@ -94,3 +94,14 @@ pub enum WealthType {
     Mining,
     Rikaz,
 }
+
+impl WealthType {
+    /// Checks if the wealth type is considered "monetary" (Amwal Zakawiyyah)
+    /// and should be aggregated for Nisab calculation under "Dam' al-Amwal".
+    pub fn is_monetary(&self) -> bool {
+        matches!(
+            self,
+            WealthType::Gold | WealthType::Silver | WealthType::Business | WealthType::Income | WealthType::Investment
+        )
+    }
+}

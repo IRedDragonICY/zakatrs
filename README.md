@@ -90,7 +90,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             20000, InvestmentType::Crypto, &config
         )?.with_debt(dec!(2000.0)));
 
-    let result = portfolio.calculate_total()?;
+    let result = portfolio.calculate_total(&config)?;
     println!("Total: ${}", result.total_zakat_due);
     Ok(())
 }

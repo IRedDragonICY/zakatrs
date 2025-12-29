@@ -47,7 +47,7 @@ fn main() {
         .add_calculator(gold_calc)   // $5000 * 2.5% = $125 (100g * 50)
         .add_calculator(crypto_calc.with_debt(dec!(2000.0))); // ($20,000 - $2,000) * 2.5% = $450
         
-    let result = portfolio.calculate_total().unwrap();
+    let result = portfolio.calculate_total(&config).unwrap();
     
     println!("\n--- Portfolio Result ---");
     println!("Total Assets: ${}", result.total_assets);

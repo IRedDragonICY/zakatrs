@@ -18,7 +18,7 @@ pub struct InvestmentAssets {
 
 impl InvestmentAssets {
     pub fn new(
-        market_value: Decimal,
+        market_value: impl Into<Decimal>,
         investment_type: InvestmentType,
         config: &ZakatConfig,
     ) -> Result<Self, ZakatError> {
@@ -29,7 +29,7 @@ impl InvestmentAssets {
         let nisab_threshold_value = config.gold_price_per_gram * config.get_nisab_gold_grams();
         
         Ok(Self {
-            market_value,
+            market_value: market_value.into(),
             investment_type,
             nisab_threshold_value,
         })

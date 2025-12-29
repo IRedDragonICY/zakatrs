@@ -31,13 +31,47 @@ impl Default for ZakatConfig {
 
 // Ensure the caller can easily create a config
 impl ZakatConfig {
-    pub fn new(gold_price: Decimal, silver_price: Decimal) -> Self {
+    pub fn new(gold_price: impl Into<Decimal>, silver_price: impl Into<Decimal>) -> Self {
         Self {
-            gold_price_per_gram: gold_price,
-            silver_price_per_gram: silver_price,
+            gold_price_per_gram: gold_price.into(),
+            silver_price_per_gram: silver_price.into(),
             ..Default::default()
         }
     }
+
+    // ========== Fluent Builder Methods ==========
+
+    /// Sets a custom gold nisab threshold (default: 85g)
+    pub fn with_gold_nisab(mut self, grams: impl Into<Decimal>) -> Self {
+        self.nisab_gold_grams = Some(grams.into());
+        self
+    }
+
+    /// Sets a custom silver nisab threshold (default: 595g)
+    pub fn with_silver_nisab(mut self, grams: impl Into<Decimal>) -> Self {
+        self.nisab_silver_grams = Some(grams.into());
+        self
+    }
+
+    /// Sets a custom agriculture nisab threshold (default: 653kg)
+    pub fn with_agriculture_nisab(mut self, kg: impl Into<Decimal>) -> Self {
+        self.nisab_agriculture_kg = Some(kg.into());
+        self
+    }
+
+    /// Sets the rice price per kilogram (for Fitrah calculations)
+    pub fn with_rice_price_per_kg(mut self, price: impl Into<Decimal>) -> Self {
+        self.rice_price_per_kg = Some(price.into());
+        self
+    }
+
+    /// Sets the rice price per liter (for Fitrah calculations)
+    pub fn with_rice_price_per_liter(mut self, price: impl Into<Decimal>) -> Self {
+        self.rice_price_per_liter = Some(price.into());
+        self
+    }
+
+    // ========== Getters with Defaults ==========
     
     pub fn get_nisab_gold_grams(&self) -> Decimal {
         use rust_decimal_macros::dec;

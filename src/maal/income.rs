@@ -18,8 +18,8 @@ pub struct IncomeZakatCalculator {
 
 impl IncomeZakatCalculator {
     pub fn new(
-        total_income: Decimal,
-        basic_expenses: Decimal,
+        total_income: impl Into<Decimal>,
+        basic_expenses: impl Into<Decimal>,
         method: IncomeCalculationMethod,
         config: &ZakatConfig,
     ) -> Result<Self, ZakatError> {
@@ -30,8 +30,8 @@ impl IncomeZakatCalculator {
         let nisab_threshold_value = config.gold_price_per_gram * config.get_nisab_gold_grams();
         
         Ok(Self {
-            total_income,
-            basic_expenses,
+            total_income: total_income.into(),
+            basic_expenses: basic_expenses.into(),
             method,
             nisab_threshold_value,
         })

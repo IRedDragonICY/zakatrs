@@ -11,77 +11,60 @@
 ╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   
 ```
 
-# Zakat: The Definitive Islamic Alms Calculation Library
+# Zakat
 
 [![Crates.io](https://img.shields.io/crates/v/zakat.svg)](https://crates.io/crates/zakat)
 [![Docs.rs](https://docs.rs/zakat/badge.svg)](https://docs.rs/zakat)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Zakat** is a production-grade, type-safe Rust library designed to bridge **Classical Fiqh** with **Modern Finance**. It provides mathematically precise calculations for essentially all major wealth types, including cryptocurrencies, stocks, livestock, and professional income, while handling currency precision flawlessly using `rust_decimal`.
-
----
+Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 
 ## Features
 
--   **Type-Safe Precision**: Zero floating-point errors. All calculations use `rust_decimal`.
--   **Comprehensive Coverage**:
-    -   **Maal (Wealth)**: Gold, Silver, Business/Trade, Agriculture, Livestock (Camels, Cows, Sheep), Mining & Rikaz.
-    -   **Modern Assets**: Stocks, Mutual Funds, and Cryptocurrencies (treated as liquid assets).
-    -   **Income**: Professional Income calculation (Gross & Net support).
-    -   **Fitrah**: Per-capita food staple calculation.
--   **Fiqh Compliant & Flexible**:
-    -   Built-in default Nisab thresholds (e.g., 85g Gold).
-    -   **Fully Configurable**: Override thresholds to match specific Fatwa or regional standards.
-    -   **Debt Deduction**: Flexible logic to deduct liabilities before or after Nisab checks as per config.
--   **Portfolio Management**: Builder pattern to aggregate diverse assets and calculate total Zakat due in one go.
+- Gold, Silver, Business, Agriculture, Livestock, Mining & Rikaz
+- Stocks, Mutual Funds, Crypto (as liquid assets)
+- Professional Income (Gross/Net)
+- Zakat Fitrah
+- Configurable Nisab thresholds
+- Portfolio aggregation
 
-## Installation
-
-Add this to your `Cargo.toml`:
+## Install
 
 ```toml
 [dependencies]
-zakat = "0.1.0"
+zakat = "0.1.2"
 rust_decimal = "1.39"
 rust_decimal_macros = "1.39"
 ```
 
-## Quick Start
+## Usage
 
-### 1. Simple Business Calculation
+### Business Zakat
 
 ```rust
 use zakat::{ZakatConfig, CalculateZakat};
 use zakat::maal::business::{BusinessAssets, BusinessZakatCalculator};
-use rust_decimal_macros::dec;
 
 fn main() {
-    // 1. Configure Prices (e.g., Gold = $65/gram)
-    let config = ZakatConfig::new(dec!(65.0), dec!(1.0));
+    let config = ZakatConfig::new(65, 1); // gold $65/g, silver $1/g
 
-    // 2. Define Assets
     let assets = BusinessAssets::new(
-        dec!(50000.0), // Cash on Hand
-        dec!(20000.0), // Inventory Value
-        dec!(5000.0),  // Receivables
-        dec!(1000.0)   // Short Term Debt
+        50000, // cash
+        20000, // inventory
+        5000,  // receivables
+        1000   // debt
     );
 
-    // 3. Calculate
-    let calculator = BusinessZakatCalculator::new(assets, &config).unwrap();
-    let result = calculator.calculate_zakat(None).unwrap();
+    let calc = BusinessZakatCalculator::new(assets, &config).unwrap();
+    let result = calc.calculate_zakat(None).unwrap();
 
     if result.is_payable {
-        println!("Zakat Due: ${}", result.zakat_due);
-    } else {
-        println!("Nisab not reached.");
+        println!("Zakat: ${}", result.zakat_due);
     }
 }
 ```
 
-### 2. Portfolio Management (The "Enterprise" Way)
-
-Handling a complex user scenario (e.g., "Mr. Ahmad") who has income, gold, investments, and debts.
+### Portfolio
 
 ```rust
 use zakat::{ZakatConfig, ZakatPortfolio, WealthType};
@@ -91,79 +74,54 @@ use zakat::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
 use rust_decimal_macros::dec;
 
 fn main() {
-    // Global Config
-    let config = ZakatConfig::new(dec!(65.0), dec!(1.0));
+    let config = ZakatConfig::new(65, 1);
 
-    // Initialize Portfolio
     let portfolio = ZakatPortfolio::new()
-        // Add Monthly Income (Gross Method)
         .add_calculator(IncomeZakatCalculator::new(
-            dec!(5000.0), 
-            dec!(0.0), 
-            IncomeCalculationMethod::Gross, 
-            &config
+            5000, 0, IncomeCalculationMethod::Gross, &config
         ).unwrap())
-        // Add Gold Stash
         .add_calculator(PreciousMetal::new(
-            dec!(100.0), // 100 grams
-            WealthType::Gold, 
-            &config
+            100, WealthType::Gold, &config
         ).unwrap())
-        // Add Crypto Portfolio with Debt Deduction
         .add_calculator_with_debt(InvestmentAssets::new(
-            dec!(20000.0), 
-            InvestmentType::Crypto, 
-            &config
-        ).unwrap(), dec!(2000.0)); // Deduct $2k personal debt
+            20000, InvestmentType::Crypto, &config
+        ).unwrap(), dec!(2000.0));
 
-    // Execute
     let result = portfolio.calculate_total().unwrap();
-
-    println!("Total Zakat Due: ${}", result.total_zakat_due);
-    // Output breakdown...
+    println!("Total: ${}", result.total_zakat_due);
 }
 ```
 
-## Advanced Configuration (Custom Nisab)
-
-Different regions or scholar councils may have different standards for Nisab. You can override defaults easily:
+### Custom Nisab
 
 ```rust
 use zakat::ZakatConfig;
-use rust_decimal_macros::dec;
 
-let mut config = ZakatConfig::new(dec!(65.0), dec!(1.0));
-
-// Override Gold Nisab to 87g (some opinions) instead of default 85g
-config.nisab_gold_grams = Some(dec!(87.0));
-
-// Override Agriculture Nisab
-config.nisab_agriculture_kg = Some(dec!(700.0));
+let config = ZakatConfig::new(65, 1)
+    .with_gold_nisab(87)
+    .with_agriculture_nisab(700);
 ```
 
-## Supported Modules
+## Modules
 
-| Module | Features | Nisab Basis |
-| :--- | :--- | :--- |
-| `maal::precious_metals` | Gold, Silver | 85g Gold / 595g Silver |
-| `maal::business` | Cash, Inventory, Receivables | 85g Gold Equiv |
-| `maal::income` | Professional Income (Gross/Net) | 85g Gold Equiv |
-| `maal::investments` | Stocks, Crypto, Mutual Funds | 85g Gold Equiv |
-| `maal::agriculture` | Rain (10%), Irrigated (5%), Mixed | 5 Wasq (~653 kg) |
-| `maal::livestock` | Camels, Cows, Sheep (Tiered logic) | Count-based (e.g. 40 Sheep)|
-| `maal::mining` | Rikaz (20% flat), Mines (2.5%) | None (Rikaz) / 85g Gold |
-| `fitrah` | Per person food staple | N/A |
+| Module | Nisab |
+| :--- | :--- |
+| `maal::precious_metals` | 85g Gold / 595g Silver |
+| `maal::business` | 85g Gold |
+| `maal::income` | 85g Gold |
+| `maal::investments` | 85g Gold |
+| `maal::agriculture` | 653 kg |
+| `maal::livestock` | Count-based |
+| `maal::mining` | Rikaz: None / Mines: 85g Gold |
+| `fitrah` | N/A |
 
 ## Contributing
 
-Contributions are welcome! Please ensure you:
-1.  Add unit tests for any new logic.
-2.  Maintain `rust_decimal` usage for precision.
-3.  Run `cargo test` before submitting.
+1. Add tests
+2. Use `rust_decimal`
+3. Run `cargo test`
 
-## 💖 Support This Project
-
-If you find this library helpful for your zakat calculations or Islamic finance applications, please consider supporting its development. Your support helps maintain and improve this project.
+## Support
 
 <div align="center">
 
@@ -175,8 +133,8 @@ If you find this library helpful for your zakat calculations or Islamic finance 
 
 </div>
 
-> *"Those who spend their wealth in the cause of Allah and do not follow their charity with reminders of their generosity or hurtful words—they will have their reward with their Lord."* — **Al-Baqarah 2:262**
+> *"Those who spend their wealth in the cause of Allah..."* — **Al-Baqarah 2:262**
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+MIT

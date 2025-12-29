@@ -12,7 +12,7 @@ pub struct PreciousMetal {
 }
 
 impl PreciousMetal {
-    pub fn new(weight_grams: Decimal, metal_type: WealthType, config: &ZakatConfig) -> Result<Self, ZakatError> {
+    pub fn new(weight_grams: impl Into<Decimal>, metal_type: WealthType, config: &ZakatConfig) -> Result<Self, ZakatError> {
         let (price_per_gram, nisab_threshold_grams) = match metal_type {
             WealthType::Gold => (config.gold_price_per_gram, config.get_nisab_gold_grams()),
             WealthType::Silver => (config.silver_price_per_gram, config.get_nisab_silver_grams()),
@@ -24,7 +24,7 @@ impl PreciousMetal {
         }
 
         Ok(Self {
-            weight_grams,
+            weight_grams: weight_grams.into(),
             metal_type,
             price_per_gram,
             nisab_threshold_grams,

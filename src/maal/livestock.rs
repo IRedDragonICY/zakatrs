@@ -22,6 +22,20 @@ pub struct LivestockPrices {
     pub camel_price: Decimal,
 }
 
+impl LivestockPrices {
+    pub fn new(
+        sheep_price: impl Into<Decimal>,
+        cow_price: impl Into<Decimal>,
+        camel_price: impl Into<Decimal>,
+    ) -> Self {
+        Self {
+            sheep_price: sheep_price.into(),
+            cow_price: cow_price.into(),
+            camel_price: camel_price.into(),
+        }
+    }
+}
+
 impl LivestockAssets {
     pub fn new(
         count: u32,

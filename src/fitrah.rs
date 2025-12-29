@@ -15,9 +15,10 @@ use crate::types::{ZakatDetails, ZakatError};
 /// `ZakatDetails` where `zakat_due` is the total monetary value.
 pub fn calculate_fitrah(
     person_count: u32,
-    price_per_unit: Decimal,
+    price_per_unit: impl Into<Decimal>,
     unit_amount: Option<Decimal>,
 ) -> Result<ZakatDetails, ZakatError> {
+    let price_per_unit = price_per_unit.into();
     if person_count == 0 {
         return Err(ZakatError::InvalidInput("Person count must be greater than 0".to_string()));
     }

@@ -13,22 +13,22 @@ pub struct BusinessAssets {
 
 impl BusinessAssets {
     pub fn new(
-        cash: Decimal,
-        inventory: Decimal,
-        receivables: Decimal,
-        short_term_liabilities: Decimal,
+        cash: impl Into<Decimal>,
+        inventory: impl Into<Decimal>,
+        receivables: impl Into<Decimal>,
+        short_term_liabilities: impl Into<Decimal>,
     ) -> Self {
         Self {
-            cash_on_hand: cash,
-            inventory_value: inventory,
-            receivables,
-            short_term_liabilities,
+            cash_on_hand: cash.into(),
+            inventory_value: inventory.into(),
+            receivables: receivables.into(),
+            short_term_liabilities: short_term_liabilities.into(),
         }
     }
 }
 
 impl CalculateZakat for BusinessAssets {
-    fn calculate_zakat(&self, extra_debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat(&self, _extra_debts: Option<Decimal>) -> Result<ZakatDetails, ZakatError> {
         // Zakat Trade = (Cash + Inventory + Receivables) - Short Term Debt
         // Note: extra_debts passed here would be arguably redundant if short_term_liabilities covers it,
         // but we treat short_term_liabilities as business operational debt, and extra_debts as potentially personal debt if applicable,

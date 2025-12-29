@@ -19,11 +19,13 @@ pub struct AgricultureAssets {
 
 impl AgricultureAssets {
     pub fn new(
-        harvest_weight_kg: Decimal,
-        price_per_kg: Decimal,
+        harvest_weight_kg: impl Into<Decimal>,
+        price_per_kg: impl Into<Decimal>,
         irrigation: IrrigationMethod,
         config: &ZakatConfig, 
     ) -> Result<Self, ZakatError> {
+        let harvest_weight_kg = harvest_weight_kg.into();
+        let price_per_kg = price_per_kg.into();
         // Nisab: 5 Wasq. 1 Wasq ~ 60 Sa'. 1 Sa' ~ 2.176 kg (varies but commonly ~653kg total).
         // Requirement says "~653 kg". Use config.
         let nisab = config.get_nisab_agriculture_kg();

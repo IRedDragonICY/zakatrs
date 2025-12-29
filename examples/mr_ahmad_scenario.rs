@@ -14,29 +14,29 @@ fn main() {
     // - Personal Debt: $2,000.
     // - Gold Price: $50/gram.
     
-    // Config
-    let config = ZakatConfig::new(dec!(50.0), dec!(1.0)); // Gold $50
+    // Config - NEW ERGONOMIC API: No dec!() needed!
+    let config = ZakatConfig::new(50, 1); // Gold $50/g, Silver $1/g
     println!("Configuration: Gold Price = ${}/g", config.gold_price_per_gram);
     println!("Nisab Threshold (Gold): ${}", config.gold_price_per_gram * config.get_nisab_gold_grams());
 
-    // 1. Income
+    // 1. Income - integers work directly!
     let income_calc = IncomeZakatCalculator::new(
-        dec!(5000.0), 
-        dec!(0.0), 
+        5000, 
+        0, 
         IncomeCalculationMethod::Gross, 
         &config
     ).unwrap();
     
-    // 2. Gold
+    // 2. Gold - integers work directly!
     let gold_calc = PreciousMetal::new(
-        dec!(100.0), 
+        100, 
         WealthType::Gold, 
         &config
     ).unwrap();
     
-    // 3. Crypto
+    // 3. Crypto - integers work directly!
     let crypto_calc = InvestmentAssets::new(
-        dec!(20000.0), 
+        20000, 
         InvestmentType::Crypto, 
         &config
     ).unwrap();

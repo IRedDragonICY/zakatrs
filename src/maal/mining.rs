@@ -19,7 +19,7 @@ pub struct MiningAssets {
 
 impl MiningAssets {
     pub fn new(
-        value: Decimal,
+        value: impl Into<Decimal>,
         mining_type: MiningType,
         config: &ZakatConfig,
     ) -> Result<Self, ZakatError> {
@@ -27,7 +27,7 @@ impl MiningAssets {
         // However, for consistency and Mines, we'll take config.
         let nisab = config.gold_price_per_gram * config.get_nisab_gold_grams(); 
         Ok(Self {
-            value,
+            value: value.into(),
             mining_type,
             nisab_threshold_value: nisab,
         })

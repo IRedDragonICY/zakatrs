@@ -4,12 +4,11 @@ use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
-use crate::builder::AssetBuilder;
 
 /// Represents Business Assets for Zakat Calculation.
 /// 
 /// This struct unifies the assets data and calculation context (liabilities, hawl, etc.).
-/// Use `BusinessZakat::builder()` to construct.
+/// Use `BusinessZakat::new()` to construct and chain methods to set values.
 #[derive(Debug, Clone, PartialEq)]
 pub struct BusinessZakat {
     // Assets
@@ -24,50 +23,54 @@ pub struct BusinessZakat {
     pub label: Option<String>,
 }
 
-impl BusinessZakat {
-    /// Returns a new builder for creating `BusinessZakat`.
-    pub fn builder() -> BusinessZakatBuilder {
-        BusinessZakatBuilder::default()
+impl Default for BusinessZakat {
+    fn default() -> Self {
+        Self {
+            cash_on_hand: Decimal::ZERO,
+            inventory_value: Decimal::ZERO,
+            receivables: Decimal::ZERO,
+            short_term_liabilities: Decimal::ZERO,
+            liabilities_due_now: Decimal::ZERO,
+            hawl_satisfied: true,
+            label: None,
+        }
     }
 }
 
-#[derive(Default)]
-pub struct BusinessZakatBuilder {
-    cash_on_hand: Option<Decimal>,
-    inventory_value: Option<Decimal>,
-    receivables: Option<Decimal>,
-    short_term_liabilities: Option<Decimal>,
-    liabilities_due_now: Option<Decimal>,
-    hawl_satisfied: Option<bool>,
-    label: Option<String>,
-}
+impl BusinessZakat {
+    /// Creates a new `BusinessZakat` instance with default values.
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-impl BusinessZakatBuilder {
+    /// Sets cash on hand.
     pub fn cash(mut self, cash: impl IntoZakatDecimal) -> Self {
         if let Ok(val) = cash.into_zakat_decimal() {
-             self.cash_on_hand = Some(val);
+             self.cash_on_hand = val;
         }
         self
     }
 
+    /// Sets inventory value.
     pub fn inventory(mut self, inventory: impl IntoZakatDecimal) -> Self {
         if let Ok(val) = inventory.into_zakat_decimal() {
-            self.inventory_value = Some(val);
+            self.inventory_value = val;
         }
         self
     }
 
+    /// Sets receivables (money owed to the business).
     pub fn receivables(mut self, receivables: impl IntoZakatDecimal) -> Self {
         if let Ok(val) = receivables.into_zakat_decimal() {
-            self.receivables = Some(val);
+            self.receivables = val;
         }
         self
     }
 
-    /// Sets short-term business liabilities (deducted from gross asstes).
+    /// Sets short-term business liabilities (deducted from gross assets).
     pub fn liabilities(mut self, liabilities: impl IntoZakatDecimal) -> Self {
         if let Ok(val) = liabilities.into_zakat_decimal() {
-            self.short_term_liabilities = Some(val);
+            self.short_term_liabilities = val;
         }
         self
     }
@@ -75,66 +78,34 @@ impl BusinessZakatBuilder {
     /// Sets additional liabilities due immediately (deducted from total).
     pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
         if let Ok(val) = debt.into_zakat_decimal() {
-            self.liabilities_due_now = Some(val);
+            self.liabilities_due_now = val;
         }
         self
     }
 
+    /// Sets whether the Hawl (1 lunar year) has been satisfied.
     pub fn hawl(mut self, satisfied: bool) -> Self {
-        self.hawl_satisfied = Some(satisfied);
+        self.hawl_satisfied = satisfied;
         self
     }
 
+    /// Sets an optional label for the asset.
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
 }
 
-use crate::builder::Validate;
-
-impl Validate for BusinessZakatBuilder {
-    fn validate(&self) -> Result<(), ZakatError> {
-        let cash = self.cash_on_hand.unwrap_or(Decimal::ZERO);
-        let inventory = self.inventory_value.unwrap_or(Decimal::ZERO);
-        let receivables = self.receivables.unwrap_or(Decimal::ZERO);
-        let liabilities = self.short_term_liabilities.unwrap_or(Decimal::ZERO);
-        let liabilities_due_now = self.liabilities_due_now.unwrap_or(Decimal::ZERO);
-
-        if cash < Decimal::ZERO || inventory < Decimal::ZERO || receivables < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Business assets must be non-negative".to_string(), self.label.clone()));
-        }
-        if liabilities < Decimal::ZERO || liabilities_due_now < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput("Liabilities must be non-negative".to_string(), self.label.clone()));
-        }
-        Ok(())
-    }
-}
-
-impl AssetBuilder<BusinessZakat> for BusinessZakatBuilder {
-    fn build(self) -> Result<BusinessZakat, ZakatError> {
-        self.validate()?;
-        
-        let cash = self.cash_on_hand.unwrap_or(Decimal::ZERO);
-        let inventory = self.inventory_value.unwrap_or(Decimal::ZERO);
-        let receivables = self.receivables.unwrap_or(Decimal::ZERO);
-        let liabilities = self.short_term_liabilities.unwrap_or(Decimal::ZERO);
-        let liabilities_due_now = self.liabilities_due_now.unwrap_or(Decimal::ZERO);
-
-        Ok(BusinessZakat {
-            cash_on_hand: cash,
-            inventory_value: inventory,
-            receivables,
-            short_term_liabilities: liabilities,
-            liabilities_due_now,
-            hawl_satisfied: self.hawl_satisfied.unwrap_or(true), // Default to true if not specified
-            label: self.label,
-        })
-    }
-}
-
 impl CalculateZakat for BusinessZakat {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        // Validation moved here
+        if self.cash_on_hand < Decimal::ZERO || self.inventory_value < Decimal::ZERO || self.receivables < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Business assets must be non-negative".to_string(), self.label.clone()));
+        }
+        if self.short_term_liabilities < Decimal::ZERO || self.liabilities_due_now < Decimal::ZERO {
+             return Err(ZakatError::InvalidInput("Liabilities must be non-negative".to_string(), self.label.clone()));
+        }
+
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(
             config.cash_nisab_standard,
@@ -212,13 +183,11 @@ mod tests {
     fn test_business_zakat() {
         let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
         
-        let business = BusinessZakat::builder()
+        let business = BusinessZakat::new()
             .cash(dec!(5000.0))
             .inventory(dec!(5000.0))
             .liabilities(dec!(1000.0))
-            .hawl(true)
-            .build()
-            .expect("Valid business");
+            .hawl(true);
 
         let result = business.calculate_zakat(&config).unwrap();
 
@@ -230,11 +199,9 @@ mod tests {
     #[test]
     fn test_business_below_nisab() {
          let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
-         let business = BusinessZakat::builder()
+         let business = BusinessZakat::new()
              .cash(dec!(1000.0))
-             .inventory(dec!(1000.0))
-             .build()
-             .expect("Valid");
+             .inventory(dec!(1000.0));
          
          let result = business.calculate_zakat(&config).unwrap();
          
@@ -245,17 +212,24 @@ mod tests {
     fn test_business_specific_case() {
         let config = ZakatConfig { gold_price_per_gram: dec!(1000000.0), ..Default::default() };
         
-        let business = BusinessZakat::builder()
+        let business = BusinessZakat::new()
             .cash(dec!(100000000.0))
             .liabilities(dec!(20000000.0))
-            .hawl(true)
-            .build()
-            .expect("Valid");
+            .hawl(true);
         
-        // Use with_config implicitly by passing config
         let result = business.calculate_zakat(&config).unwrap();
         
         assert!(!result.is_payable);
         assert_eq!(result.net_assets, dec!(80000000.0));
+    }
+
+    #[test]
+    fn test_business_validation() {
+        let config = ZakatConfig::default();
+        let business = BusinessZakat::new()
+            .cash(dec!(-100.0));
+            
+        let result = business.calculate_zakat(&config);
+        assert!(matches!(result, Err(ZakatError::InvalidInput(_, _))));
     }
 }

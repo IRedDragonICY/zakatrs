@@ -9,17 +9,13 @@ fn test_labeling_workflow() {
         ..Default::default()
     };
 
-    let business_a = BusinessZakat::builder()
+    let business_a = BusinessZakat::new()
         .cash(10000)
-        .label("Shop A")
-        .build()
-        .unwrap();
+        .label("Shop A");
 
-    let business_b = BusinessZakat::builder()
+    let business_b = BusinessZakat::new()
         .cash(500)
-        .label("Shop B")
-        .build()
-        .unwrap();
+        .label("Shop B");
 
     let details_a = business_a.calculate_zakat(&config).unwrap();
     let details_b = business_b.calculate_zakat(&config).unwrap();
@@ -30,8 +26,11 @@ fn test_labeling_workflow() {
 
 #[test]
 fn test_sanitization_negative_weight() {
-    let _config = ZakatConfig::default();
-    let res = PreciousMetals::new(-50.0, WealthType::Gold);
+    let config = ZakatConfig::default();
+    let res = PreciousMetals::new()
+        .weight(-50.0)
+        .metal_type(WealthType::Gold)
+        .calculate_zakat(&config);
     
     assert!(res.is_err());
     if let Err(ZakatError::InvalidInput(msg, _)) = res {
@@ -43,22 +42,30 @@ fn test_sanitization_negative_weight() {
 
 #[test]
 fn test_sanitization_business_negative() {
-    let res = BusinessZakat::builder()
+    let config = ZakatConfig::default();
+    let res = BusinessZakat::new()
         .cash(-100)
-        .build();
+        .calculate_zakat(&config);
     assert!(res.is_err());
 }
 
 #[test]
 fn test_sanitization_income_negative() {
-    let _config = ZakatConfig::default();
-    let res = IncomeZakatCalculator::new(-1000, 0, IncomeCalculationMethod::Gross);
+    let config = ZakatConfig::default();
+    let res = IncomeZakatCalculator::new()
+        .income(-1000)
+        .expenses(0)
+        .method(IncomeCalculationMethod::Gross)
+        .calculate_zakat(&config);
     assert!(res.is_err());
 }
 
 #[test]
 fn test_sanitization_investment_negative() {
-    let _config = ZakatConfig::default();
-    let res = InvestmentAssets::new(-500, InvestmentType::Stock);
+    let config = ZakatConfig::default();
+    let res = InvestmentAssets::new()
+        .value(-500)
+        .kind(InvestmentType::Stock)
+        .calculate_zakat(&config);
     assert!(res.is_err());
 }

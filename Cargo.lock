@@ -834,7 +834,7 @@ dependencies = [
 
 [[package]]
 name = "zakat"
-version = "0.4.1"
+version = "0.5.0"
 dependencies = [
  "async-trait",
  "rust_decimal",

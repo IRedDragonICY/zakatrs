@@ -46,12 +46,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Note: existing calculators (PreciousMetals, BusinessZakat) are used directly!
     // This is because of the blanket impl: impl AsyncCalculateZakat for T where T: CalculateZakat
     let portfolio = AsyncZakatPortfolio::new()
-        .add(PreciousMetals::new(dec!(100), WealthType::Gold).unwrap()) // 100g Gold
-        .add(BusinessZakat::builder()
+        .add(PreciousMetals::new()
+            .weight(100)
+            .metal_type(WealthType::Gold)) // 100g Gold
+        .add(BusinessZakat::new()
             .cash(dec!(5000))
             .inventory(dec!(2000))
-            .liabilities(dec!(1000))
-            .build().unwrap());
+            .liabilities(dec!(1000)));
 
     // 4. Calculate Asynchronously
     println!("\nCalculating Portfolio...");

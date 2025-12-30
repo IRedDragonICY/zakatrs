@@ -30,18 +30,19 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Portfolio aggregation (Dam' al-Amwal)
 - **Asset Labeling** (e.g., "Main Store", "Crypto Wallet")
 - **Input Sanitization & Validation** (Rejects negative values, ensures safe configuration)
-- **Flexible Configuration** (Env Vars, JSON, Fluent Builder)
+- **Flexible Configuration** (Env Vars, JSON, Fluent API)
 - **Fiqh Compliance** (Jewelry exemptions, Madhab-specific rules, Hawl requirements)
 - **Async Support** (Optional integration with `tokio` and `async-trait`)
 - **Live Pricing Interface** (e.g. for API integration)
 - **Detailed Reporting** (Livestock in-kind details, calculation traces, metadata support)
+- **[NEW] `explain()` Debugging** (Get human-readable trace of calculations)
 
 ## Install
 
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.4.1"
+zakat = "0.5"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] } # Required if using async features
 ```
@@ -49,7 +50,7 @@ tokio = { version = "1", features = ["full"] } # Required if using async feature
 Synchronous Only (Lighter weight):
 ```toml
 [dependencies]
-zakat = { version = "0.4.1", default-features = false }
+zakat = { version = "0.5", default-features = false }
 rust_decimal = "1.39"
 ```
 
@@ -57,47 +58,50 @@ rust_decimal = "1.39"
 
 ### Business Zakat
 
-> **Note:** You can pass standard Rust types (`i32`, `f64`, `&str`) directly to all constructors for ease of use.
+> **Note:** v0.5 uses a new **Fluent API**. No more Builders! You can pass standard Rust types (`i32`, `f64`, `&str`) directly.
 
 ```rust
 use zakat::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = ZakatConfig::new(65, 1)?; // gold $65/g, silver $1/g
+    let config = ZakatConfig::new()
+        .with_gold_price(65)  // $65/g
+        .with_silver_price(1); // $1/g
 
-    // Builder pattern with validation
-    // Validates inputs (non-negative) and configuration on .build()
-    let store = BusinessZakatBuilder::default()
-        .cash_on_hand(10_000)
-        .inventory_value(50_000)
+    // Fluent API: Infallible construction, chained setters
+    let store = BusinessZakat::new()
+        .cash(10_000)
+        .inventory(50_000)
         .label("Main Store")
-        .hawl_satisfied(true)
-        .build()?;
+        .hawl(true);
 
-    // Calculate directly
+    // Validation & Calculation happens here
     let result = store.calculate_zakat(&config)?;
 
     if result.is_payable {
         println!("Zakat for {}: ${}", result.label.unwrap_or_default(), result.zakat_due);
     }
+    
+    // NEW: Get a human-readable trace of the calculation
+    println!("{}", result.explain());
+    
     Ok(())
 }
 ```
 
-### Advanced Usage (Builder Pattern)
+### Advanced Usage (Complex Scenarios)
 
 For complex scenarios involving debts and receivables:
 
 ```rust
-let assets = BusinessZakatBuilder::default()
-    .cash_on_hand(50000)
-    .inventory_value(20000)
+let assets = BusinessZakat::new()
+    .cash(50000)
+    .inventory(20000)
     .receivables(5000)
-    .short_term_liabilities(1000)
-    .liabilities_due_now(500) // Deductible immediate debt
+    .liabilities(1000)
+    .debt(500) // Deductible immediate debt
     .label("Tech Startup")
-    .hawl_satisfied(true)
-    .build()?;
+    .hawl(true);
 ```
 
 ### Portfolio Management
@@ -109,23 +113,29 @@ use zakat::prelude::*;
 use zakat::portfolio::PortfolioStatus;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config = ZakatConfig::new(65, 1)?;
+    let config = ZakatConfig::new()
+        .with_gold_price(65)
+        .with_silver_price(1);
 
     let portfolio = ZakatPortfolio::new()
-        .add(IncomeZakatCalculator::new(
-            5000, 0, IncomeCalculationMethod::Gross
-        )?.with_label("Monthly Salary"))
-        .add(PreciousMetals::new(
-            100, WealthType::Gold
-        )?.with_label("Wife's Gold"))
-        .add(InvestmentAssets::new(
-            20000, InvestmentType::Crypto
-        )?.with_debt(2000)?.with_label("Binance Portfolio"));
+        .add(IncomeZakatCalculator::new()
+            .income(5000)
+            .method(IncomeCalculationMethod::Gross)
+            .label("Monthly Salary"))
+        .add(PreciousMetals::new()
+            .weight(100)
+            .metal_type(WealthType::Gold)
+            .label("Wife's Gold"))
+        .add(InvestmentAssets::new()
+            .value(20000)
+            .kind(InvestmentType::Crypto)
+            .debt(2000)
+            .label("Binance Portfolio"));
 
     let result = portfolio.calculate_total(&config);
     println!("Total Zakat Due: ${}", result.total_zakat_due);
     
-    // robust error handling for partial failures
+    // Robust error handling for partial failures
     match result.status {
         PortfolioStatus::Complete => println!("All assets calculated successfully."),
         PortfolioStatus::Partial => {
@@ -175,9 +185,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let config = ZakatConfig::from_provider(&api).await?;
         
         let portfolio = AsyncZakatPortfolio::new()
-            .add(BusinessZakatBuilder::default()
-                .cash_on_hand(10_000)
-                .build()?);
+            .add(BusinessZakat::new()
+                .cash(10_000));
                 
         let result = portfolio.calculate_total_async(&config).await;
         println!("Total Due: {}", result.total_zakat_due);
@@ -188,7 +197,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Configuration
 
-Refactored to be flexible and safe.
+Flexible and safe configuration options.
 
 ```rust
 use zakat::prelude::*;
@@ -199,13 +208,11 @@ let config = ZakatConfig::from_env()?;
 // Or load from JSON
 let config = ZakatConfig::try_from_json("config.json")?;
 
-// Or using Fluent Builder (with Validation)
-let config = ZakatConfigBuilder::default()
-    .gold_price(100.0)
-    .silver_price(1.0)
-    .madhab(Madhab::Hanafi)
-     // Validates that adequate prices are set for the chosen Madhab/Standard
-    .build()?;
+// Or using Fluent API
+let config = ZakatConfig::new()
+    .with_gold_price(100)
+    .with_silver_price(1)
+    .with_madhab(Madhab::Hanafi);
 ```
 
 ### Advanced Assets (Jewelry & Livestock)
@@ -214,18 +221,22 @@ let config = ZakatConfigBuilder::default()
 use zakat::prelude::*;
 
 // Personal Jewelry (Exempt in Shafi/Maliki, Payable in Hanafi)
-let necklace = PreciousMetals::new(100.0, WealthType::Gold)?
-    .with_usage(JewelryUsage::PersonalUse)
-    .with_label("Wife's Wedding Necklace");
+let necklace = PreciousMetals::new()
+    .weight(100)
+    .metal_type(WealthType::Gold)
+    .usage(JewelryUsage::PersonalUse)
+    .label("Wife's Wedding Necklace");
 
 // Livestock Reporting
-let prices = LivestockPricesBuilder::default()
+let prices = LivestockPrices::new()
     .sheep_price(200)
     .cow_price(1500)
-    .camel_price(3000)
-    .build()?;
+    .camel_price(3000);
     
-let camels = LivestockAssets::new(30, LivestockType::Camel, prices);
+let camels = LivestockAssets::new()
+    .count(30)
+    .animal_type(LivestockType::Camel)
+    .prices(prices);
 
 let result = camels.calculate_zakat(&config)?;
 
@@ -250,6 +261,24 @@ if result.is_payable {
 | `maal::livestock` | Count-based |
 | `maal::mining` | Rikaz: None / Mines: 85g Gold |
 | `fitrah` | N/A |
+
+## Migrating from v0.4 (Builder Pattern)
+
+v0.5 removes all `*Builder` structs. Migration is straightforward:
+
+```diff
+- let assets = BusinessZakatBuilder::default()
+-     .cash_on_hand(10_000)
+-     .build()?;
++ let assets = BusinessZakat::new()
++     .cash(10_000);
+```
+
+Key changes:
+- `::builder()` → `::new()` (now infallible, returns `Self`)
+- `.build()?` → removed, object is ready immediately
+- Validation errors now occur at `.calculate_zakat()` instead of `.build()`
+- Errors include Asset Labels for better debugging
 
 ## Contributing
 

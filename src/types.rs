@@ -262,6 +262,76 @@ impl ZakatDetails {
         
         format!("{}: {}{} - Due: {}", label_str, status, reason, self.format_amount())
     }
+
+    /// Generates a human-readable explanation of the Zakat calculation.
+    ///
+    /// The output is formatted as a step-by-step list or table, showing operations
+    /// and their results, helping users understand exactly how the `zakat_due` was determined.
+    pub fn explain(&self) -> String {
+        use std::fmt::Write;
+        let mut output = String::new();
+        let label = self.label.as_deref().unwrap_or("Asset");
+        
+        writeln!(&mut output, "Explanation for '{}' ({:?}):", label, self.wealth_type).unwrap();
+        writeln!(&mut output, "{:-<50}", "").unwrap(); // Separator
+
+        // Find the maximum description length for alignment
+        let max_desc_len = self.calculation_trace.iter()
+            .map(|step| step.description.len())
+            .max()
+            .unwrap_or(20)
+            .max(20);
+
+        for step in &self.calculation_trace {
+            let op_symbol = match step.operation.as_str() {
+                "Initial" => " ",
+                "Add" => "+",
+                "Subtract" => "-",
+                "rate" => "x",
+                "result" => "=",
+                "compare" => "?",
+                _ => " "
+            };
+
+            let amount_str = if let Some(amt) = step.amount {
+                if step.operation == "rate" {
+                     format!("{:.3}", amt) // Rates often have more precision e.g. 0.025
+                } else {
+                     format!("{:.2}", amt)
+                }
+            } else {
+                String::new()
+            };
+
+            if step.operation == "info" {
+                 writeln!(&mut output, "  INFO: {}", step.description).unwrap();
+            } else if !amount_str.is_empty() {
+                 writeln!(&mut output, "  {:<width$} : {} {:>10} ({})", 
+                    step.description, 
+                    op_symbol, 
+                    amount_str, 
+                    step.operation,
+                    width = max_desc_len
+                 ).unwrap();
+            } else {
+                 writeln!(&mut output, "  {:<width$} : [No Amount] ({})", 
+                    step.description, 
+                    step.operation,
+                    width = max_desc_len
+                 ).unwrap();
+            }
+        }
+        
+        writeln!(&mut output, "{:-<50}", "").unwrap();
+        writeln!(&mut output, "Status: {}", if self.is_payable { "PAYABLE" } else { "EXEMPT" }).unwrap();
+        if self.is_payable {
+            writeln!(&mut output, "Amount Due: {}", self.format_amount()).unwrap();
+        } else if let Some(reason) = &self.status_reason {
+            writeln!(&mut output, "Reason: {}", reason).unwrap();
+        }
+
+        output
+    }
 }
 
 impl std::fmt::Display for ZakatDetails {

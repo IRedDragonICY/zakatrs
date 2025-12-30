@@ -5,12 +5,20 @@ use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IrrigationMethod {
     Rain, // Natural, 10%
     Irrigated, // Artificial/Costly, 5%
     Mixed, // Both, 7.5%
 }
 
+impl Default for IrrigationMethod {
+    fn default() -> Self {
+        Self::Rain
+    }
+}
+
+#[derive(Default)]
 pub struct AgricultureAssets {
     pub harvest_weight_kg: Decimal,
     pub price_per_kg: Decimal,
@@ -21,26 +29,8 @@ pub struct AgricultureAssets {
 }
 
 impl AgricultureAssets {
-    pub fn new(
-        harvest_weight_kg: impl IntoZakatDecimal,
-        price_per_kg: impl IntoZakatDecimal,
-        irrigation: IrrigationMethod,
-    ) -> Result<Self, ZakatError> {
-        let weight = harvest_weight_kg.into_zakat_decimal()?;
-        let price = price_per_kg.into_zakat_decimal()?;
-
-        if weight < Decimal::ZERO || price < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Harvest weight and price must be non-negative".to_string(), None));
-        }
-
-        Ok(Self {
-            harvest_weight_kg: weight,
-            price_per_kg: price,
-            irrigation,
-            liabilities_due_now: Decimal::ZERO,
-            hawl_satisfied: true,
-            label: None,
-        })
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Creates a new AgricultureAssets instance from Wasaq units.
@@ -49,24 +39,50 @@ impl AgricultureAssets {
         wasaq: impl IntoZakatDecimal,
         price_per_kg: impl IntoZakatDecimal,
         irrigation: IrrigationMethod,
-    ) -> Result<Self, ZakatError> {
-        let wasaq_value = wasaq.into_zakat_decimal()?;
-        let wasaq_in_kg = dec!(130.6);
-        let weight_kg = wasaq_value * wasaq_in_kg;
-        Self::new(weight_kg, price_per_kg, irrigation)
+    ) -> Self {
+        let mut s = Self::default();
+        if let Ok(w) = wasaq.into_zakat_decimal() {
+            s.harvest_weight_kg = w * dec!(130.6);
+        }
+        if let Ok(p) = price_per_kg.into_zakat_decimal() {
+            s.price_per_kg = p;
+        }
+        s.irrigation = irrigation;
+        s
     }
 
-    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        self.liabilities_due_now = debt.into_zakat_decimal()?;
-        Ok(self)
+    pub fn harvest_weight(mut self, weight: impl IntoZakatDecimal) -> Self {
+        if let Ok(w) = weight.into_zakat_decimal() {
+            self.harvest_weight_kg = w;
+        }
+        self
     }
 
-    pub fn with_hawl(mut self, satisfied: bool) -> Self {
+    pub fn price(mut self, price: impl IntoZakatDecimal) -> Self {
+        if let Ok(p) = price.into_zakat_decimal() {
+            self.price_per_kg = p;
+        }
+        self
+    }
+
+    pub fn irrigation(mut self, irrigation: IrrigationMethod) -> Self {
+        self.irrigation = irrigation;
+        self
+    }
+
+    pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
+        if let Ok(d) = debt.into_zakat_decimal() {
+            self.liabilities_due_now = d;
+        }
+        self
+    }
+
+    pub fn hawl(mut self, satisfied: bool) -> Self {
         self.hawl_satisfied = satisfied;
         self
     }
 
-    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+    pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
@@ -74,6 +90,10 @@ impl AgricultureAssets {
 
 impl CalculateZakat for AgricultureAssets {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        if self.harvest_weight_kg < Decimal::ZERO || self.price_per_kg < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Harvest weight and price must be non-negative".to_string(), self.label.clone()));
+        }
+
         let rate = match self.irrigation {
             IrrigationMethod::Rain => dec!(0.10),
             IrrigationMethod::Irrigated => dec!(0.05),
@@ -84,10 +104,10 @@ impl CalculateZakat for AgricultureAssets {
 
         let total_value = self.harvest_weight_kg
             .checked_mul(self.price_per_kg)
-            .ok_or(ZakatError::CalculationError("Overflow calculating agriculture total value".to_string(), None))?;
+            .ok_or(ZakatError::CalculationError("Overflow calculating agriculture total value".to_string(), self.label.clone()))?;
         let nisab_value = nisab_threshold_kg
             .checked_mul(self.price_per_kg)
-            .ok_or(ZakatError::CalculationError("Overflow calculating agriculture nisab value".to_string(), None))?; 
+            .ok_or(ZakatError::CalculationError("Overflow calculating agriculture nisab value".to_string(), self.label.clone()))?; 
         
         let liabilities = self.liabilities_due_now;
         
@@ -97,12 +117,12 @@ impl CalculateZakat for AgricultureAssets {
         
         let net_value = total_value
             .checked_sub(liabilities)
-            .ok_or(ZakatError::CalculationError("Underflow calculating agriculture net value".to_string(), None))?;
+            .ok_or(ZakatError::CalculationError("Underflow calculating agriculture net value".to_string(), self.label.clone()))?;
         
         let zakat_due = if net_value >= nisab_value {
              net_value
                  .checked_mul(rate)
-                 .ok_or(ZakatError::CalculationError("Overflow calculating agriculture zakat due".to_string(), None))?
+                 .ok_or(ZakatError::CalculationError("Overflow calculating agriculture zakat due".to_string(), self.label.clone()))?
         } else {
              Decimal::ZERO
         };
@@ -168,8 +188,12 @@ mod tests {
         // Price 1.0 -> Value 1000.
         // Due 100.
         
-        let agri = AgricultureAssets::new(dec!(1000.0), dec!(1.0), IrrigationMethod::Rain).unwrap();
-        let res = agri.with_hawl(true).calculate_zakat(&config).unwrap();
+        let agri = AgricultureAssets::new()
+            .harvest_weight(dec!(1000.0))
+            .price(dec!(1.0))
+            .irrigation(IrrigationMethod::Rain);
+            
+        let res = agri.hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(100.0));
@@ -178,8 +202,12 @@ mod tests {
     #[test]
     fn test_agriculture_irrigated() {
         let config = ZakatConfig::default();
-        let agri = AgricultureAssets::new(dec!(1000.0), dec!(1.0), IrrigationMethod::Irrigated).unwrap();
-        let res = agri.with_hawl(true).calculate_zakat(&config).unwrap();
+        let agri = AgricultureAssets::new()
+            .harvest_weight(dec!(1000.0))
+            .price(dec!(1.0))
+            .irrigation(IrrigationMethod::Irrigated);
+            
+        let res = agri.hawl(true).calculate_zakat(&config).unwrap();
         
         // Irrigated -> 5%.
         // Due 50.
@@ -189,8 +217,12 @@ mod tests {
     #[test]
     fn test_agriculture_mixed() {
         let config = ZakatConfig::default();
-        let agri = AgricultureAssets::new(dec!(1000.0), dec!(1.0), IrrigationMethod::Mixed).unwrap();
-        let res = agri.with_hawl(true).calculate_zakat(&config).unwrap();
+        let agri = AgricultureAssets::new()
+            .harvest_weight(dec!(1000.0))
+            .price(dec!(1.0))
+            .irrigation(IrrigationMethod::Mixed);
+            
+        let res = agri.hawl(true).calculate_zakat(&config).unwrap();
         
         // Mixed -> 7.5%.
         // Due 75.
@@ -200,16 +232,24 @@ mod tests {
     #[test]
     fn test_below_nisab() {
          let config = ZakatConfig::default(); // 653kg
-         let agri = AgricultureAssets::new(dec!(600.0), dec!(1.0), IrrigationMethod::Rain).unwrap();
-         let res = agri.with_hawl(true).calculate_zakat(&config).unwrap();
+         let agri = AgricultureAssets::new()
+            .harvest_weight(dec!(600.0))
+            .price(dec!(1.0))
+            .irrigation(IrrigationMethod::Rain);
+            
+         let res = agri.hawl(true).calculate_zakat(&config).unwrap();
          
          assert!(!res.is_payable);
     }
     #[test]
     fn test_agriculture_payload() {
         let config = ZakatConfig::default();
-        let agri = AgricultureAssets::new(dec!(1000.0), dec!(1.0), IrrigationMethod::Rain).unwrap();
-        let res = agri.with_hawl(true).calculate_zakat(&config).unwrap();
+        let agri = AgricultureAssets::new()
+            .harvest_weight(dec!(1000.0))
+            .price(dec!(1.0))
+            .irrigation(IrrigationMethod::Rain);
+            
+        let res = agri.hawl(true).calculate_zakat(&config).unwrap();
         
         match res.payload {
             crate::types::PaymentPayload::Agriculture { harvest_weight, irrigation_method, crop_value } => {

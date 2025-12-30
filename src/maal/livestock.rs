@@ -3,7 +3,6 @@ use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::inputs::IntoZakatDecimal;
-use crate::builder::AssetBuilder;
 
 pub enum LivestockType {
     Camel,
@@ -17,41 +16,11 @@ pub enum GrazingMethod {
     Maalufah, // Fed/Fodder provided
 }
 
-pub struct LivestockAssets {
-    pub count: u32,
-    pub animal_type: LivestockType,
-    pub prices: LivestockPrices,
-    pub liabilities_due_now: Decimal,
-    pub hawl_satisfied: bool,
-    pub grazing_method: GrazingMethod,
-    pub label: Option<String>,
-}
-
 #[derive(Debug, Clone, Copy)]
 pub struct LivestockPrices {
     pub sheep_price: Decimal,
     pub cow_price: Decimal, // For Tabi/Musinnah avg or simplified
     pub camel_price: Decimal,
-}
-
-impl LivestockPrices {
-    pub fn builder() -> LivestockPricesBuilder {
-        LivestockPricesBuilder::default()
-    }
-
-    /// Deprecated: Use `LivestockPrices::builder()` instead.
-    #[deprecated(since = "0.2.1", note = "Use `LivestockPrices::builder()` instead")]
-    pub fn new(
-        sheep_price: impl IntoZakatDecimal,
-        cow_price: impl IntoZakatDecimal,
-        camel_price: impl IntoZakatDecimal,
-    ) -> Result<Self, ZakatError> {
-        Self::builder()
-            .sheep_price(sheep_price)
-            .cow_price(cow_price)
-            .camel_price(camel_price)
-            .build()
-    }
 }
 
 impl Default for LivestockPrices {
@@ -64,105 +33,95 @@ impl Default for LivestockPrices {
     }
 }
 
-#[derive(Default)]
-pub struct LivestockPricesBuilder {
-    sheep_price: Option<Decimal>,
-    cow_price: Option<Decimal>,
-    camel_price: Option<Decimal>,
-}
+impl LivestockPrices {
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-impl LivestockPricesBuilder {
     pub fn sheep_price(mut self, price: impl IntoZakatDecimal) -> Self {
         if let Ok(p) = price.into_zakat_decimal() {
-            self.sheep_price = Some(p);
+            self.sheep_price = p;
         }
         self
     }
 
     pub fn cow_price(mut self, price: impl IntoZakatDecimal) -> Self {
         if let Ok(p) = price.into_zakat_decimal() {
-            self.cow_price = Some(p);
+            self.cow_price = p;
         }
         self
     }
 
     pub fn camel_price(mut self, price: impl IntoZakatDecimal) -> Self {
          if let Ok(p) = price.into_zakat_decimal() {
-            self.camel_price = Some(p);
+            self.camel_price = p;
         }
         self
     }
 }
 
-use crate::builder::Validate;
-
-impl Validate for LivestockPricesBuilder {
-    fn validate(&self) -> Result<(), ZakatError> {
-        let s = self.sheep_price.unwrap_or(Decimal::ZERO);
-        let c = self.cow_price.unwrap_or(Decimal::ZERO);
-        let m = self.camel_price.unwrap_or(Decimal::ZERO); // m for camel (ibl)
-
-        if s < Decimal::ZERO || c < Decimal::ZERO || m < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput("Livestock prices must be non-negative".to_string(), None));
-        }
-        Ok(())
-    }
+pub struct LivestockAssets {
+    pub count: u32,
+    pub animal_type: Option<LivestockType>,
+    pub prices: LivestockPrices,
+    pub liabilities_due_now: Decimal,
+    pub hawl_satisfied: bool,
+    pub grazing_method: GrazingMethod,
+    pub label: Option<String>,
 }
 
-impl AssetBuilder<LivestockPrices> for LivestockPricesBuilder {
-    fn build(self) -> Result<LivestockPrices, ZakatError> {
-        self.validate()?;
-        
-        // We require at least one price to be set or explicit 0.
-        // If not set, they default to 0.
-        
-        let s = self.sheep_price.unwrap_or(Decimal::ZERO);
-        let c = self.cow_price.unwrap_or(Decimal::ZERO);
-        let m = self.camel_price.unwrap_or(Decimal::ZERO); 
-
-        Ok(LivestockPrices {
-            sheep_price: s,
-            cow_price: c,
-            camel_price: m,
-        })
-    }
-}
-
-
-
-impl LivestockAssets {
-    pub fn new(
-        count: u32,
-        animal_type: LivestockType,
-        prices: LivestockPrices,
-    ) -> Self {
+impl Default for LivestockAssets {
+    fn default() -> Self {
         Self {
-            count,
-            animal_type,
-            prices,
+            count: 0,
+            animal_type: None,
+            prices: LivestockPrices::default(),
             liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
-            grazing_method: GrazingMethod::Saimah, // Default to Zakatable state (Saimah)
+            grazing_method: GrazingMethod::Saimah,
             label: None,
         }
     }
+}
 
-    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        self.liabilities_due_now = debt.into_zakat_decimal()?;
-        Ok(self)
+impl LivestockAssets {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn with_hawl(mut self, satisfied: bool) -> Self {
+    pub fn count(mut self, count: u32) -> Self {
+        self.count = count;
+        self
+    }
+
+    pub fn animal_type(mut self, animal_type: LivestockType) -> Self {
+        self.animal_type = Some(animal_type);
+        self
+    }
+
+    pub fn prices(mut self, prices: LivestockPrices) -> Self {
+        self.prices = prices;
+        self
+    }
+
+    pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
+        if let Ok(d) = debt.into_zakat_decimal() {
+            self.liabilities_due_now = d;
+        }
+        self
+    }
+
+    pub fn hawl(mut self, satisfied: bool) -> Self {
         self.hawl_satisfied = satisfied;
         self
     }
 
-    pub fn with_grazing_method(mut self, method: GrazingMethod) -> Self {
+    pub fn grazing(mut self, method: GrazingMethod) -> Self {
         self.grazing_method = method;
         self
     }
 
-    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+    pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
@@ -172,15 +131,19 @@ use crate::config::ZakatConfig;
 
 impl CalculateZakat for LivestockAssets {
     fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        let animal_type = self.animal_type.as_ref().ok_or_else(|| 
+            ZakatError::InvalidInput("Animal type must be specified".to_string(), self.label.clone())
+        )?;
+
         // Validate price for the specific animal type
-        let single_price = match self.animal_type {
+        let single_price = match animal_type {
             LivestockType::Sheep => self.prices.sheep_price,
             LivestockType::Cow => self.prices.cow_price,
             LivestockType::Camel => self.prices.camel_price,
         };
 
         if single_price <= Decimal::ZERO {
-            let animal_str = match self.animal_type {
+            let animal_str = match animal_type {
                 LivestockType::Sheep => "Sheep",
                 LivestockType::Cow => "Cow",
                 LivestockType::Camel => "Camel",
@@ -192,8 +155,7 @@ impl CalculateZakat for LivestockAssets {
         }
 
         // Calculate Nisab Count Value for reporting consistency even if not payable
-        
-        let nisab_count_val = match self.animal_type {
+        let nisab_count_val = match animal_type {
             LivestockType::Sheep => Decimal::from(40).checked_mul(single_price).ok_or_else(|| ZakatError::Overflow { operation: "calculate_nisab_value_sheep".to_string(), source: self.label.clone() })?,
             LivestockType::Cow => Decimal::from(30).checked_mul(single_price).ok_or_else(|| ZakatError::Overflow { operation: "calculate_nisab_value_cow".to_string(), source: self.label.clone() })?,
             LivestockType::Camel => Decimal::from(5).checked_mul(single_price).ok_or_else(|| ZakatError::Overflow { operation: "calculate_nisab_value_camel".to_string(), source: self.label.clone() })?,
@@ -209,7 +171,7 @@ impl CalculateZakat for LivestockAssets {
                 .with_label(self.label.clone().unwrap_or_default()));
         }
 
-        let (zakat_value, nisab_count, heads_due) = match self.animal_type {
+        let (zakat_value, nisab_count, heads_due) = match animal_type {
             LivestockType::Sheep => calculate_sheep_zakat(self.count, self.prices.sheep_price).map_err(|_| ZakatError::Overflow { operation: "calculate_sheep_zakat".to_string(), source: self.label.clone() })?,
             LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price).map_err(|_| ZakatError::Overflow { operation: "calculate_cow_zakat".to_string(), source: self.label.clone() })?,
             LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices).map_err(|_| ZakatError::Overflow { operation: "calculate_camel_zakat".to_string(), source: self.label.clone() })?,
@@ -229,7 +191,7 @@ impl CalculateZakat for LivestockAssets {
         let description = description_parts.join(", ");
 
         // Build calculation trace
-        let animal_type_str = match self.animal_type {
+        let animal_type_str = match animal_type {
             LivestockType::Sheep => "Sheep/Goat",
             LivestockType::Cow => "Cattle",
             LivestockType::Camel => "Camel",
@@ -469,88 +431,133 @@ mod tests {
 
     #[test]
     fn test_sheep() {
-        let prices = LivestockPrices { sheep_price: dec!(100.0), ..Default::default() };
+        let prices = LivestockPrices::new().sheep_price(dec!(100.0));
         // 1-39 -> 0
-        let stock = LivestockAssets::new(39, LivestockType::Sheep, prices);
-        let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+        let stock = LivestockAssets::new()
+            .count(39)
+            .animal_type(LivestockType::Sheep)
+            .prices(prices)
+            .hawl(true);
+        let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
         assert!(!res.is_payable);
 
         // 40-120 -> 1 sheep
-        let stock = LivestockAssets::new(40, LivestockType::Sheep, prices);
-        let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+        let stock = LivestockAssets::new()
+            .count(40)
+            .animal_type(LivestockType::Sheep)
+            .prices(prices)
+            .hawl(true);
+        let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(100.0));
 
-        let stock = LivestockAssets::new(120, LivestockType::Sheep, prices);
-        let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+        let stock = LivestockAssets::new()
+            .count(120)
+            .animal_type(LivestockType::Sheep)
+            .prices(prices)
+            .hawl(true);
+        let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
         assert_eq!(res.zakat_due, dec!(100.0));
         
          // 121-200 -> 2 sheep
-        let stock = LivestockAssets::new(121, LivestockType::Sheep, prices);
-        let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+        let stock = LivestockAssets::new()
+            .count(121)
+            .animal_type(LivestockType::Sheep)
+            .prices(prices)
+            .hawl(true);
+        let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
         assert_eq!(res.zakat_due, dec!(200.0));
     }
 
     #[test]
     fn test_camels() {
-         let prices = LivestockPrices { camel_price: dec!(1000.0), sheep_price: dec!(100.0), ..Default::default() };
+         let prices = LivestockPrices::new()
+            .camel_price(dec!(1000.0))
+            .sheep_price(dec!(100.0));
          
          // 1-4 -> 0
-         let stock = LivestockAssets::new(4, LivestockType::Camel, prices);
-         let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+         let stock = LivestockAssets::new()
+            .count(4)
+            .animal_type(LivestockType::Camel)
+            .prices(prices)
+            .hawl(true);
+         let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
          assert!(!res.is_payable);
 
          // 5-9 -> 1 sheep
-         let stock = LivestockAssets::new(5, LivestockType::Camel, prices);
-         let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+         let stock = LivestockAssets::new()
+            .count(5)
+            .animal_type(LivestockType::Camel)
+            .prices(prices)
+            .hawl(true);
+         let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
          assert!(res.is_payable);
          assert_eq!(res.zakat_due, dec!(100.0)); // 1 sheep value
          
          // 25-35 -> 1 Bint Makhad (Camel)
-         let stock = LivestockAssets::new(25, LivestockType::Camel, prices);
-         let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+         let stock = LivestockAssets::new()
+            .count(25)
+            .animal_type(LivestockType::Camel)
+            .prices(prices)
+            .hawl(true);
+         let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
          assert_eq!(res.zakat_due, dec!(500.0)); // 1 Bint Makhad (0.5x camel_price)
     }
 
     #[test]
     fn test_cows() {
-         let prices = LivestockPrices { cow_price: dec!(500.0), ..Default::default() };
+         let prices = LivestockPrices::new().cow_price(dec!(500.0));
          
          // 1-29 -> 0
-         let stock = LivestockAssets::new(29, LivestockType::Cow, prices);
-         let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+         let stock = LivestockAssets::new()
+            .count(29)
+            .animal_type(LivestockType::Cow)
+            .prices(prices)
+            .hawl(true);
+         let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
          assert!(!res.is_payable);
 
          // 30-39 -> 1 Tabi' (implied 1 year old cow, assumed base price here)
          // For simplicity using cow_price. In reality Tabi' vs Musinnah prices differ.
-         let stock = LivestockAssets::new(30, LivestockType::Cow, prices);
-         let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+         let stock = LivestockAssets::new()
+            .count(30)
+            .animal_type(LivestockType::Cow)
+            .prices(prices)
+            .hawl(true);
+         let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
          assert!(res.is_payable);
          assert_eq!(res.zakat_due, dec!(350.0)); // 1 Tabi (0.7x cow_price)
     }
 
     #[test]
     fn test_maalufah_below_threshold() {
-        let prices = LivestockPrices { sheep_price: dec!(100.0), ..Default::default() };
+        let prices = LivestockPrices::new().sheep_price(dec!(100.0));
         // 50 Sheep (usually payable) but Feed-lot (Maalufah)
-        let stock = LivestockAssets::new(50, LivestockType::Sheep, prices)
-            .with_grazing_method(GrazingMethod::Maalufah);
+        let stock = LivestockAssets::new()
+            .count(50)
+            .animal_type(LivestockType::Sheep)
+            .prices(prices)
+            .grazing(GrazingMethod::Maalufah)
+            .hawl(true);
             
-        let res = stock.with_hawl(true).calculate_zakat(&ZakatConfig::default()).unwrap();
+        let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
         assert!(!res.is_payable);
         assert_eq!(res.status_reason, Some("Not Sa'imah (naturally grazed)".to_string()));
     }
 
     #[test]
     fn test_large_number_success() {
-        let prices = LivestockPrices::builder()
-            .cow_price(dec!(500.0))
-            .build().unwrap();
+        let prices = LivestockPrices::new()
+            .cow_price(dec!(500.0));
 
         // 100M + 1 cows. Previously failed due to complexity/iteration limit.
         // Now should pass instantly with O(1) logic.
         
-        let stock_large = LivestockAssets::new(100_000_001, LivestockType::Cow, prices);
+        let stock_large = LivestockAssets::new()
+            .count(100_000_001)
+            .animal_type(LivestockType::Cow)
+            .prices(prices);
+            
         let res_large = stock_large.calculate_zakat(&ZakatConfig::default());
         
         // Should NOT be an error now

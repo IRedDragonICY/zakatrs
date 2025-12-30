@@ -5,54 +5,65 @@ use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum IncomeCalculationMethod {
     Gross,
     Net,
 }
 
+impl Default for IncomeCalculationMethod {
+    fn default() -> Self {
+        Self::Gross
+    }
+}
+
+#[derive(Default)]
 pub struct IncomeZakatCalculator {
-    total_income: Decimal,
-    basic_expenses: Decimal,
-    method: IncomeCalculationMethod,
-    liabilities_due_now: Decimal,
+    pub total_income: Decimal,
+    pub basic_expenses: Decimal,
+    pub method: IncomeCalculationMethod,
+    pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
 }
 
 impl IncomeZakatCalculator {
-    pub fn new(
-        total_income: impl IntoZakatDecimal,
-        basic_expenses: impl IntoZakatDecimal,
-        method: IncomeCalculationMethod,
-    ) -> Result<Self, ZakatError> {
-        let income = total_income.into_zakat_decimal()?;
-        let expenses = basic_expenses.into_zakat_decimal()?;
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-        if income < Decimal::ZERO || expenses < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Income and expenses must be non-negative".to_string(), None));
+    pub fn income(mut self, income: impl IntoZakatDecimal) -> Self {
+        if let Ok(i) = income.into_zakat_decimal() {
+            self.total_income = i;
         }
-
-        Ok(Self {
-            total_income: income,
-            basic_expenses: expenses,
-            method,
-            liabilities_due_now: Decimal::ZERO,
-            hawl_satisfied: true,
-            label: None,
-        })
+        self
     }
 
-    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        self.liabilities_due_now = debt.into_zakat_decimal()?;
-        Ok(self)
+    pub fn expenses(mut self, expenses: impl IntoZakatDecimal) -> Self {
+        if let Ok(e) = expenses.into_zakat_decimal() {
+            self.basic_expenses = e;
+        }
+        self
     }
 
-    pub fn with_hawl(mut self, satisfied: bool) -> Self {
+    pub fn method(mut self, method: IncomeCalculationMethod) -> Self {
+        self.method = method;
+        self
+    }
+
+    pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
+        if let Ok(d) = debt.into_zakat_decimal() {
+            self.liabilities_due_now = d;
+        }
+        self
+    }
+
+    pub fn hawl(mut self, satisfied: bool) -> Self {
         self.hawl_satisfied = satisfied;
         self
     }
 
-    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+    pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
@@ -60,6 +71,10 @@ impl IncomeZakatCalculator {
 
 impl CalculateZakat for IncomeZakatCalculator {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+         if self.total_income < Decimal::ZERO || self.basic_expenses < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Income and expenses must be non-negative".to_string(), self.label.clone()));
+        }
+
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(
             config.cash_nisab_standard,
@@ -67,10 +82,10 @@ impl CalculateZakat for IncomeZakatCalculator {
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError("Gold price needed for Income Nisab".to_string(), None));
+            return Err(ZakatError::ConfigurationError("Gold price needed for Income Nisab".to_string(), self.label.clone()));
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Silver price needed for Income Nisab with current standard".to_string(), None));
+            return Err(ZakatError::ConfigurationError("Silver price needed for Income Nisab with current standard".to_string(), self.label.clone()));
         }
         
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
@@ -97,7 +112,7 @@ impl CalculateZakat for IncomeZakatCalculator {
                 // Then we also deduct any extra debts.
                 let combined_liabilities = self.basic_expenses
                     .checked_add(external_debt)
-                    .ok_or(ZakatError::CalculationError("Overflow summing income liabilities".to_string(), None))?;
+                    .ok_or(ZakatError::CalculationError("Overflow summing income liabilities".to_string(), self.label.clone()))?;
                 (self.total_income, combined_liabilities)
             }
         };
@@ -147,8 +162,11 @@ mod tests {
         // Income 10,000. Gross.
         // Due 250.
         
-        let calc = IncomeZakatCalculator::new(dec!(10000.0), dec!(5000.0), IncomeCalculationMethod::Gross).unwrap();
-        let res = calc.with_hawl(true).calculate_zakat(&config).unwrap();
+        let calc = IncomeZakatCalculator::new()
+            .income(dec!(10000.0))
+            .expenses(dec!(5000.0)) // Ignored in Gross
+            .method(IncomeCalculationMethod::Gross);
+        let res = calc.hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(250.0));
@@ -161,8 +179,11 @@ mod tests {
         // Income 12,000. Expenses 4,000. Net 8,000.
         // Net < Nisab. Not Payable.
         
-        let calc = IncomeZakatCalculator::new(dec!(12000.0), dec!(4000.0), IncomeCalculationMethod::Net).unwrap();
-        let res = calc.with_hawl(true).calculate_zakat(&config).unwrap();
+        let calc = IncomeZakatCalculator::new()
+            .income(dec!(12000.0))
+            .expenses(dec!(4000.0))
+            .method(IncomeCalculationMethod::Net);
+        let res = calc.hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(!res.is_payable);
         // (12000 - 4000) = 8000. 8000 < 8500.

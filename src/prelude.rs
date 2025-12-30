@@ -23,9 +23,8 @@ pub use crate::types::{WealthType, ZakatDetails, ZakatError};
 pub use crate::inputs::IntoZakatDecimal;
 
 // Re-export specific calculators and types
-pub use crate::builder::AssetBuilder;
-pub use crate::maal::business::{BusinessZakat, BusinessZakatBuilder};
-pub use crate::config::ZakatConfigBuilder;
+// Note: Builders have been removed in favor of fluent structs.
+pub use crate::maal::business::BusinessZakat;
 pub use crate::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
 pub use crate::maal::investments::{InvestmentAssets, InvestmentType};
 pub use crate::maal::precious_metals::PreciousMetals;

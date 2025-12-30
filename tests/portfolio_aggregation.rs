@@ -14,23 +14,19 @@ fn test_portfolio_aggregation_mix_gold_and_cash() {
     // Zakat should be due on the total $9,000.
     // Zakat Due = $9,000 * 0.025 = $225.
 
-    let config = ZakatConfig::new(
-        100.0, // Gold price
-        1.0    // Silver price (irrelevant here if using Gold standard or if Gold is higher)
-    ).unwrap().with_madhab(Madhab::Shafi); // Explicitly Gold standard for simplicity
+    let config = ZakatConfig::new()
+        .with_gold_price(100.0)
+        .with_silver_price(1.0)
+        .with_madhab(Madhab::Shafi); // Explicitly Gold standard for simplicity
 
-    let gold_asset = PreciousMetals::new(
-        50.0, 
-        WealthType::Gold
-    ).expect("Valid gold input");
+    let gold_asset = PreciousMetals::new()
+        .weight(50.0)
+        .metal_type(WealthType::Gold);
 
     // Using BusinessZakat to represent Cash roughly
-    // BusinessZakat::builder(...)
-    let cash_calculator = BusinessZakat::builder()
+    let cash_calculator = BusinessZakat::new()
             .cash(4000.0) // Cash equivalent
-            .hawl(true) // Ensure hawl is met
-            .build()
-            .expect("Valid assets");
+            .hawl(true); // Ensure hawl is met
 
     let portfolio = ZakatPortfolio::new()
         .add(gold_asset)
@@ -68,10 +64,17 @@ fn test_portfolio_no_aggregation_if_total_below_nisab() {
     // Total = $5,000 < $8,500.
     // Zakat Due = 0.
 
-    let config = ZakatConfig::new(100.0, 1.0).unwrap();
+    let config = ZakatConfig::new()
+        .with_gold_price(100.0)
+        .with_silver_price(1.0);
     
-    let gold_asset = PreciousMetals::new(30.0, WealthType::Gold).unwrap();
-    let cash_calculator = BusinessZakat::builder().cash(2000.0).hawl(true).build().expect("Valid");
+    let gold_asset = PreciousMetals::new()
+        .weight(30.0)
+        .metal_type(WealthType::Gold);
+        
+    let cash_calculator = BusinessZakat::new()
+        .cash(2000.0)
+        .hawl(true);
 
     let portfolio = ZakatPortfolio::new()
         .add(gold_asset)

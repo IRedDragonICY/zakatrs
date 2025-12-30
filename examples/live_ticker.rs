@@ -7,14 +7,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Initialize Assets ONCE (e.g. at app startup or user input)
     // Notice we do NOT pass config here anymore.
-    let gold_stash = PreciousMetals::new(100, WealthType::Gold)?.with_label("Grandma's Necklace");
-    let trade_goods = BusinessZakat::builder()
+    let gold_stash = PreciousMetals::new()
+        .weight(100)
+        .metal_type(WealthType::Gold)
+        .label("Grandma's Necklace");
+        
+    let trade_goods = BusinessZakat::new()
         .cash(10_000)
         .inventory(5_000)
         .liabilities(2_000)
-        .label("Corner Store")
-        .build()
-        .expect("Assets valid");
+        .label("Corner Store");
 
     // 2. Create a Portfolio holding these assets
     let portfolio = ZakatPortfolio::new()
@@ -23,7 +25,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. Simulation Day 1: Gold is Cheap ($40/g)
     // Nisab = 85 * 40 = $3,400.
-    let config_day1 = ZakatConfig::new(40, 1)?;
+    let config_day1 = ZakatConfig::new()
+        .with_gold_price(40)
+        .with_silver_price(1);
     
     println!("\n--- Day 1 (Gold ${}/g) ---", config_day1.gold_price_per_gram);
     let result_day1 = portfolio.calculate_total(&config_day1);
@@ -36,7 +40,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 4. Simulation Day 2: Gold Spikes ($80/g)
     // Nisab = 85 * 80 = $6,800.
     // We do NOT need to recreate assets or portfolio. Just pass new config.
-    let config_day2 = ZakatConfig::new(80, 1)?;
+    let config_day2 = ZakatConfig::new()
+        .with_gold_price(80)
+        .with_silver_price(1);
 
     println!("\n--- Day 2 (Gold ${}/g) ---", config_day2.gold_price_per_gram);
     let result_day2 = portfolio.calculate_total(&config_day2);

@@ -14,9 +14,14 @@ impl CalculateZakat for FailingAsset {
 
 #[test]
 fn test_portfolio_partial_failure() {
-    let config = ZakatConfig::new(100, 1).unwrap();
+    let config = ZakatConfig::new()
+        .with_gold_price(100)
+        .with_silver_price(1);
     
-    let valid_asset = PreciousMetals::new(100, WealthType::Gold).unwrap();
+    let valid_asset = PreciousMetals::new()
+        .weight(100)
+        .metal_type(WealthType::Gold);
+        
     let failing_asset = FailingAsset;
     
     let portfolio = ZakatPortfolio::new()

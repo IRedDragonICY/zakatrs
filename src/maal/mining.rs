@@ -5,6 +5,7 @@ use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MiningType {
     /// Buried Treasure / Ancient Wealth found.
     Rikaz,
@@ -12,6 +13,13 @@ pub enum MiningType {
     Mines,
 }
 
+impl Default for MiningType {
+    fn default() -> Self {
+        Self::Mines
+    }
+}
+
+#[derive(Default)]
 pub struct MiningAssets {
     pub value: Decimal,
     pub mining_type: MiningType,
@@ -21,36 +29,35 @@ pub struct MiningAssets {
 }
 
 impl MiningAssets {
-    pub fn new(
-        value: impl IntoZakatDecimal,
-        mining_type: MiningType,
-    ) -> Result<Self, ZakatError> {
-        let val = value.into_zakat_decimal()?;
+    pub fn new() -> Self {
+        Self::default()
+    }
 
-        if val < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Mining value must be non-negative".to_string(), None));
+    pub fn value(mut self, value: impl IntoZakatDecimal) -> Self {
+        if let Ok(v) = value.into_zakat_decimal() {
+            self.value = v;
         }
-
-        Ok(Self {
-            value: val,
-            mining_type,
-            liabilities_due_now: Decimal::ZERO,
-            hawl_satisfied: true,
-            label: None,
-        })
+        self
     }
 
-    pub fn with_debt_due_now(mut self, debt: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        self.liabilities_due_now = debt.into_zakat_decimal()?;
-        Ok(self)
+    pub fn kind(mut self, kind: MiningType) -> Self {
+        self.mining_type = kind;
+        self
     }
 
-    pub fn with_hawl(mut self, satisfied: bool) -> Self {
+    pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
+        if let Ok(d) = debt.into_zakat_decimal() {
+            self.liabilities_due_now = d;
+        }
+        self
+    }
+
+    pub fn hawl(mut self, satisfied: bool) -> Self {
         self.hawl_satisfied = satisfied;
         self
     }
 
-    pub fn with_label(mut self, label: impl Into<String>) -> Self {
+    pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
         self
     }
@@ -58,6 +65,10 @@ impl MiningAssets {
 
 impl CalculateZakat for MiningAssets {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        if self.value < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput("Mining value must be non-negative".to_string(), self.label.clone()));
+        }
+
         match self.mining_type {
             MiningType::Rikaz => {
                 // Rate: 20%. No Nisab (or minimal). No Debts deduction.
@@ -82,8 +93,8 @@ impl CalculateZakat for MiningAssets {
             MiningType::Mines => {
                 let nisab_threshold = config.gold_price_per_gram
                     .checked_mul(config.get_nisab_gold_grams())
-                    .ok_or(ZakatError::CalculationError("Overflow calculating mining nisab threshold".to_string(), None))?;
-
+                    .ok_or(ZakatError::CalculationError("Overflow calculating mining nisab threshold".to_string(), self.label.clone()))?;
+                
                 // Rate: 2.5%. Nisab: 85g Gold.
                 if !self.hawl_satisfied {
                      return Ok(ZakatDetails::below_threshold(nisab_threshold, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met")
@@ -124,11 +135,13 @@ mod tests {
     #[test]
     fn test_rikaz() {
         let config = ZakatConfig::default();
-        let mining = MiningAssets::new(dec!(1000.0), MiningType::Rikaz).unwrap();
+        let mining = MiningAssets::new()
+            .value(dec!(1000.0))
+            .kind(MiningType::Rikaz);
         // Rikaz (Buried Treasure) is taxed at 20% on the gross value.
         // Debts and Hawl are not considered for Rikaz.
         
-        let res = mining.with_debt_due_now(dec!(500.0)).unwrap().with_hawl(false).calculate_zakat(&config).unwrap();
+        let res = mining.debt(dec!(500.0)).hawl(false).calculate_zakat(&config).unwrap();
         // Calculation: 1000 * 0.20 = 200. (Debt of 500 is ignored).
         
         assert!(res.is_payable);
@@ -140,8 +153,10 @@ mod tests {
          let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
          // Nisab 85g = 8500.
          
-         let mining = MiningAssets::new(dec!(10000.0), MiningType::Mines).unwrap(); // Changed Mineral to Mines
-         let res = mining.with_hawl(true).calculate_zakat(&config).unwrap();
+         let mining = MiningAssets::new()
+             .value(dec!(10000.0))
+             .kind(MiningType::Mines);
+         let res = mining.hawl(true).calculate_zakat(&config).unwrap();
          
          // 10000 > 8500. Rate 2.5%.
          // Due 250.

@@ -4,7 +4,6 @@ use std::env;
 use std::fs;
 use crate::types::ZakatError;
 use crate::inputs::IntoZakatDecimal;
-use crate::builder::AssetBuilder;
 
 use crate::madhab::{Madhab, NisabStandard};
 
@@ -54,22 +53,8 @@ impl std::str::FromStr for ZakatConfig {
 }
 
 impl ZakatConfig {
-    pub fn builder() -> ZakatConfigBuilder {
-        ZakatConfigBuilder::default()
-    }
-
-    pub fn new(gold_price: impl IntoZakatDecimal, silver_price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        let gold = gold_price.into_zakat_decimal()?;
-        let silver = silver_price.into_zakat_decimal()?;
-
-        let config = Self {
-            gold_price_per_gram: gold,
-            silver_price_per_gram: silver,
-            ..Default::default()
-        };
-        
-        config.validate()?;
-        Ok(config)
+    pub fn new() -> Self {
+        Self::default()
     }
 
     /// Validates the configuration for logical consistency and safety.
@@ -124,7 +109,11 @@ impl ZakatConfig {
         let silver_price = silver_str.parse::<Decimal>()
             .map_err(|e| ZakatError::ConfigurationError(format!("Invalid silver price format: {}", e), None))?;
 
-        Self::new(gold_price, silver_price)
+        Ok(Self {
+            gold_price_per_gram: gold_price,
+            silver_price_per_gram: silver_price,
+            ..Default::default()
+        })
     }
 
     /// Attempts to load configuration from a JSON file.
@@ -145,7 +134,11 @@ impl ZakatConfig {
         provider: &P,
     ) -> Result<Self, ZakatError> {
         let prices = provider.get_prices().await?;
-        Self::new(prices.gold_per_gram, prices.silver_per_gram)
+        Ok(Self {
+            gold_price_per_gram: prices.gold_per_gram,
+            silver_price_per_gram: prices.silver_per_gram,
+            ..Default::default()
+        })
     }
 
     /// Refreshes the prices in this configuration using the given provider.
@@ -160,31 +153,54 @@ impl ZakatConfig {
 
     // ========== Fluent Helper Methods ========== 
     // These methods allow chaining configuration adjustments.
-    // Validation is enforced when calling `validate()` or using the builder.
 
-    pub fn with_gold_nisab(mut self, grams: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        self.nisab_gold_grams = Some(grams.into_zakat_decimal()?);
-        Ok(self)
+    pub fn with_gold_price(mut self, price: impl IntoZakatDecimal) -> Self {
+        if let Ok(p) = price.into_zakat_decimal() {
+            self.gold_price_per_gram = p;
+        }
+        self
     }
 
-    pub fn with_silver_nisab(mut self, grams: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        self.nisab_silver_grams = Some(grams.into_zakat_decimal()?);
-        Ok(self)
+    pub fn with_silver_price(mut self, price: impl IntoZakatDecimal) -> Self {
+        if let Ok(p) = price.into_zakat_decimal() {
+             self.silver_price_per_gram = p;
+        }
+        self
     }
 
-    pub fn with_agriculture_nisab(mut self, kg: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        self.nisab_agriculture_kg = Some(kg.into_zakat_decimal()?);
-        Ok(self)
+    pub fn with_gold_nisab(mut self, grams: impl IntoZakatDecimal) -> Self {
+        if let Ok(p) = grams.into_zakat_decimal() {
+            self.nisab_gold_grams = Some(p);
+        }
+        self
     }
 
-    pub fn with_rice_price_per_kg(mut self, price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        self.rice_price_per_kg = Some(price.into_zakat_decimal()?);
-        Ok(self)
+    pub fn with_silver_nisab(mut self, grams: impl IntoZakatDecimal) -> Self {
+        if let Ok(p) = grams.into_zakat_decimal() {
+            self.nisab_silver_grams = Some(p);
+        }
+        self
     }
 
-    pub fn with_rice_price_per_liter(mut self, price: impl IntoZakatDecimal) -> Result<Self, ZakatError> {
-        self.rice_price_per_liter = Some(price.into_zakat_decimal()?);
-        Ok(self)
+    pub fn with_agriculture_nisab(mut self, kg: impl IntoZakatDecimal) -> Self {
+        if let Ok(p) = kg.into_zakat_decimal() {
+            self.nisab_agriculture_kg = Some(p);
+        }
+        self
+    }
+
+    pub fn with_rice_price_per_kg(mut self, price: impl IntoZakatDecimal) -> Self {
+        if let Ok(p) = price.into_zakat_decimal() {
+            self.rice_price_per_kg = Some(p);
+        }
+        self
+    }
+
+    pub fn with_rice_price_per_liter(mut self, price: impl IntoZakatDecimal) -> Self {
+        if let Ok(p) = price.into_zakat_decimal() {
+            self.rice_price_per_liter = Some(p);
+        }
+        self
     }
 
     pub fn with_madhab(mut self, madhab: Madhab) -> Self {
@@ -226,134 +242,6 @@ impl ZakatConfig {
     }
 }
 
-// ========== ZakatConfigBuilder ==========
-
-#[derive(Default)]
-pub struct ZakatConfigBuilder {
-    gold_price: Option<Decimal>,
-    silver_price: Option<Decimal>,
-    madhab: Option<Madhab>,
-    cash_nisab_standard: Option<NisabStandard>,
-    rice_price_kg: Option<Decimal>,
-    rice_price_liter: Option<Decimal>,
-    // Custom thresholds
-    nisab_gold: Option<Decimal>,
-    nisab_silver: Option<Decimal>,
-    nisab_agriculture: Option<Decimal>,
-}
-
-impl ZakatConfigBuilder {
-    pub fn gold_price(mut self, price: impl IntoZakatDecimal) -> Self {
-        if let Ok(p) = price.into_zakat_decimal() {
-            self.gold_price = Some(p);
-        }
-        self
-    }
-
-    pub fn silver_price(mut self, price: impl IntoZakatDecimal) -> Self {
-         if let Ok(p) = price.into_zakat_decimal() {
-            self.silver_price = Some(p);
-        }
-        self
-    }
-
-    pub fn madhab(mut self, madhab: Madhab) -> Self {
-        self.madhab = Some(madhab);
-        self
-    }
-
-    pub fn nisab_standard(mut self, standard: NisabStandard) -> Self {
-        self.cash_nisab_standard = Some(standard);
-        self
-    }
-
-    pub fn rice_price_kg(mut self, price: impl IntoZakatDecimal) -> Self {
-        if let Ok(p) = price.into_zakat_decimal() {
-             self.rice_price_kg = Some(p);
-        }
-        self
-    }
-
-    pub fn rice_price_liter(mut self, price: impl IntoZakatDecimal) -> Self {
-         if let Ok(p) = price.into_zakat_decimal() {
-             self.rice_price_liter = Some(p);
-        }
-        self
-    }
-
-    // .. setters for custom nisabs if needed, omitting for brevity or can add ..
-    pub fn nisab_gold(mut self, grams: impl IntoZakatDecimal) -> Self {
-        if let Ok(p) = grams.into_zakat_decimal() { self.nisab_gold = Some(p); } self
-    }
-     pub fn nisab_silver(mut self, grams: impl IntoZakatDecimal) -> Self {
-        if let Ok(p) = grams.into_zakat_decimal() { self.nisab_silver = Some(p); } self
-    }
-     pub fn nisab_agriculture(mut self, kg: impl IntoZakatDecimal) -> Self {
-        if let Ok(p) = kg.into_zakat_decimal() { self.nisab_agriculture = Some(p); } self
-    }
-}
-
-use crate::builder::Validate;
-
-impl Validate for ZakatConfigBuilder {
-    fn validate(&self) -> Result<(), ZakatError> {
-        let gold = self.gold_price.unwrap_or(Decimal::ZERO);
-        let silver = self.silver_price.unwrap_or(Decimal::ZERO);
-        
-        if gold < Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Gold price must be non-negative".to_string(), None));
-        }
-        if silver < Decimal::ZERO {
-             return Err(ZakatError::ConfigurationError("Silver price must be non-negative".to_string(), None));
-        }
-
-        // Check for conflicting settings (e.g. LowerOfTwo but missing prices)
-        let madhab = self.madhab.unwrap_or_default();
-        let standard = self.cash_nisab_standard.unwrap_or_else(|| madhab.strategy().get_rules().nisab_standard);
-        
-        if standard == NisabStandard::LowerOfTwo {
-             if gold <= Decimal::ZERO {
-                 return Err(ZakatError::MissingConfig { field: "gold_price".to_string(), source: Some("ZakatConfigBuilder".to_string()) });
-             }
-             if silver <= Decimal::ZERO {
-                 return Err(ZakatError::MissingConfig { field: "silver_price".to_string(), source: Some("ZakatConfigBuilder".to_string()) });
-             }
-        }
-        
-        Ok(())
-    }
-}
-
-impl AssetBuilder<ZakatConfig> for ZakatConfigBuilder {
-    fn build(self) -> Result<ZakatConfig, ZakatError> {
-        self.validate()?;
-
-        let gold = self.gold_price.unwrap_or(Decimal::ZERO);
-        let silver = self.silver_price.unwrap_or(Decimal::ZERO);
-
-        let madhab = self.madhab.unwrap_or_default();
-        // If standard is explicit, use it. Otherwise derive from Madhab.
-        let standard = self.cash_nisab_standard.unwrap_or_else(|| madhab.strategy().get_rules().nisab_standard);
-
-        let config = ZakatConfig {
-            madhab,
-            gold_price_per_gram: gold,
-            silver_price_per_gram: silver,
-            rice_price_per_kg: self.rice_price_kg,
-            rice_price_per_liter: self.rice_price_liter,
-            cash_nisab_standard: standard,
-            nisab_gold_grams: self.nisab_gold,
-            nisab_silver_grams: self.nisab_silver,
-            nisab_agriculture_kg: self.nisab_agriculture,
-        };
-
-        // We run config.validate() again as a final safety check on the constructed object,
-        // but the builder validation catches most issues early.
-        config.validate()?;
-        Ok(config)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -363,22 +251,9 @@ mod tests {
     fn test_validate_prices() {
         // Zero prices with default settings.
         // Whether this fails depends on the default Madhab/NisabStandard.
-        let _res = ZakatConfig::new(dec!(0), dec!(0));
-    }
-
-    #[test]
-    fn test_builder_validation() {
-        let res = ZakatConfig::builder()
-            .gold_price(dec!(100))
-            .silver_price(dec!(2))
-            .madhab(Madhab::Hanafi) // LowerOfTwo -> needs both
-            .build();
-        assert!(res.is_ok());
-
-        let res_fail = ZakatConfig::builder()
-            .gold_price(dec!(100))
-            .madhab(Madhab::Hanafi) // Missing Silver (0) -> Fail
-            .build();
-        assert!(res_fail.is_err());
+        let config = ZakatConfig::new()
+            .with_gold_price(dec!(0))
+            .with_silver_price(dec!(0));
+        let _res = config.validate();
     }
 }

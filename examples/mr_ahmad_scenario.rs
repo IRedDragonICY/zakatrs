@@ -14,35 +14,38 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // - Personal Debt: $2,000.
     // - Gold Price: $50/gram.
     
-    // Config - NEW ERGONOMIC API: No dec!() needed!
-    let config = ZakatConfig::new(50, 1)?; // Gold $50/g, Silver $1/g
+    // Config - NEW ERGONOMIC API
+    let config = ZakatConfig::new()
+        .with_gold_price(50)
+        .with_silver_price(1);
+    
     println!("Configuration: Gold Price = ${}/g", config.gold_price_per_gram);
     println!("Nisab Threshold (Gold): ${}", config.gold_price_per_gram * config.get_nisab_gold_grams());
 
     // 1. Income - integers work directly!
-    let income_calc = IncomeZakatCalculator::new(
-        5000, 
-        0, 
-        IncomeCalculationMethod::Gross
-    )?.with_label("Monthly Salary");
+    let income_calc = IncomeZakatCalculator::new()
+        .income(5000)
+        .expenses(0)
+        .method(IncomeCalculationMethod::Gross)
+        .label("Monthly Salary");
     
     // 2. Gold - integers work directly!
-    let gold_calc = PreciousMetals::new(
-        100, 
-        WealthType::Gold
-    )?.with_label("Wife's Gold Stash");
+    let gold_calc = PreciousMetals::new()
+        .weight(100)
+        .metal_type(WealthType::Gold)
+        .label("Wife's Gold Stash");
     
     // 3. Crypto - integers work directly!
-    let crypto_calc = InvestmentAssets::new(
-        20000, 
-        InvestmentType::Crypto
-    )?.with_label("Bitcoin Holding");
+    let crypto_calc = InvestmentAssets::new()
+        .value(20000)
+        .kind(InvestmentType::Crypto)
+        .label("Bitcoin Holding");
     
     // 4. Portfolio with Debt Deduction on Crypto
     let portfolio = ZakatPortfolio::new()
         .add(income_calc) // $5000 * 2.5% = $125
         .add(gold_calc)   // $5000 * 2.5% = $125 (100g * 50)
-        .add(crypto_calc.with_debt_due_now(dec!(2000.0))?); // ($20,000 - $2,000) * 2.5% = $450
+        .add(crypto_calc.debt(dec!(2000.0))); // ($20,000 - $2,000) * 2.5% = $450
         
     let result = portfolio.calculate_total(&config);
     

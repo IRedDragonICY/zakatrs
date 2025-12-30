@@ -98,7 +98,7 @@ impl CalculateZakat for PreciousMetals {
         };
 
         // Check for personal usage exemption first
-        if self.usage == JewelryUsage::PersonalUse && config.madhab.strategy().get_rules().jewelry_exempt {
+        if self.usage == JewelryUsage::PersonalUse && config.strategy.get_rules().jewelry_exempt {
              return Ok(ZakatDetails::below_threshold(
                  Decimal::ZERO, 
                  metal_type, 
@@ -264,11 +264,9 @@ mod tests {
     #[test]
     fn test_personal_jewelry_hanafi_payable() {
         // Hanafi uses LowerOfTwo. Personal jewelry is Zakatable.
-        let config = ZakatConfig { 
-            gold_price_per_gram: dec!(100.0), 
-            madhab: Madhab::Hanafi,
-            ..Default::default() 
-        };
+        let config = ZakatConfig::new()
+            .with_gold_price(dec!(100.0))
+            .with_madhab(Madhab::Hanafi);
         
         // 100g > 85g Nisab
         let metal = PreciousMetals::new()
@@ -284,11 +282,9 @@ mod tests {
     #[test]
     fn test_personal_jewelry_shafi_exempt() {
         // Shafi uses Gold Standard. Personal jewelry is Exempt.
-        let config = ZakatConfig { 
-            gold_price_per_gram: dec!(100.0), 
-            madhab: Madhab::Shafi,
-            ..Default::default() 
-        };
+        let config = ZakatConfig::new()
+            .with_gold_price(dec!(100.0))
+            .with_madhab(Madhab::Shafi);
         
         let metal = PreciousMetals::new()
             .weight(dec!(100.0))

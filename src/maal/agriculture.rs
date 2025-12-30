@@ -5,17 +5,12 @@ use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IrrigationMethod {
+    #[default]
     Rain, // Natural, 10%
     Irrigated, // Artificial/Costly, 5%
     Mixed, // Both, 7.5%
-}
-
-impl Default for IrrigationMethod {
-    fn default() -> Self {
-        Self::Rain
-    }
 }
 
 #[derive(Default)]

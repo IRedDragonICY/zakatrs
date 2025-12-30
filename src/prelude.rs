@@ -11,7 +11,7 @@
 
 // Core exports
 pub use crate::config::ZakatConfig;
-pub use crate::madhab::{Madhab, NisabStandard};
+pub use crate::madhab::{Madhab, NisabStandard, ZakatStrategy, ZakatRules};
 pub use crate::portfolio::{ZakatPortfolio, PortfolioResult, PortfolioItemResult};
 #[cfg(feature = "async")]
 pub use crate::portfolio::AsyncZakatPortfolio;

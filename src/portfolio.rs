@@ -162,6 +162,7 @@ impl AsyncZakatPortfolio {
         }
     }
     
+    #[allow(clippy::should_implement_trait)]
     pub fn add<T: AsyncCalculateZakat + 'static>(mut self, calculator: T) -> Self {
          self.calculators.push(Box::new(calculator));
          self
@@ -211,11 +212,11 @@ fn aggregate_and_summarize(mut results: Vec<PortfolioItemResult>, config: &crate
     let mut monetary_indices = Vec::new();
 
     for (i, result) in results.iter().enumerate() {
-        if let PortfolioItemResult::Success(detail) = result {
-             if detail.wealth_type.is_monetary() {
-                monetary_net_assets += detail.net_assets;
-                monetary_indices.push(i);
-            }
+        if let PortfolioItemResult::Success(detail) = result
+            && detail.wealth_type.is_monetary()
+        {
+            monetary_net_assets += detail.net_assets;
+            monetary_indices.push(i);
         }
     }
     
@@ -227,24 +228,24 @@ fn aggregate_and_summarize(mut results: Vec<PortfolioItemResult>, config: &crate
 
         for i in monetary_indices {
             // We need to mutate the result.
-            if let Some(PortfolioItemResult::Success(detail)) = results.get_mut(i) {
-                if !detail.is_payable {
-                     detail.is_payable = true;
-                     detail.status_reason = Some("Payable via Aggregation (Dam' al-Amwal)".to_string());
-                     
-                     // Recalculate zakat due
-                     if detail.net_assets > Decimal::ZERO {
-                         detail.zakat_due = detail.net_assets * standard_rate;
-                     }
-                     
-                     // Add trace step explaining aggregation
-                     detail.calculation_trace.push(crate::types::CalculationStep::info(
-                         "Aggregated Monetary Wealth > Nisab -> Payable (Dam' al-Amwal)"
-                     ));
-                     detail.calculation_trace.push(crate::types::CalculationStep::result(
-                         "Recalculated Zakat Due", detail.zakat_due
-                     ));
+            if let Some(PortfolioItemResult::Success(detail)) = results.get_mut(i)
+                && !detail.is_payable
+            {
+                detail.is_payable = true;
+                detail.status_reason = Some("Payable via Aggregation (Dam' al-Amwal)".to_string());
+                
+                // Recalculate zakat due
+                if detail.net_assets > Decimal::ZERO {
+                    detail.zakat_due = detail.net_assets * standard_rate;
                 }
+                
+                // Add trace step explaining aggregation
+                detail.calculation_trace.push(crate::types::CalculationStep::info(
+                    "Aggregated Monetary Wealth > Nisab -> Payable (Dam' al-Amwal)"
+                ));
+                detail.calculation_trace.push(crate::types::CalculationStep::result(
+                    "Recalculated Zakat Due", detail.zakat_due
+                ));
             }
         }
     }

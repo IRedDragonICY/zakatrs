@@ -5,17 +5,12 @@ use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InvestmentType {
+    #[default]
     Stock,
     Crypto,
     MutualFund,
-}
-
-impl Default for InvestmentType {
-    fn default() -> Self {
-        Self::Stock
-    }
 }
 
 #[derive(Default)]

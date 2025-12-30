@@ -231,6 +231,7 @@ impl CalculateZakat for LivestockAssets {
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn calculate_sheep_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ()> {
     let nisab = 40;
     if count < 40 {

@@ -2,15 +2,24 @@ use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
+use std::sync::Arc;
 use crate::types::ZakatError;
 use crate::inputs::IntoZakatDecimal;
 
-use crate::madhab::{Madhab, NisabStandard};
+use crate::madhab::{Madhab, NisabStandard, ZakatStrategy};
+
+/// Default strategy for serde deserialization.
+fn default_strategy() -> Arc<dyn ZakatStrategy> {
+    Arc::new(Madhab::default())
+}
 
 /// Global configuration for Zakat prices.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct ZakatConfig {
-    pub madhab: Madhab, // Added field to store the selected Madhab
+    /// The Zakat calculation strategy. Uses `Madhab::Hanafi` by default.
+    /// Can be set to any custom strategy implementing `ZakatStrategy`.
+    #[serde(skip, default = "default_strategy")]
+    pub strategy: Arc<dyn ZakatStrategy>,
     pub gold_price_per_gram: Decimal,
     pub silver_price_per_gram: Decimal,
     pub rice_price_per_kg: Option<Decimal>,
@@ -26,10 +35,22 @@ pub struct ZakatConfig {
     pub nisab_agriculture_kg: Option<Decimal>, // Default 653kg
 }
 
+// Manual Debug impl since Arc<dyn Trait> doesn't auto-derive Debug
+impl std::fmt::Debug for ZakatConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ZakatConfig")
+            .field("strategy", &self.strategy)
+            .field("gold_price_per_gram", &self.gold_price_per_gram)
+            .field("silver_price_per_gram", &self.silver_price_per_gram)
+            .field("cash_nisab_standard", &self.cash_nisab_standard)
+            .finish()
+    }
+}
+
 impl Default for ZakatConfig {
     fn default() -> Self {
         ZakatConfig {
-            madhab: Madhab::default(),
+            strategy: Arc::new(Madhab::default()),
             gold_price_per_gram: Decimal::ZERO,
             silver_price_per_gram: Decimal::ZERO,
             rice_price_per_kg: None,
@@ -203,9 +224,26 @@ impl ZakatConfig {
         self
     }
 
-    pub fn with_madhab(mut self, madhab: Madhab) -> Self {
-        self.madhab = madhab;
-        self.cash_nisab_standard = madhab.strategy().get_rules().nisab_standard;
+    /// Sets the Zakat strategy using a preset Madhab or custom strategy.
+    /// 
+    /// # Example
+    /// ```
+    /// use zakat::prelude::*;
+    /// let config = ZakatConfig::new().with_madhab(Madhab::Shafi);
+    /// ```
+    pub fn with_madhab(mut self, madhab: impl ZakatStrategy + 'static) -> Self {
+        let rules = madhab.get_rules();
+        self.strategy = Arc::new(madhab);
+        self.cash_nisab_standard = rules.nisab_standard;
+        self
+    }
+
+    /// Sets a custom Zakat strategy from an Arc.
+    /// 
+    /// Useful when the strategy is shared across multiple configs or threads.
+    pub fn with_strategy(mut self, strategy: Arc<dyn ZakatStrategy>) -> Self {
+        self.cash_nisab_standard = strategy.get_rules().nisab_standard;
+        self.strategy = strategy;
         self
     }
 

@@ -5,16 +5,11 @@ use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IncomeCalculationMethod {
+    #[default]
     Gross,
     Net,
-}
-
-impl Default for IncomeCalculationMethod {
-    fn default() -> Self {
-        Self::Gross
-    }
 }
 
 #[derive(Default)]

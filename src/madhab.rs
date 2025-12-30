@@ -23,17 +23,6 @@ pub enum Madhab {
     Hanbali,
 }
 
-impl Madhab {
-    pub fn strategy(&self) -> Box<dyn MadhabStrategy> {
-        match self {
-            Madhab::Hanafi => Box::new(HanafiStrategy),
-            Madhab::Shafi => Box::new(ShafiStrategy),
-            Madhab::Maliki => Box::new(MalikiStrategy),
-            Madhab::Hanbali => Box::new(HanbaliStrategy),
-        }
-    }
-}
-
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
@@ -56,12 +45,33 @@ impl Default for ZakatRules {
     }
 }
 
-pub trait MadhabStrategy {
+/// Trait for providing Zakat calculation rules.
+/// 
+/// Implement this trait to create custom Zakat strategies beyond the standard Madhabs.
+/// For example, a "Gregorian Tax Year" strategy or institution-specific rules.
+pub trait ZakatStrategy: std::fmt::Debug + Send + Sync {
+    /// Returns the rules that govern Zakat calculations.
     fn get_rules(&self) -> ZakatRules;
 }
 
-pub struct HanafiStrategy;
-impl MadhabStrategy for HanafiStrategy {
+// ============ Implement ZakatStrategy for Madhab enum (preset helper) ============
+
+impl ZakatStrategy for Madhab {
+    fn get_rules(&self) -> ZakatRules {
+        match self {
+            Madhab::Hanafi => HanafiStrategy.get_rules(),
+            Madhab::Shafi => ShafiStrategy.get_rules(),
+            Madhab::Maliki => MalikiStrategy.get_rules(),
+            Madhab::Hanbali => HanbaliStrategy.get_rules(),
+        }
+    }
+}
+
+// ============ Internal Strategy Implementations ============
+
+#[derive(Debug)]
+struct HanafiStrategy;
+impl ZakatStrategy for HanafiStrategy {
     fn get_rules(&self) -> ZakatRules {
         ZakatRules {
             nisab_standard: NisabStandard::LowerOfTwo,
@@ -71,8 +81,9 @@ impl MadhabStrategy for HanafiStrategy {
     }
 }
 
-pub struct ShafiStrategy;
-impl MadhabStrategy for ShafiStrategy {
+#[derive(Debug)]
+struct ShafiStrategy;
+impl ZakatStrategy for ShafiStrategy {
     fn get_rules(&self) -> ZakatRules {
         ZakatRules {
             nisab_standard: NisabStandard::Gold,
@@ -82,8 +93,9 @@ impl MadhabStrategy for ShafiStrategy {
     }
 }
 
-pub struct MalikiStrategy;
-impl MadhabStrategy for MalikiStrategy {
+#[derive(Debug)]
+struct MalikiStrategy;
+impl ZakatStrategy for MalikiStrategy {
     fn get_rules(&self) -> ZakatRules {
         ZakatRules {
             nisab_standard: NisabStandard::Gold,
@@ -93,8 +105,9 @@ impl MadhabStrategy for MalikiStrategy {
     }
 }
 
-pub struct HanbaliStrategy;
-impl MadhabStrategy for HanbaliStrategy {
+#[derive(Debug)]
+struct HanbaliStrategy;
+impl ZakatStrategy for HanbaliStrategy {
     fn get_rules(&self) -> ZakatRules {
         ZakatRules {
             nisab_standard: NisabStandard::LowerOfTwo,

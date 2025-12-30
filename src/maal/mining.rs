@@ -5,18 +5,13 @@ use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MiningType {
     /// Buried Treasure / Ancient Wealth found.
     Rikaz,
     /// Extracted Minerals/Metals from a mine.
+    #[default]
     Mines,
-}
-
-impl Default for MiningType {
-    fn default() -> Self {
-        Self::Mines
-    }
 }
 
 #[derive(Default)]

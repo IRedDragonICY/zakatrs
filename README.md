@@ -36,6 +36,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - **Live Pricing Interface** (e.g. for API integration)
 - **Detailed Reporting** (Livestock in-kind details, calculation traces, metadata support)
 - **[NEW] `explain()` Debugging** (Get human-readable trace of calculations)
+- **[NEW] Custom Strategies** (Pluggable `ZakatStrategy` trait for custom rules)
 
 ## Install
 
@@ -214,6 +215,41 @@ let config = ZakatConfig::new()
     .with_silver_price(1)
     .with_madhab(Madhab::Hanafi);
 ```
+
+### Custom Zakat Strategy (Advanced)
+
+Create custom calculation rules beyond the standard Madhabs:
+
+```rust
+use zakat::prelude::*;
+use std::sync::Arc;
+
+#[derive(Debug)]
+struct GregorianTaxStrategy;
+
+impl ZakatStrategy for GregorianTaxStrategy {
+    fn get_rules(&self) -> ZakatRules {
+        ZakatRules {
+            nisab_standard: NisabStandard::Gold,
+            jewelry_exempt: false,
+            trade_goods_rate: rust_decimal_macros::dec!(0.02577), // 2.577%
+            ..Default::default()
+        }
+    }
+}
+
+fn main() {
+    // Use custom strategy with with_madhab() (accepts any impl ZakatStrategy)
+    let config = ZakatConfig::new()
+        .with_gold_price(100)
+        .with_madhab(GregorianTaxStrategy);
+    
+    // Or share strategy across configs with Arc
+    let shared = Arc::new(GregorianTaxStrategy);
+    let config = ZakatConfig::new()
+        .with_gold_price(100)
+        .with_strategy(shared);
+}
 
 ### Advanced Assets (Jewelry & Livestock)
 

@@ -49,12 +49,17 @@ macro_rules! zakat_asset {
             pub hawl_satisfied: bool,
             /// Optional label for identifying this asset in portfolio reports.
             pub label: Option<String>,
+            // Internal unique identifier
+            _id: uuid::Uuid,
         }
 
         impl $name {
             /// Creates a new instance with default values.
             pub fn new() -> Self {
-                Self::default()
+                Self {
+                    _id: uuid::Uuid::new_v4(),
+                    ..Default::default()
+                }
             }
 
             /// Sets the deductible debt/liabilities due now.
@@ -75,6 +80,11 @@ macro_rules! zakat_asset {
             pub fn label(mut self, val: impl Into<String>) -> Self {
                 self.label = Some(val.into());
                 self
+            }
+
+            /// Returns the unique ID of the asset.
+            pub fn get_id(&self) -> uuid::Uuid {
+                self._id
             }
         }
     };

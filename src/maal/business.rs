@@ -45,6 +45,7 @@ impl Default for BusinessZakat {
             liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
+            _id: uuid::Uuid::new_v4(),
         }
     }
 }
@@ -161,6 +162,10 @@ impl CalculateZakat for BusinessZakat {
 
     fn get_label(&self) -> Option<String> {
         self.label.clone()
+    }
+
+    fn get_id(&self) -> uuid::Uuid {
+        self.get_id()
     }
 }
 

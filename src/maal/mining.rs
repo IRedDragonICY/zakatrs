@@ -28,11 +28,15 @@ pub struct MiningAssets {
     pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
+    pub id: uuid::Uuid,
 }
 
 impl MiningAssets {
     pub fn new() -> Self {
-        Self::default()
+        Self {
+            id: uuid::Uuid::new_v4(),
+            ..Default::default()
+        }
     }
 
     pub fn value(mut self, value: impl IntoZakatDecimal) -> Self {
@@ -127,6 +131,10 @@ impl CalculateZakat for MiningAssets {
 
     fn get_label(&self) -> Option<String> {
         self.label.clone()
+    }
+
+    fn get_id(&self) -> uuid::Uuid {
+        self.id
     }
 }
 

@@ -37,6 +37,7 @@ pub struct PreciousMetals {
     pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
+    pub id: uuid::Uuid,
 }
 
 impl Default for PreciousMetals {
@@ -49,6 +50,7 @@ impl Default for PreciousMetals {
             liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
             label: None,
+            id: uuid::Uuid::new_v4(),
         }
     }
 }
@@ -189,6 +191,10 @@ impl CalculateZakat for PreciousMetals {
 
     fn get_label(&self) -> Option<String> {
         self.label.clone()
+    }
+
+    fn get_id(&self) -> uuid::Uuid {
+        self.id
     }
 }
 

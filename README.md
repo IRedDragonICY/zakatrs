@@ -28,6 +28,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Zakat Fitrah
 - Configurable Nisab thresholds
 - Portfolio aggregation (Dam' al-Amwal)
+- **[NEW] Dynamic Portfolio** (Add, Remove, Replace assets with stable UUIDs)
 - **Asset Labeling** (e.g., "Main Store", "Crypto Wallet")
 - **Input Sanitization & Validation** (Rejects negative values, ensures safe configuration)
 - **Flexible Configuration** (Env Vars, JSON, Fluent API)
@@ -35,8 +36,8 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - **Async Support** (Optional integration with `tokio` and `async-trait`)
 - **Live Pricing Interface** (e.g. for API integration)
 - **Detailed Reporting** (Livestock in-kind details, calculation traces, metadata support)
-- **[NEW] `explain()` Debugging** (Get human-readable trace of calculations)
-- **[NEW] Custom Strategies** (Pluggable `ZakatStrategy` trait for custom rules)
+- **`explain()` Debugging** (Get human-readable trace of calculations)
+- **Custom Strategies** (Pluggable `ZakatStrategy` trait for custom rules)
 
 ## Install
 
@@ -155,6 +156,35 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     Ok(())
+}
+```
+
+### Dynamic Portfolio Operations
+
+New in v0.6: Manage assets dynamically using stable UUIDs.
+
+```rust
+use zakat::prelude::*;
+
+fn main() {
+    let mut portfolio = ZakatPortfolio::new();
+    
+    // Add returns the ID
+    let (portfolio, id_1) = portfolio.add_with_id(
+        BusinessZakat::new().cash(10_000).label("Branch A")
+    );
+    
+    // Or push to mutable reference
+    let mut portfolio = portfolio;
+    let id_2 = portfolio.push(
+        BusinessZakat::new().cash(5_000).label("Branch B")
+    );
+    
+    // Replace an asset (e.g. updating values)
+    portfolio.replace(id_1, BusinessZakat::new().cash(12_000).label("Branch A Updated")).unwrap();
+    
+    // Remove an asset
+    portfolio.remove(id_2);
 }
 ```
 

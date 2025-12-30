@@ -10,6 +10,7 @@ pub struct FitrahCalculator {
     pub price_per_unit: Decimal,
     pub unit_amount: Decimal,
     pub label: Option<String>,
+    id: uuid::Uuid,
 }
 
 impl FitrahCalculator {
@@ -36,6 +37,7 @@ impl FitrahCalculator {
             price_per_unit: price,
             unit_amount: amount,
             label: None,
+            id: uuid::Uuid::new_v4(),
         })
     }
 
@@ -79,6 +81,10 @@ impl CalculateZakat for FitrahCalculator {
 
     fn get_label(&self) -> Option<String> {
         self.label.clone()
+    }
+
+    fn get_id(&self) -> uuid::Uuid {
+        self.id
     }
 }
 

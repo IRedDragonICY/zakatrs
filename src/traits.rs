@@ -12,6 +12,9 @@ pub trait CalculateZakat {
     fn get_label(&self) -> Option<String> {
         None
     }
+
+    /// Returns the stable unique identifier for this asset.
+    fn get_id(&self) -> uuid::Uuid;
 }
 
 /// Async version of the CalculateZakat trait.
@@ -25,6 +28,9 @@ pub trait AsyncCalculateZakat: Send + Sync {
     
     /// Returns the label of the asset, if any.
     fn get_label(&self) -> Option<String> { None }
+
+    /// Returns the stable unique identifier for this asset.
+    fn get_id(&self) -> uuid::Uuid;
 }
 
 #[cfg(feature = "async")]
@@ -38,5 +44,9 @@ where T: CalculateZakat + Sync + Send
 
     fn get_label(&self) -> Option<String> {
         self.get_label()
+    }
+
+    fn get_id(&self) -> uuid::Uuid {
+        self.get_id()
     }
 }

@@ -76,6 +76,7 @@ pub struct LivestockAssets {
     pub hawl_satisfied: bool,
     pub grazing_method: GrazingMethod,
     pub label: Option<String>,
+    pub id: uuid::Uuid,
 }
 
 impl Default for LivestockAssets {
@@ -88,6 +89,7 @@ impl Default for LivestockAssets {
             hawl_satisfied: true,
             grazing_method: GrazingMethod::Saimah,
             label: None,
+            id: uuid::Uuid::new_v4(),
         }
     }
 }
@@ -236,6 +238,10 @@ impl CalculateZakat for LivestockAssets {
 
     fn get_label(&self) -> Option<String> {
         self.label.clone()
+    }
+
+    fn get_id(&self) -> uuid::Uuid {
+        self.id
     }
 }
 

@@ -91,8 +91,10 @@ impl BusinessZakatBuilder {
     }
 }
 
-impl AssetBuilder<BusinessZakat> for BusinessZakatBuilder {
-    fn build(self) -> Result<BusinessZakat, ZakatError> {
+use crate::builder::Validate;
+
+impl Validate for BusinessZakatBuilder {
+    fn validate(&self) -> Result<(), ZakatError> {
         let cash = self.cash_on_hand.unwrap_or(Decimal::ZERO);
         let inventory = self.inventory_value.unwrap_or(Decimal::ZERO);
         let receivables = self.receivables.unwrap_or(Decimal::ZERO);
@@ -100,11 +102,24 @@ impl AssetBuilder<BusinessZakat> for BusinessZakatBuilder {
         let liabilities_due_now = self.liabilities_due_now.unwrap_or(Decimal::ZERO);
 
         if cash < Decimal::ZERO || inventory < Decimal::ZERO || receivables < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Business assets must be non-negative".to_string(), None));
+            return Err(ZakatError::InvalidInput("Business assets must be non-negative".to_string(), self.label.clone()));
         }
         if liabilities < Decimal::ZERO || liabilities_due_now < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Liabilities must be non-negative".to_string(), None));
+             return Err(ZakatError::InvalidInput("Liabilities must be non-negative".to_string(), self.label.clone()));
         }
+        Ok(())
+    }
+}
+
+impl AssetBuilder<BusinessZakat> for BusinessZakatBuilder {
+    fn build(self) -> Result<BusinessZakat, ZakatError> {
+        self.validate()?;
+        
+        let cash = self.cash_on_hand.unwrap_or(Decimal::ZERO);
+        let inventory = self.inventory_value.unwrap_or(Decimal::ZERO);
+        let receivables = self.receivables.unwrap_or(Decimal::ZERO);
+        let liabilities = self.short_term_liabilities.unwrap_or(Decimal::ZERO);
+        let liabilities_due_now = self.liabilities_due_now.unwrap_or(Decimal::ZERO);
 
         Ok(BusinessZakat {
             cash_on_hand: cash,

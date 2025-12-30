@@ -16,5 +16,7 @@ pub use config::ZakatConfig;
 pub use traits::CalculateZakat;
 pub use types::{ZakatDetails, ZakatError, WealthType};
 pub use portfolio::ZakatPortfolio;
-pub use pricing::{Prices, PriceProvider, StaticPriceProvider};
+pub use pricing::{Prices, StaticPriceProvider};
+#[cfg(feature = "async")]
+pub use pricing::PriceProvider;
 

@@ -12,8 +12,13 @@
 // Core exports
 pub use crate::config::ZakatConfig;
 pub use crate::madhab::{Madhab, NisabStandard};
-pub use crate::portfolio::{ZakatPortfolio, PortfolioResult, PortfolioItemResult, AsyncZakatPortfolio};
-pub use crate::traits::{CalculateZakat, AsyncCalculateZakat};
+pub use crate::portfolio::{ZakatPortfolio, PortfolioResult, PortfolioItemResult};
+#[cfg(feature = "async")]
+pub use crate::portfolio::AsyncZakatPortfolio;
+
+pub use crate::traits::CalculateZakat;
+#[cfg(feature = "async")]
+pub use crate::traits::AsyncCalculateZakat;
 pub use crate::types::{WealthType, ZakatDetails, ZakatError};
 pub use crate::inputs::IntoZakatDecimal;
 

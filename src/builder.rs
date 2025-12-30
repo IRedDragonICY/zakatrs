@@ -7,3 +7,8 @@ pub trait AssetBuilder<T> {
     /// Builds the final object, returning a Result.
     fn build(self) -> Result<T, ZakatError>;
 }
+
+/// Trait for validating builder state before construction.
+pub trait Validate {
+    fn validate(&self) -> Result<(), ZakatError>;
+}

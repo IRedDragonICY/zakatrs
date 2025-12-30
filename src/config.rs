@@ -102,10 +102,10 @@ impl ZakatConfig {
 
         if self.cash_nisab_standard == NisabStandard::LowerOfTwo {
             if self.gold_price_per_gram <= Decimal::ZERO {
-                return Err(ZakatError::ConfigurationError("Gold price must be > 0 for LowerOfTwo Standard (Requires both)".to_string(), None));
+                return Err(ZakatError::MissingConfig { field: "gold_price".to_string(), source: Some("ZakatConfig validation".to_string()) });
             }
             if self.silver_price_per_gram <= Decimal::ZERO {
-                return Err(ZakatError::ConfigurationError("Silver price must be > 0 for LowerOfTwo Standard (Requires both)".to_string(), None));
+                return Err(ZakatError::MissingConfig { field: "silver_price".to_string(), source: Some("ZakatConfig validation".to_string()) });
             }
         }
 
@@ -140,6 +140,7 @@ impl ZakatConfig {
     }
 
     /// Creates a ZakatConfig from an async PriceProvider.
+    #[cfg(feature = "async")]
     pub async fn from_provider<P: crate::pricing::PriceProvider>(
         provider: &P,
     ) -> Result<Self, ZakatError> {
@@ -148,6 +149,7 @@ impl ZakatConfig {
     }
 
     /// Refreshes the prices in this configuration using the given provider.
+    #[cfg(feature = "async")]
     pub async fn refresh_prices(&mut self, provider: &impl crate::pricing::PriceProvider) -> Result<(), ZakatError> {
         let prices = provider.get_prices().await?;
         self.gold_price_per_gram = prices.gold_per_gram;
@@ -187,7 +189,7 @@ impl ZakatConfig {
 
     pub fn with_madhab(mut self, madhab: Madhab) -> Self {
         self.madhab = madhab;
-        self.cash_nisab_standard = madhab.strategy().nisab_standard();
+        self.cash_nisab_standard = madhab.strategy().get_rules().nisab_standard;
         self
     }
 
@@ -291,14 +293,47 @@ impl ZakatConfigBuilder {
     }
 }
 
+use crate::builder::Validate;
+
+impl Validate for ZakatConfigBuilder {
+    fn validate(&self) -> Result<(), ZakatError> {
+        let gold = self.gold_price.unwrap_or(Decimal::ZERO);
+        let silver = self.silver_price.unwrap_or(Decimal::ZERO);
+        
+        if gold < Decimal::ZERO {
+            return Err(ZakatError::ConfigurationError("Gold price must be non-negative".to_string(), None));
+        }
+        if silver < Decimal::ZERO {
+             return Err(ZakatError::ConfigurationError("Silver price must be non-negative".to_string(), None));
+        }
+
+        // Check for conflicting settings (e.g. LowerOfTwo but missing prices)
+        let madhab = self.madhab.unwrap_or_default();
+        let standard = self.cash_nisab_standard.unwrap_or_else(|| madhab.strategy().get_rules().nisab_standard);
+        
+        if standard == NisabStandard::LowerOfTwo {
+             if gold <= Decimal::ZERO {
+                 return Err(ZakatError::MissingConfig { field: "gold_price".to_string(), source: Some("ZakatConfigBuilder".to_string()) });
+             }
+             if silver <= Decimal::ZERO {
+                 return Err(ZakatError::MissingConfig { field: "silver_price".to_string(), source: Some("ZakatConfigBuilder".to_string()) });
+             }
+        }
+        
+        Ok(())
+    }
+}
+
 impl AssetBuilder<ZakatConfig> for ZakatConfigBuilder {
     fn build(self) -> Result<ZakatConfig, ZakatError> {
+        self.validate()?;
+
         let gold = self.gold_price.unwrap_or(Decimal::ZERO);
         let silver = self.silver_price.unwrap_or(Decimal::ZERO);
 
         let madhab = self.madhab.unwrap_or_default();
         // If standard is explicit, use it. Otherwise derive from Madhab.
-        let standard = self.cash_nisab_standard.unwrap_or_else(|| madhab.strategy().nisab_standard());
+        let standard = self.cash_nisab_standard.unwrap_or_else(|| madhab.strategy().get_rules().nisab_standard);
 
         let config = ZakatConfig {
             madhab,
@@ -312,6 +347,8 @@ impl AssetBuilder<ZakatConfig> for ZakatConfigBuilder {
             nisab_agriculture_kg: self.nisab_agriculture,
         };
 
+        // We run config.validate() again as a final safety check on the constructed object,
+        // but the builder validation catches most issues early.
         config.validate()?;
         Ok(config)
     }

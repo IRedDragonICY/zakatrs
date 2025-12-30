@@ -75,7 +75,7 @@ impl PreciousMetals {
 impl CalculateZakat for PreciousMetals {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         // Check for personal usage exemption first
-        if self.usage == JewelryUsage::PersonalUse && config.madhab.strategy().is_jewelry_exempt() {
+        if self.usage == JewelryUsage::PersonalUse && config.madhab.strategy().get_rules().jewelry_exempt {
              return Ok(ZakatDetails::below_threshold(
                  Decimal::ZERO, 
                  self.metal_type, 

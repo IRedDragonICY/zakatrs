@@ -1,7 +1,9 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 
-use crate::traits::{CalculateZakat, AsyncCalculateZakat};
+use crate::traits::CalculateZakat;
+#[cfg(feature = "async")]
+use crate::traits::AsyncCalculateZakat;
 use crate::types::{ZakatDetails, ZakatError};
 
 /// Individual result for an asset in the portfolio.
@@ -16,12 +18,26 @@ pub enum PortfolioItemResult {
     },
 }
 
+/// Status of the portfolio calculation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PortfolioStatus {
+    /// All items calculated successfully.
+    Complete,
+    /// Some items failed, but others succeeded. Result contains partial totals.
+    Partial,
+    /// All items failed.
+    Failed,
+}
+
 /// Result of a portfolio calculation, including successes and partial failures.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct PortfolioResult {
+    pub status: PortfolioStatus,
     pub results: Vec<PortfolioItemResult>,
     pub total_assets: Decimal,
     pub total_zakat_due: Decimal,
+    pub items_attempted: usize,
+    pub items_failed: usize,
 }
 
 impl PortfolioResult {
@@ -40,7 +56,22 @@ impl PortfolioResult {
 
     /// Returns true if there were no failures.
     pub fn is_clean(&self) -> bool {
-        !self.results.iter().any(|r| matches!(r, PortfolioItemResult::Failure { .. }))
+        self.status == PortfolioStatus::Complete
+    }
+    
+    /// Returns the result if Complete, otherwise returns an error describing the failure(s).
+    pub fn expect_complete(self) -> Result<Self, ZakatError> {
+        match self.status {
+            PortfolioStatus::Complete => Ok(self),
+            PortfolioStatus::Partial => Err(ZakatError::CalculationError(
+                format!("Portfolio calculation incomplete. {}/{} items failed.", self.items_failed, self.items_attempted), 
+                Some("Portfolio".to_string())
+            )),
+            PortfolioStatus::Failed => Err(ZakatError::CalculationError(
+                "Portfolio calculation failed completely.".to_string(), 
+                Some("Portfolio".to_string())
+            )),
+        }
     }
 }
 
@@ -118,10 +149,12 @@ impl ZakatPortfolio {
     }
 }
 
+#[cfg(feature = "async")]
 pub struct AsyncZakatPortfolio {
     calculators: Vec<Box<dyn AsyncCalculateZakat>>,
 }
 
+#[cfg(feature = "async")]
 impl AsyncZakatPortfolio {
     pub fn new() -> Self {
         Self {
@@ -163,6 +196,7 @@ impl AsyncZakatPortfolio {
     }
 }
 
+#[cfg(feature = "async")]
 impl Default for AsyncZakatPortfolio {
     fn default() -> Self {
         Self::new()
@@ -218,6 +252,8 @@ fn aggregate_and_summarize(mut results: Vec<PortfolioItemResult>, config: &crate
     // 3. Final Summation (only successes)
     let mut total_assets = Decimal::ZERO;
     let mut total_zakat_due = Decimal::ZERO;
+    let items_attempted = results.len();
+    let items_failed = results.iter().filter(|r| matches!(r, PortfolioItemResult::Failure { .. })).count();
 
     for result in &results {
         if let PortfolioItemResult::Success(detail) = result {
@@ -226,10 +262,21 @@ fn aggregate_and_summarize(mut results: Vec<PortfolioItemResult>, config: &crate
         }
     }
 
+    let status = if items_failed == 0 {
+        PortfolioStatus::Complete
+    } else if items_failed == items_attempted {
+        PortfolioStatus::Failed
+    } else {
+        PortfolioStatus::Partial
+    };
+
     PortfolioResult {
+        status,
         results,
         total_assets,
         total_zakat_due,
+        items_attempted,
+        items_failed,
     }
 }
 

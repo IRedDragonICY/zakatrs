@@ -27,48 +27,51 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Professional Income (Gross/Net)
 - Zakat Fitrah
 - Configurable Nisab thresholds
-- Portfolio aggregation
+- Portfolio aggregation (Dam' al-Amwal)
 - **Asset Labeling** (e.g., "Main Store", "Crypto Wallet")
-- **Input Sanitization** (Rejects negative values)
+- **Input Sanitization & Validation** (Rejects negative values, ensures safe configuration)
 - **Flexible Configuration** (Env Vars, JSON, Fluent Builder)
-- **Fiqh Compliance** (Jewelry exemptions, Madhab-specific rules)
-- **Async Support** (Integration with `tokio` and `async-trait`)
+- **Fiqh Compliance** (Jewelry exemptions, Madhab-specific rules, Hawl requirements)
+- **Async Support** (Optional integration with `tokio` and `async-trait`)
 - **Live Pricing Interface** (e.g. for API integration)
-- **Detailed Reporting** (Livestock in-kind details, metadata support)
+- **Detailed Reporting** (Livestock in-kind details, calculation traces, metadata support)
 
 ## Install
 
+With Async Support (Default):
 ```toml
-[dependencies]
 [dependencies]
 zakat = "0.4.1"
 rust_decimal = "1.39"
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-tokio = { version = "1", features = ["full"] } # Optional: for async support
-async-trait = "0.1"
+tokio = { version = "1", features = ["full"] } # Required if using async features
+```
+
+Synchronous Only (Lighter weight):
+```toml
+[dependencies]
+zakat = { version = "0.4.1", default-features = false }
+rust_decimal = "1.39"
 ```
 
 ## Usage
 
 ### Business Zakat
 
-> **Note:** You can pass standard Rust types (`i32`, `f64`, `&str`) directly to all constructors. There is no need to manually convert to `Decimal` or use the `dec!()` macro anymore.
+> **Note:** You can pass standard Rust types (`i32`, `f64`, `&str`) directly to all constructors for ease of use.
 
 ```rust
-use zakat::{ZakatConfig, CalculateZakat};
-use zakat::maal::business::BusinessZakat;
+use zakat::prelude::*;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ZakatConfig::new(65, 1)?; // gold $65/g, silver $1/g
 
-    // 1. Simple Case: Trading Goods (Cash + Inventory)
-    // Now unified into a single builder step!
-    let store = BusinessZakat::builder()
-        .cash(10_000)
-        .inventory(50_000)
+    // Builder pattern with validation
+    // Validates inputs (non-negative) and configuration on .build()
+    let store = BusinessZakatBuilder::default()
+        .cash_on_hand(10_000)
+        .inventory_value(50_000)
         .label("Main Store")
-        .hawl(true)
+        .hawl_satisfied(true)
         .build()?;
 
     // Calculate directly
@@ -86,20 +89,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 For complex scenarios involving debts and receivables:
 
 ```rust
-let assets = BusinessZakat::builder()
-    .cash(50000)
-    .inventory(20000)
+let assets = BusinessZakatBuilder::default()
+    .cash_on_hand(50000)
+    .inventory_value(20000)
     .receivables(5000)
-    .liabilities(1000)
-    .debt(500) // Deductible immediate debt
+    .short_term_liabilities(1000)
+    .liabilities_due_now(500) // Deductible immediate debt
+    .label("Tech Startup")
+    .hawl_satisfied(true)
     .build()?;
 ```
 
-### Portfolio
+### Portfolio Management
+
+Handles multiple assets with "Dam' al-Amwal" (Wealth Aggregation) logic.
 
 ```rust
 use zakat::prelude::*;
-use rust_decimal_macros::dec;
+use zakat::portfolio::PortfolioStatus;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = ZakatConfig::new(65, 1)?;
@@ -115,12 +122,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             20000, InvestmentType::Crypto
         )?.with_debt(2000)?.with_label("Binance Portfolio"));
 
-    let result = portfolio.calculate_total(&config)?;
+    let result = portfolio.calculate_total(&config);
     println!("Total Zakat Due: ${}", result.total_zakat_due);
     
-    // Check for partial failures
-    if !result.is_clean() {
-        println!("Warning: {} items failed to calculate", result.failures().len());
+    // robust error handling for partial failures
+    match result.status {
+        PortfolioStatus::Complete => println!("All assets calculated successfully."),
+        PortfolioStatus::Partial => {
+            println!("Warning: Some assets failed calculation.");
+            for failure in result.failures() {
+                 println!("Failed item: {:?}", failure);
+            }
+        }
+        PortfolioStatus::Failed => println!("Critical: All asset calculations failed."),
     }
 
     // Iterate successful details
@@ -133,9 +147,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-### Async & Live Pricing
+### Async & Live Pricing (Optional)
 
-For applications requiring live data fetching or async flows:
+Enable the `async` feature to use these capabilities.
 
 ```rust
 use zakat::prelude::*;
@@ -143,6 +157,7 @@ use zakat::pricing::{PriceProvider, Prices};
 
 struct MockApi;
 
+#[cfg(feature = "async")]
 #[async_trait::async_trait]
 impl PriceProvider for MockApi {
     async fn get_prices(&self) -> Result<Prices, ZakatError> {
@@ -153,27 +168,30 @@ impl PriceProvider for MockApi {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let api = MockApi;
-    // Initialize config from provider
-    let config = ZakatConfig::from_provider(&api).await?;
-    
-    let portfolio = AsyncZakatPortfolio::new()
-        .add(BusinessZakat::builder()
-            .cash(10_000)
-            .build()?);
-            
-    let result = portfolio.calculate_total_async(&config).await;
-    println!("Total Due: {}", result.total_zakat_due);
+    #[cfg(feature = "async")]
+    {
+        let api = MockApi;
+        // Initialize config from provider
+        let config = ZakatConfig::from_provider(&api).await?;
+        
+        let portfolio = AsyncZakatPortfolio::new()
+            .add(BusinessZakatBuilder::default()
+                .cash_on_hand(10_000)
+                .build()?);
+                
+        let result = portfolio.calculate_total_async(&config).await;
+        println!("Total Due: {}", result.total_zakat_due);
+    }
     Ok(())
 }
 ```
 
 ### Configuration
 
-### Configuration
+Refactored to be flexible and safe.
 
 ```rust
-use zakat::{ZakatConfig, Madhab, AssetBuilder};
+use zakat::prelude::*;
 
 // Load from Environment Variables (ZAKAT_GOLD_PRICE, etc.)
 let config = ZakatConfig::from_env()?;
@@ -181,19 +199,19 @@ let config = ZakatConfig::from_env()?;
 // Or load from JSON
 let config = ZakatConfig::try_from_json("config.json")?;
 
-// Or using Value Builder
-let config = ZakatConfig::builder()
+// Or using Fluent Builder (with Validation)
+let config = ZakatConfigBuilder::default()
     .gold_price(100.0)
     .silver_price(1.0)
     .madhab(Madhab::Hanafi)
+     // Validates that adequate prices are set for the chosen Madhab/Standard
     .build()?;
 ```
 
 ### Advanced Assets (Jewelry & Livestock)
 
 ```rust
-use zakat::maal::precious_metals::{PreciousMetals, JewelryUsage};
-use zakat::maal::livestock::{LivestockAssets, LivestockType, LivestockPrices};
+use zakat::prelude::*;
 
 // Personal Jewelry (Exempt in Shafi/Maliki, Payable in Hanafi)
 let necklace = PreciousMetals::new(100.0, WealthType::Gold)?
@@ -201,33 +219,23 @@ let necklace = PreciousMetals::new(100.0, WealthType::Gold)?
     .with_label("Wife's Wedding Necklace");
 
 // Livestock Reporting
-let prices = LivestockPrices::builder()
+let prices = LivestockPricesBuilder::default()
     .sheep_price(200)
     .cow_price(1500)
     .camel_price(3000)
     .build()?;
+    
 let camels = LivestockAssets::new(30, LivestockType::Camel, prices);
 
 let result = camels.calculate_zakat(&config)?;
 
 if result.is_payable {
     // Access detailed "in-kind" payment info
-    use zakat::types::PaymentPayload;
-    if let PaymentPayload::Livestock { description, .. } = result.payload {
+    if let crate::types::PaymentPayload::Livestock { description, .. } = result.payload {
         println!("Pay Due: {}", description);
         // Output: "Pay Due: 1 Bint Makhad"
     }
 }
-```
-
-### Custom Nisab
-
-```rust
-use zakat::ZakatConfig;
-
-let config = ZakatConfig::new(65.0, 1.0)?
-    .with_gold_nisab(87)
-    .with_agriculture_nisab(700);
 ```
 
 ## Modules
@@ -247,7 +255,8 @@ let config = ZakatConfig::new(65.0, 1.0)?
 
 1. Add tests
 2. Use `rust_decimal`
-3. Run `cargo test`
+3. If adding async features, ensure they are gated behind `#[cfg(feature = "async")]`
+4. Run `cargo test` and `cargo check --no-default-features`
 
 ## Support
 

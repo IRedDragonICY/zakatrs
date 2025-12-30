@@ -55,6 +55,7 @@ impl Prices {
 /// let provider = StaticPriceProvider::new(65.0, 0.85)?;
 /// let prices = provider.get_prices().await?;
 /// ```
+#[cfg(feature = "async")]
 #[async_trait::async_trait]
 pub trait PriceProvider {
     /// Fetches current metal prices.
@@ -91,6 +92,7 @@ impl StaticPriceProvider {
     }
 }
 
+#[cfg(feature = "async")]
 #[async_trait::async_trait]
 impl PriceProvider for StaticPriceProvider {
     async fn get_prices(&self) -> Result<Prices, ZakatError> {

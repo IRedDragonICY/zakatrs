@@ -289,6 +289,14 @@ pub enum ZakatError {
     CalculationError(String, Option<String>), // Msg, Source
     InvalidInput(String, Option<String>),
     ConfigurationError(String, Option<String>),
+    Overflow {
+        operation: String,
+        source: Option<String>,
+    },
+    MissingConfig {
+        field: String,
+        source: Option<String>,
+    },
 }
 
 impl ZakatError {
@@ -297,6 +305,14 @@ impl ZakatError {
             ZakatError::CalculationError(msg, _) => ZakatError::CalculationError(msg, Some(source)),
             ZakatError::InvalidInput(msg, _) => ZakatError::InvalidInput(msg, Some(source)),
             ZakatError::ConfigurationError(msg, _) => ZakatError::ConfigurationError(msg, Some(source)),
+            ZakatError::Overflow { operation, .. } => ZakatError::Overflow {
+                operation,
+                source: Some(source),
+            },
+            ZakatError::MissingConfig { field, .. } => ZakatError::MissingConfig {
+                field,
+                source: Some(source),
+            },
         }
     }
 }
@@ -316,6 +332,14 @@ impl std::fmt::Display for ZakatError {
                 let s = source.as_deref().unwrap_or("Unknown");
                 write!(f, "Configuration Error [Asset: {}]: {}", s, msg)
             }
+            ZakatError::Overflow { operation, source } => {
+                let s = source.as_deref().unwrap_or("Unknown");
+                write!(f, "Arithmetic Overflow [Asset: {}]: Operation '{}' failed", s, operation)
+            }
+            ZakatError::MissingConfig { field, source } => {
+                let s = source.as_deref().unwrap_or("Unknown");
+                write!(f, "Missing Configuration [Asset: {}]: Field '{}' is required", s, field)
+            }
         }
     }
 }
@@ -334,6 +358,12 @@ pub mod ZakatErrorConstructors {
     }
     pub fn ConfigurationError(msg: impl Into<String>) -> ZakatError {
         ZakatError::ConfigurationError(msg.into(), None)
+    }
+    pub fn Overflow(op: impl Into<String>) -> ZakatError {
+        ZakatError::Overflow { operation: op.into(), source: None }
+    }
+    pub fn MissingConfig(field: impl Into<String>) -> ZakatError {
+        ZakatError::MissingConfig { field: field.into(), source: None }
     }
 }
 

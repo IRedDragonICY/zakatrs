@@ -34,45 +34,72 @@ impl Madhab {
     }
 }
 
-pub trait MadhabStrategy {
-    fn nisab_standard(&self) -> NisabStandard;
-    
-    /// Determines if personal jewelry is exempt from Zakat.
-    /// Hanafi: Not exempt (Payable).
-    /// Shafi/Maliki/Hanbali: Exempt if for personal use and within moderation.
-    fn is_jewelry_exempt(&self) -> bool {
-        true // Default to exempt (Shafi/Maliki/Hanbali)
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ZakatRules {
+    pub nisab_standard: NisabStandard,
+    pub jewelry_exempt: bool,
+    pub trade_goods_rate: Decimal, // default 0.025
+    pub agriculture_rates: (Decimal, Decimal, Decimal), // Rain, Irrigated, Mixed
+}
+
+impl Default for ZakatRules {
+    fn default() -> Self {
+        Self {
+            nisab_standard: NisabStandard::default(),
+            jewelry_exempt: true,
+            trade_goods_rate: dec!(0.025),
+            agriculture_rates: (dec!(0.10), dec!(0.05), dec!(0.075)),
+        }
     }
+}
+
+pub trait MadhabStrategy {
+    fn get_rules(&self) -> ZakatRules;
 }
 
 pub struct HanafiStrategy;
 impl MadhabStrategy for HanafiStrategy {
-    fn nisab_standard(&self) -> NisabStandard {
-        NisabStandard::LowerOfTwo
-    }
-
-    fn is_jewelry_exempt(&self) -> bool {
-        false // Hanafi views jewelry as wealth (Amwal Namiya), so it is payable.
+    fn get_rules(&self) -> ZakatRules {
+        ZakatRules {
+            nisab_standard: NisabStandard::LowerOfTwo,
+            jewelry_exempt: false, // Hanafi views jewelry as wealth (Amwal Namiya)
+            ..Default::default()
+        }
     }
 }
 
 pub struct ShafiStrategy;
 impl MadhabStrategy for ShafiStrategy {
-    fn nisab_standard(&self) -> NisabStandard {
-        NisabStandard::Gold
+    fn get_rules(&self) -> ZakatRules {
+        ZakatRules {
+            nisab_standard: NisabStandard::Gold,
+            jewelry_exempt: true,
+            ..Default::default()
+        }
     }
 }
 
 pub struct MalikiStrategy;
 impl MadhabStrategy for MalikiStrategy {
-    fn nisab_standard(&self) -> NisabStandard {
-        NisabStandard::Gold
+    fn get_rules(&self) -> ZakatRules {
+        ZakatRules {
+            nisab_standard: NisabStandard::Gold,
+            jewelry_exempt: true,
+            ..Default::default()
+        }
     }
 }
 
 pub struct HanbaliStrategy;
 impl MadhabStrategy for HanbaliStrategy {
-    fn nisab_standard(&self) -> NisabStandard {
-        NisabStandard::LowerOfTwo
+    fn get_rules(&self) -> ZakatRules {
+        ZakatRules {
+            nisab_standard: NisabStandard::LowerOfTwo,
+            jewelry_exempt: true,
+            ..Default::default()
+        }
     }
 }

@@ -17,6 +17,7 @@ pub trait CalculateZakat {
 /// Async version of the CalculateZakat trait.
 ///
 /// This trait is automatically implemented for any type that implements `CalculateZakat + Send + Sync`.
+#[cfg(feature = "async")]
 #[async_trait::async_trait]
 pub trait AsyncCalculateZakat: Send + Sync {
     /// Calculate Zakat details asynchronously.
@@ -26,6 +27,7 @@ pub trait AsyncCalculateZakat: Send + Sync {
     fn get_label(&self) -> Option<String> { None }
 }
 
+#[cfg(feature = "async")]
 #[async_trait::async_trait]
 impl<T> AsyncCalculateZakat for T 
 where T: CalculateZakat + Sync + Send 

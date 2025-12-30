@@ -35,7 +35,7 @@ fn test_dynamic_portfolio_operations() {
     // Verify Replace
     // Note: Replacing an asset swaps the underlying object. Since the ID is internal to the asset,
     // the new asset will have a different ID. The old ID is no longer valid for lookup.
-    let new_asset = BusinessZakat::new().cash(dec!(20000)).label("Shop 2 Updated");
+    let _new_asset = BusinessZakat::new().cash(dec!(20000)).label("Shop 2 Updated");
     
     // Check total
     let config = ZakatConfig::new().with_gold_price(100);

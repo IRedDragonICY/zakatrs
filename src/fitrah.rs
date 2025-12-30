@@ -1,10 +1,12 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
+use serde::{Serialize, Deserialize};
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FitrahCalculator {
     pub person_count: u32,
     pub price_per_unit: Decimal,
@@ -26,10 +28,20 @@ impl FitrahCalculator {
         };
 
         if person_count == 0 {
-            return Err(ZakatError::InvalidInput("Person count must be greater than 0".to_string(), None));
+            return Err(ZakatError::InvalidInput {
+                field: "person_count".to_string(),
+                value: "0".to_string(),
+                reason: "Person count must be greater than 0".to_string(),
+                source_label: None
+            });
         }
         if price < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Price per unit must be non-negative".to_string(), None));
+            return Err(ZakatError::InvalidInput {
+                field: "price_per_unit".to_string(),
+                value: "negative".to_string(),
+                reason: "Price per unit must be non-negative".to_string(),
+                source_label: None
+            });
         }
 
         Ok(Self {
@@ -53,7 +65,10 @@ impl CalculateZakat for FitrahCalculator {
         let total_value = total_people_decimal
             .checked_mul(self.unit_amount)
             .and_then(|v| v.checked_mul(self.price_per_unit))
-            .ok_or(ZakatError::CalculationError("Overflow calculating Fitrah total".to_string(), None))?;
+            .ok_or(ZakatError::CalculationError {
+                reason: "Overflow calculating Fitrah total".to_string(),
+                source_label: None
+            })?;
 
         // Build calculation trace
         let trace = vec![
@@ -75,7 +90,7 @@ impl CalculateZakat for FitrahCalculator {
             status_reason: None,
             label: self.label.clone(),
             payload: crate::types::PaymentPayload::Monetary(total_value),
-            calculation_trace: trace,
+            calculation_trace: crate::types::CalculationTrace(trace),
         })
     }
 

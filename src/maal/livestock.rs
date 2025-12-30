@@ -9,22 +9,25 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
+use serde::{Serialize, Deserialize};
 use crate::traits::CalculateZakat;
 use crate::inputs::IntoZakatDecimal;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LivestockType {
     Camel,
     Cow,
     Sheep, // Includes Goats
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum GrazingMethod {
+    #[default]
     Saimah,   // Naturally grazed for majority of the year
     Maalufah, // Fed/Fodder provided
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct LivestockPrices {
     pub sheep_price: Decimal,
     pub cow_price: Decimal, // For Tabi/Musinnah avg or simplified
@@ -68,6 +71,7 @@ impl LivestockPrices {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LivestockAssets {
     pub count: u32,
     pub animal_type: Option<LivestockType>,
@@ -142,7 +146,12 @@ use crate::config::ZakatConfig;
 impl CalculateZakat for LivestockAssets {
     fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         let animal_type = self.animal_type.as_ref().ok_or_else(|| 
-            ZakatError::InvalidInput("Animal type must be specified".to_string(), self.label.clone())
+            ZakatError::InvalidInput {
+                field: "animal_type".to_string(),
+                value: "None".to_string(),
+                reason: "Animal type must be specified".to_string(),
+                source_label: self.label.clone()
+            }
         )?;
 
         // Validate price for the specific animal type
@@ -158,17 +167,17 @@ impl CalculateZakat for LivestockAssets {
                 LivestockType::Cow => "Cow",
                 LivestockType::Camel => "Camel",
             };
-            return Err(ZakatError::ConfigurationError(
-                format!("Price for {} must be greater than zero", animal_str), 
-                self.label.clone()
-            ));
+            return Err(ZakatError::ConfigurationError {
+                reason: format!("Price for {} must be greater than zero", animal_str), 
+                source_label: self.label.clone()
+            });
         }
 
         // Calculate Nisab Count Value for reporting consistency even if not payable
         let nisab_count_val = match animal_type {
-            LivestockType::Sheep => Decimal::from(40).checked_mul(single_price).ok_or_else(|| ZakatError::Overflow { operation: "calculate_nisab_value_sheep".to_string(), source: self.label.clone() })?,
-            LivestockType::Cow => Decimal::from(30).checked_mul(single_price).ok_or_else(|| ZakatError::Overflow { operation: "calculate_nisab_value_cow".to_string(), source: self.label.clone() })?,
-            LivestockType::Camel => Decimal::from(5).checked_mul(single_price).ok_or_else(|| ZakatError::Overflow { operation: "calculate_nisab_value_camel".to_string(), source: self.label.clone() })?,
+            LivestockType::Sheep => Decimal::from(40).checked_mul(single_price).ok_or_else(|| ZakatError::Overflow { operation: "calculate_nisab_value_sheep".to_string(), source_label: self.label.clone() })?,
+            LivestockType::Cow => Decimal::from(30).checked_mul(single_price).ok_or_else(|| ZakatError::Overflow { operation: "calculate_nisab_value_cow".to_string(), source_label: self.label.clone() })?,
+            LivestockType::Camel => Decimal::from(5).checked_mul(single_price).ok_or_else(|| ZakatError::Overflow { operation: "calculate_nisab_value_camel".to_string(), source_label: self.label.clone() })?,
         };
 
         if self.grazing_method != GrazingMethod::Saimah {
@@ -190,9 +199,9 @@ impl CalculateZakat for LivestockAssets {
         // We construct ZakatDetails.
         // Total Assets = Count * Price (Approx value of herd)
         
-        let total_value = Decimal::from(self.count).checked_mul(single_price).ok_or(ZakatError::Overflow { operation: "total_asset_value".to_string(), source: self.label.clone() })?;
+        let total_value = Decimal::from(self.count).checked_mul(single_price).ok_or(ZakatError::Overflow { operation: "total_asset_value".to_string(), source_label: self.label.clone() })?;
         let is_payable = zakat_value > Decimal::ZERO;
-        let nisab_threshold = Decimal::from(nisab_count).checked_mul(single_price).ok_or(ZakatError::Overflow { operation: "nisab_threshold".to_string(), source: self.label.clone() })?;
+        let nisab_threshold = Decimal::from(nisab_count).checked_mul(single_price).ok_or(ZakatError::Overflow { operation: "nisab_threshold".to_string(), source_label: self.label.clone() })?;
 
         // Generate description string from heads_due
         let description_parts: Vec<String> = heads_due.iter()
@@ -232,7 +241,7 @@ impl CalculateZakat for LivestockAssets {
                 description: description.clone(), 
                 heads_due 
             },
-            calculation_trace: trace,
+            calculation_trace: crate::types::CalculationTrace(trace),
         })
     }
 
@@ -265,7 +274,10 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Ve
 
     let zakat_value = Decimal::from(sheep_due)
         .checked_mul(price)
-        .ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Sheep Zakat".to_string())))?;
+        .ok_or_else(|| ZakatError::CalculationError {
+            reason: "Mathematical error in livestock logic (Internal)".to_string(),
+            source_label: Some("Sheep Zakat".to_string())
+        })?;
     Ok((zakat_value, nisab, vec![("Sheep".to_string(), sheep_due)]))
 }
 
@@ -336,12 +348,12 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<
     // Value estimation based on pricing ratios relative to a standard cow price:
     // Tabi (1yo) is estimated at 0.7x of standard price.
     // Musinnah (2yo) is estimated at 1.0x of standard price.
-    let val_tabi = price.checked_mul(dec!(0.7)).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Cow Zakat".to_string())))?;
+    let val_tabi = price.checked_mul(dec!(0.7)).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Cow Zakat".to_string()) })?;
     let val_musinnah = price;
     
-    let tabi_total = Decimal::from(tabi).checked_mul(val_tabi).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Cow Zakat".to_string())))?;
-    let musinnah_total = Decimal::from(musinnah).checked_mul(val_musinnah).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Cow Zakat".to_string())))?;
-    let total_zakat_val = tabi_total.checked_add(musinnah_total).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Cow Zakat".to_string())))?;
+    let tabi_total = Decimal::from(tabi).checked_mul(val_tabi).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Cow Zakat".to_string()) })?;
+    let musinnah_total = Decimal::from(musinnah).checked_mul(val_musinnah).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Cow Zakat".to_string()) })?;
+    let total_zakat_val = tabi_total.checked_add(musinnah_total).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Cow Zakat".to_string()) })?;
     
     let mut parts = Vec::new();
     if tabi > 0 { parts.push(("Tabi'".to_string(), tabi)); }
@@ -419,16 +431,16 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decima
     // Pricing implementation:
     let v_sheep = prices.sheep_price;
     let v_camel = prices.camel_price; 
-    let v_bm = v_camel.checked_mul(dec!(0.5)).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?;
-    let v_bl = v_camel.checked_mul(dec!(0.75)).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?;
+    let v_bm = v_camel.checked_mul(dec!(0.5)).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?;
+    let v_bl = v_camel.checked_mul(dec!(0.75)).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?;
     let v_hq = v_camel;
-    let v_jz = v_camel.checked_mul(dec!(1.25)).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?;
+    let v_jz = v_camel.checked_mul(dec!(1.25)).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?;
     
-    let total = Decimal::from(sheep).checked_mul(v_sheep).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?
-        .checked_add(Decimal::from(b_makhad).checked_mul(v_bm).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?
-        .checked_add(Decimal::from(b_labun).checked_mul(v_bl).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?
-        .checked_add(Decimal::from(hiqqah).checked_mul(v_hq).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?
-        .checked_add(Decimal::from(jazaah).checked_mul(v_jz).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?;
+    let total = Decimal::from(sheep).checked_mul(v_sheep).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?
+        .checked_add(Decimal::from(b_makhad).checked_mul(v_bm).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?
+        .checked_add(Decimal::from(b_labun).checked_mul(v_bl).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?
+        .checked_add(Decimal::from(hiqqah).checked_mul(v_hq).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?
+        .checked_add(Decimal::from(jazaah).checked_mul(v_jz).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?).ok_or_else(|| ZakatError::CalculationError { reason: "Mathematical error in livestock logic (Internal)".to_string(), source_label: Some("Camel Zakat".to_string()) })?;
         
     let mut parts = Vec::new();
     if sheep > 0 { parts.push(("Sheep".to_string(), sheep)); }
@@ -581,11 +593,11 @@ mod tests {
         assert!(details.is_payable);
         assert!(details.zakat_due > dec!(0));
         
-        // Value sanity check: 100M cows * $500 = $50B. Zakat should be roughly 2.5% value?
+        // Value sanity check: 100M cows * $500 = $50B. Zakat should be roughly 2.5% value.
         // Actually Livestock Zakat is approx 2.5% value but calculated via heads.
         // 100M cows -> ~2.5M heads due. 
         // 2.5M * $500 = $1.25B approx.
-        // Let's just ensure it calculated "something" reasonable.
+        // Verify that the result is within the expected order of magnitude.
         assert!(details.zakat_due > dec!(1_000_000_000));
     }
 }

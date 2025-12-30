@@ -12,11 +12,12 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
+use serde::{Serialize, Deserialize};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum IrrigationMethod {
     #[default]
     Rain, // Natural, 10%
@@ -24,7 +25,7 @@ pub enum IrrigationMethod {
     Mixed, // Both, 7.5%
 }
 
-#[derive(Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AgricultureAssets {
     pub harvest_weight_kg: Decimal,
     pub price_per_kg: Decimal,
@@ -102,7 +103,12 @@ impl AgricultureAssets {
 impl CalculateZakat for AgricultureAssets {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         if self.harvest_weight_kg < Decimal::ZERO || self.price_per_kg < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Harvest weight and price must be non-negative".to_string(), self.label.clone()));
+            return Err(ZakatError::InvalidInput {
+                field: "harvest_weight_price".to_string(),
+                value: "negative".to_string(),
+                reason: "Harvest weight and price must be non-negative".to_string(),
+                source_label: self.label.clone()
+            });
         }
 
         let rate = match self.irrigation {
@@ -115,10 +121,16 @@ impl CalculateZakat for AgricultureAssets {
 
         let total_value = self.harvest_weight_kg
             .checked_mul(self.price_per_kg)
-            .ok_or(ZakatError::CalculationError("Overflow calculating agriculture total value".to_string(), self.label.clone()))?;
+            .ok_or(ZakatError::CalculationError {
+                reason: "Overflow calculating agriculture total value".to_string(),
+                source_label: self.label.clone()
+            })?;
         let nisab_value = nisab_threshold_kg
             .checked_mul(self.price_per_kg)
-            .ok_or(ZakatError::CalculationError("Overflow calculating agriculture nisab value".to_string(), self.label.clone()))?; 
+            .ok_or(ZakatError::CalculationError {
+                reason: "Overflow calculating agriculture nisab value".to_string(),
+                source_label: self.label.clone()
+            })?; 
         
         let liabilities = self.liabilities_due_now;
         
@@ -128,12 +140,18 @@ impl CalculateZakat for AgricultureAssets {
         
         let net_value = total_value
             .checked_sub(liabilities)
-            .ok_or(ZakatError::CalculationError("Underflow calculating agriculture net value".to_string(), self.label.clone()))?;
+            .ok_or(ZakatError::CalculationError {
+                reason: "Underflow calculating agriculture net value".to_string(),
+                source_label: self.label.clone()
+            })?;
         
         let zakat_due = if net_value >= nisab_value {
              net_value
                  .checked_mul(rate)
-                 .ok_or(ZakatError::CalculationError("Overflow calculating agriculture zakat due".to_string(), self.label.clone()))?
+                 .ok_or(ZakatError::CalculationError {
+                    reason: "Overflow calculating agriculture zakat due".to_string(),
+                    source_label: self.label.clone()
+                 })?
         } else {
              Decimal::ZERO
         };
@@ -178,7 +196,7 @@ impl CalculateZakat for AgricultureAssets {
                 irrigation_method: irrigation_desc.to_string(),
                 crop_value: zakat_due,
             },
-            calculation_trace: trace,
+            calculation_trace: crate::types::CalculationTrace(trace),
         })
     }
 

@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     print_case("Case 1: Freelancer (Net Income)", freelancer.hawl(true).calculate_zakat(&config), false);
 
     // CASE 2: The Startup Founder (Business Assets - Equity)
-    // Cash: $500k. Inventory/IP Valued(?): $0. Short Debt: $50k.
+    // Cash: $500k. Inventory/IP Valued: $0. Short Debt: $50k.
     // Liquid Assets for Zakat: $500k. Debt: $50k. Net: $450k.
     // Nisab ~$5.5k. Payable.
     let startup_calc = BusinessZakat::new()

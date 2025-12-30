@@ -1,35 +1,9 @@
 use zakat::prelude::*;
-use zakat::types::{ZakatDetails, ZakatError};
-use zakat::traits::CalculateZakat;
+// use zakat::types::{ZakatDetails, ZakatError};
+// use zakat::traits::CalculateZakat;
 use zakat::config::ZakatConfig;
 use rust_decimal_macros::dec;
-use uuid::Uuid;
-
-struct FailingAsset {
-    id: Uuid,
-}
-
-impl FailingAsset {
-    fn new() -> Self {
-        Self {
-            id: Uuid::new_v4(),
-        }
-    }
-}
-
-impl CalculateZakat for FailingAsset {
-    fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
-        Err(ZakatError::CalculationError("Intentional Failure".to_string(), None))
-    }
-
-    fn get_label(&self) -> Option<String> {
-        Some("Failing Asset".to_string())
-    }
-
-    fn get_id(&self) -> Uuid {
-        self.id
-    }
-}
+// use uuid::Uuid;
 
 #[test]
 fn test_portfolio_partial_failure() {
@@ -37,11 +11,15 @@ fn test_portfolio_partial_failure() {
         .with_gold_price(100)
         .with_silver_price(1);
     
+    // Valid Asset: Gold
     let valid_asset = PreciousMetals::new()
         .weight(100)
         .metal_type(WealthType::Gold);
         
-    let failing_asset = FailingAsset::new();
+    // Failing Asset: PreciousMetals without metal type set
+    // This will fail validation in calculate_zakat
+    let failing_asset = PreciousMetals::new()
+        .weight(50); // Missing metal_type
     
     let portfolio = ZakatPortfolio::new()
         .add(valid_asset)
@@ -58,10 +36,10 @@ fn test_portfolio_partial_failure() {
     // Check errors
     let failures = report.failures();
     assert_eq!(failures.len(), 1);
-    // Failure variant moved to struct matching or destructuring
-    // PortfolioItemResult::Failure { error, .. }
+    
     if let PortfolioItemResult::Failure { error, .. } = failures[0] {
-        assert!(error.to_string().contains("Intentional Failure"));
+        // Expect "Metal type must be specified" error
+        assert!(error.to_string().contains("Metal type must be specified"));
     } else {
         panic!("Expected failure variant");
     }

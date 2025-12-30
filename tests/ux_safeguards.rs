@@ -33,10 +33,10 @@ fn test_sanitization_negative_weight() {
         .calculate_zakat(&config);
     
     assert!(res.is_err());
-    if let Err(ZakatError::InvalidInput(msg, _)) = res {
-        assert_eq!(msg, "Weight must be non-negative");
+    if let Err(ZakatError::InvalidInput { reason: msg, .. }) = res {
+        assert!(msg.contains("must be non-negative"));
     } else {
-        panic!("Expected InvalidInput error");
+        panic!("Expected InvalidInput error, got {:?}", res);
     }
 }
 

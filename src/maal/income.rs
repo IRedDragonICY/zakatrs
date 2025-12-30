@@ -11,18 +11,19 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
+use serde::{Serialize, Deserialize};
 use crate::traits::CalculateZakat;
 use crate::inputs::IntoZakatDecimal;
 use crate::config::ZakatConfig;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum IncomeCalculationMethod {
     #[default]
     Gross,
     Net,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct IncomeZakatCalculator {
     pub total_income: Decimal,
     pub basic_expenses: Decimal,
@@ -80,8 +81,13 @@ impl IncomeZakatCalculator {
 
 impl CalculateZakat for IncomeZakatCalculator {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
-         if self.total_income < Decimal::ZERO || self.basic_expenses < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Income and expenses must be non-negative".to_string(), self.label.clone()));
+        if self.total_income < Decimal::ZERO || self.basic_expenses < Decimal::ZERO {
+            return Err(ZakatError::InvalidInput {
+                field: "income_expenses".to_string(),
+                value: "negative".to_string(),
+                reason: "Income and expenses must be non-negative".to_string(),
+                source_label: self.label.clone()
+            });
         }
 
         // For LowerOfTwo or Silver standard, we need silver price too
@@ -91,10 +97,16 @@ impl CalculateZakat for IncomeZakatCalculator {
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError("Gold price needed for Income Nisab".to_string(), self.label.clone()));
+            return Err(ZakatError::ConfigurationError {
+                reason: "Gold price needed for Income Nisab".to_string(),
+                source_label: self.label.clone()
+            });
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Silver price needed for Income Nisab with current standard".to_string(), self.label.clone()));
+            return Err(ZakatError::ConfigurationError {
+                reason: "Silver price needed for Income Nisab with current standard".to_string(),
+                source_label: self.label.clone()
+            });
         }
         
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
@@ -121,7 +133,10 @@ impl CalculateZakat for IncomeZakatCalculator {
                 // Then we also deduct any extra debts.
                 let combined_liabilities = self.basic_expenses
                     .checked_add(external_debt)
-                    .ok_or(ZakatError::CalculationError("Overflow summing income liabilities".to_string(), self.label.clone()))?;
+                    .ok_or(ZakatError::CalculationError {
+                        reason: "Overflow summing income liabilities".to_string(),
+                        source_label: self.label.clone()
+                    })?;
                 (self.total_income, combined_liabilities)
             }
         };

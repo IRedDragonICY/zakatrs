@@ -11,6 +11,7 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
+use serde::{Serialize, Deserialize};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
@@ -23,7 +24,7 @@ crate::zakat_asset! {
     /// `liabilities_due_now` represents **Dayn al-Hal** (Immediate Debt). 
     /// Long-term non-commercial debts (like 20-year mortgages) should not be fully deducted; 
     /// only the upcoming year's payments should be considered (per AAOIFI).
-    #[derive(Debug, Clone, PartialEq)]
+    #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct BusinessZakat {
         // Assets
         pub cash_on_hand: Decimal,
@@ -90,10 +91,20 @@ impl CalculateZakat for BusinessZakat {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         // Validation moved here
         if self.cash_on_hand < Decimal::ZERO || self.inventory_value < Decimal::ZERO || self.receivables < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Business assets must be non-negative".to_string(), self.label.clone()));
+            return Err(ZakatError::InvalidInput {
+                field: "business_assets".to_string(),
+                value: "negative".to_string(),
+                reason: "Business assets must be non-negative".to_string(),
+                source_label: self.label.clone()
+            });
         }
         if self.short_term_liabilities < Decimal::ZERO || self.liabilities_due_now < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput("Liabilities must be non-negative".to_string(), self.label.clone()));
+             return Err(ZakatError::InvalidInput {
+                field: "liabilities".to_string(),
+                value: "negative".to_string(),
+                reason: "Liabilities must be non-negative".to_string(),
+                source_label: self.label.clone()
+             });
         }
 
         // For LowerOfTwo or Silver standard, we need silver price too
@@ -103,10 +114,16 @@ impl CalculateZakat for BusinessZakat {
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError("Gold price needed for Business Nisab".to_string(), self.label.clone()));
+            return Err(ZakatError::ConfigurationError {
+                reason: "Gold price needed for Business Nisab".to_string(),
+                source_label: self.label.clone()
+            });
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Silver price needed for Business Nisab with current standard".to_string(), self.label.clone()));
+            return Err(ZakatError::ConfigurationError {
+                reason: "Silver price needed for Business Nisab with current standard".to_string(),
+                source_label: self.label.clone()
+            });
         }
         
         // Dynamic Nisab threshold based on config (Gold, Silver, or LowerOfTwo)
@@ -120,11 +137,17 @@ impl CalculateZakat for BusinessZakat {
         let gross_assets = self.cash_on_hand
             .checked_add(self.inventory_value)
             .and_then(|v| v.checked_add(self.receivables))
-            .ok_or(ZakatError::CalculationError("Overflow summing business assets".to_string(), self.label.clone()))?;
+            .ok_or(ZakatError::CalculationError {
+                reason: "Overflow summing business assets".to_string(),
+                source_label: self.label.clone()
+            })?;
             
         let total_liabilities = self.short_term_liabilities
             .checked_add(self.liabilities_due_now)
-            .ok_or(ZakatError::CalculationError("Overflow summing business liabilities".to_string(), self.label.clone()))?;
+            .ok_or(ZakatError::CalculationError {
+                reason: "Overflow summing business liabilities".to_string(),
+                source_label: self.label.clone()
+            })?;
 
         // Zakat Rate is 2.5%
         let rate = dec!(0.025);
@@ -224,6 +247,6 @@ mod tests {
             .cash(dec!(-100.0));
             
         let result = business.calculate_zakat(&config);
-        assert!(matches!(result, Err(ZakatError::InvalidInput(_, _))));
+        assert!(matches!(result, Err(ZakatError::InvalidInput { .. })));
     }
 }

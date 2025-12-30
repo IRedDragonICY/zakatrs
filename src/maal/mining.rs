@@ -8,11 +8,12 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
+use serde::{Serialize, Deserialize};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum MiningType {
     /// Buried Treasure / Ancient Wealth found.
     Rikaz,
@@ -21,7 +22,7 @@ pub enum MiningType {
     Mines,
 }
 
-#[derive(Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MiningAssets {
     pub value: Decimal,
     pub mining_type: MiningType,
@@ -72,7 +73,12 @@ impl MiningAssets {
 impl CalculateZakat for MiningAssets {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         if self.value < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Mining value must be non-negative".to_string(), self.label.clone()));
+            return Err(ZakatError::InvalidInput {
+                field: "value".to_string(),
+                value: "negative".to_string(),
+                reason: "Mining value must be non-negative".to_string(),
+                source_label: self.label.clone()
+            });
         }
 
         match self.mining_type {
@@ -99,7 +105,10 @@ impl CalculateZakat for MiningAssets {
             MiningType::Mines => {
                 let nisab_threshold = config.gold_price_per_gram
                     .checked_mul(config.get_nisab_gold_grams())
-                    .ok_or(ZakatError::CalculationError("Overflow calculating mining nisab threshold".to_string(), self.label.clone()))?;
+                    .ok_or(ZakatError::CalculationError {
+                        reason: "Overflow calculating mining nisab threshold".to_string(),
+                        source_label: self.label.clone()
+                    })?;
                 
                 // Rate: 2.5%. Nisab: 85g Gold.
                 if !self.hawl_satisfied {

@@ -39,7 +39,12 @@ macro_rules! impl_into_zakat_decimal_float {
             impl IntoZakatDecimal for $t {
                 fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
                     Decimal::from_f64_retain(self as f64)
-                        .ok_or_else(|| ZakatError::InvalidInput(format!("Invalid float value: {}", self), None))
+                        .ok_or_else(|| ZakatError::InvalidInput {
+                            field: "fractional".to_string(),
+                            value: self.to_string(),
+                            reason: "Invalid float value".to_string(),
+                            source_label: None,
+                        })
                 }
             }
         )*
@@ -52,13 +57,23 @@ impl_into_zakat_decimal_float!(f32, f64);
 impl IntoZakatDecimal for &str {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
         let trimmed = self.trim();
-        Decimal::from_str(trimmed).map_err(|e| ZakatError::InvalidInput(format!("Invalid decimal '{}': {}", trimmed, e), None))
+        Decimal::from_str(trimmed).map_err(|e| ZakatError::InvalidInput {
+            field: "string".to_string(),
+            value: trimmed.to_string(),
+            reason: format!("Parse error: {}", e),
+            source_label: None,
+        })
     }
 }
 
 impl IntoZakatDecimal for String {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
         let trimmed = self.trim();
-        Decimal::from_str(trimmed).map_err(|e| ZakatError::InvalidInput(format!("Invalid decimal '{}': {}", trimmed, e), None))
+        Decimal::from_str(trimmed).map_err(|e| ZakatError::InvalidInput {
+            field: "string".to_string(),
+            value: trimmed.to_string(),
+            reason: format!("Parse error: {}", e),
+            source_label: None,
+        })
     }
 }

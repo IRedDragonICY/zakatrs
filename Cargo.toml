@@ -1,6 +1,6 @@
 [package]
 name = "zakat"
-version = "0.6.1"
+version = "0.7.0"
 edition = "2024"
 license = "MIT"
 authors = ["Mohammad Farid Hendianto (IRedDragonICY)"]
@@ -15,7 +15,7 @@ default = ["async"]
 async = ["dep:async-trait"]
 
 [dependencies]
-rust_decimal = "1.39"
+rust_decimal = { version = "1.39", features = ["serde"] }
 rust_decimal_macros = "1.39"
 thiserror = "2.0.17"
 serde = { version = "1.0.228", features = ["derive"] }

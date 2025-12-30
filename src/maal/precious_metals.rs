@@ -23,12 +23,14 @@ use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum JewelryUsage {
+    #[default]
     Investment,    // Always Zakatable
     PersonalUse,   // Exempt in Shafi/Maliki/Hanbali (Jumhur), Zakatable in Hanafi
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PreciousMetals {
     pub weight_grams: Decimal,
     pub metal_type: Option<WealthType>, // Gold or Silver
@@ -103,16 +105,31 @@ impl PreciousMetals {
 impl CalculateZakat for PreciousMetals {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         let metal_type = self.metal_type.ok_or_else(|| 
-            ZakatError::InvalidInput("Metal type must be specified (Gold or Silver)".to_string(), self.label.clone())
+            ZakatError::InvalidInput { 
+                field: "metal_type".to_string(),
+                value: "None".to_string(),
+                reason: "Metal type must be specified (Gold or Silver)".to_string(), 
+                source_label: self.label.clone() 
+            }
         )?;
 
         if self.weight_grams < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Weight must be non-negative".to_string(), self.label.clone()));
+            return Err(ZakatError::InvalidInput { 
+                field: "weight".to_string(),
+                value: "negative".to_string(),
+                reason: "Weight must be non-negative".to_string(), 
+                source_label: self.label.clone() 
+            });
         }
 
         match metal_type {
             WealthType::Gold | WealthType::Silver => {},
-            _ => return Err(ZakatError::InvalidInput("Type must be Gold or Silver".to_string(), self.label.clone())),
+            _ => return Err(ZakatError::InvalidInput { 
+                field: "metal_type".to_string(),
+                value: format!("{:?}", metal_type),
+                reason: "Type must be Gold or Silver".to_string(), 
+                source_label: self.label.clone() 
+            }),
         };
 
         // Check for personal usage exemption first
@@ -127,16 +144,27 @@ impl CalculateZakat for PreciousMetals {
         let (price_per_gram, nisab_threshold_grams) = match metal_type {
             WealthType::Gold => (config.gold_price_per_gram, config.get_nisab_gold_grams()),
             WealthType::Silver => (config.silver_price_per_gram, config.get_nisab_silver_grams()),
-            _ => return Err(ZakatError::InvalidInput("Type must be Gold or Silver".to_string(), self.label.clone())),
+            _ => return Err(ZakatError::InvalidInput {
+                field: "metal_type".to_string(),
+                value: format!("{:?}", metal_type),
+                reason: "Type must be Gold or Silver".to_string(),
+                source_label: self.label.clone()
+            }),
         };
 
         if price_per_gram <= Decimal::ZERO {
-             return Err(ZakatError::ConfigurationError("Price for metal not set".to_string(), self.label.clone()));
+             return Err(ZakatError::ConfigurationError { 
+                reason: "Price for metal not set".to_string(), 
+                source_label: self.label.clone() 
+             });
         }
 
         let nisab_value = nisab_threshold_grams
             .checked_mul(price_per_gram)
-            .ok_or(ZakatError::CalculationError("Overflow calculating metal nisab value".to_string(), self.label.clone()))?;
+            .ok_or(ZakatError::CalculationError { 
+                reason: "Overflow calculating metal nisab value".to_string(), 
+                source_label: self.label.clone() 
+            })?;
         if !self.hawl_satisfied {
             return Ok(ZakatDetails::below_threshold(nisab_value, metal_type, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
@@ -147,17 +175,20 @@ impl CalculateZakat for PreciousMetals {
             // formula: weight * (karat / 24)
             let purity_ratio = Decimal::from(self.purity)
                 .checked_div(Decimal::from(24))
-                .ok_or(ZakatError::CalculationError("Error calculating purity ratio".to_string(), self.label.clone()))?;
+                .ok_or(ZakatError::CalculationError { reason: "Error calculating purity ratio".to_string(), source_label: self.label.clone() })?;
             self.weight_grams
                 .checked_mul(purity_ratio)
-                .ok_or(ZakatError::CalculationError("Overflow calculating effective gold weight".to_string(), self.label.clone()))?
+                .ok_or(ZakatError::CalculationError { reason: "Overflow calculating effective gold weight".to_string(), source_label: self.label.clone() })?
         } else {
             self.weight_grams
         };
 
         let total_value = effective_weight
             .checked_mul(price_per_gram)
-            .ok_or(ZakatError::CalculationError("Overflow calculating metal total value".to_string(), self.label.clone()))?;
+            .ok_or(ZakatError::CalculationError { 
+                reason: "Overflow calculating metal total value".to_string(), 
+                source_label: self.label.clone() 
+            })?;
         let liabilities = self.liabilities_due_now;
 
         let rate = dec!(0.025); // 2.5%

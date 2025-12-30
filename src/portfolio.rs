@@ -83,80 +83,87 @@ impl PortfolioResult {
     pub fn expect_complete(self) -> Result<Self, ZakatError> {
         match self.status {
             PortfolioStatus::Complete => Ok(self),
-            PortfolioStatus::Partial => Err(ZakatError::CalculationError(
-                format!("Portfolio calculation incomplete. {}/{} items failed.", self.items_failed, self.items_attempted), 
-                Some("Portfolio".to_string())
-            )),
-            PortfolioStatus::Failed => Err(ZakatError::CalculationError(
-                "Portfolio calculation failed completely.".to_string(), 
-                Some("Portfolio".to_string())
-            )),
+            PortfolioStatus::Partial => Err(ZakatError::CalculationError {
+                reason: format!("Portfolio calculation incomplete. {}/{} items failed.", self.items_failed, self.items_attempted), 
+                source_label: Some("Portfolio".to_string())
+            }),
+            PortfolioStatus::Failed => Err(ZakatError::CalculationError {
+                reason: "Portfolio calculation failed completely.".to_string(), 
+                source_label: Some("Portfolio".to_string())
+            }),
         }
     }
 }
 
+use crate::assets::PortfolioItem;
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ZakatPortfolio {
-    calculators: Vec<Box<dyn CalculateZakat + Send + Sync>>,
+    items: Vec<PortfolioItem>,
 }
 
 impl ZakatPortfolio {
     pub fn new() -> Self {
         Self {
-            calculators: Vec::new(),
+            items: Vec::new(),
         }
     }
-}
 
-impl Default for ZakatPortfolio {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl ZakatPortfolio {
     #[allow(clippy::should_implement_trait)]
-    pub fn add<T: CalculateZakat + Send + Sync + 'static>(mut self, calculator: T) -> Self {
-         self.calculators.push(Box::new(calculator));
+    pub fn add<T: Into<PortfolioItem>>(mut self, item: T) -> Self {
+         self.items.push(item.into());
          self
     }
 
     /// Adds an asset and returns the portfolio along with the asset's UUID.
     /// Useful for tracking the asset for later updates/removals.
-    pub fn add_with_id<T: CalculateZakat + Send + Sync + 'static>(mut self, calculator: T) -> (Self, Uuid) {
-        let id = calculator.get_id();
-        self.calculators.push(Box::new(calculator));
+    pub fn add_with_id<T: Into<PortfolioItem>>(mut self, item: T) -> (Self, Uuid) {
+        let item: PortfolioItem = item.into();
+        let id = CalculateZakat::get_id(&item);
+        self.items.push(item);
         (self, id)
     }
 
     /// Adds an asset to a mutable reference and returns its UUID.
-    pub fn push<T: CalculateZakat + Send + Sync + 'static>(&mut self, calculator: T) -> Uuid {
-        let id = calculator.get_id();
-        self.calculators.push(Box::new(calculator));
+    pub fn push<T: Into<PortfolioItem>>(&mut self, item: T) -> Uuid {
+        let item: PortfolioItem = item.into();
+        let id = CalculateZakat::get_id(&item);
+        self.items.push(item);
         id
     }
 
-    /// Removes an asset by its UUID. Returns the removed calculator if found.
-    pub fn remove(&mut self, id: Uuid) -> Option<Box<dyn CalculateZakat + Send + Sync>> {
-        if let Some(pos) = self.calculators.iter().position(|c| c.get_id() == id) {
-            Some(self.calculators.remove(pos))
+    /// Removes an asset by its UUID. Returns the removed item if found.
+    pub fn remove(&mut self, id: Uuid) -> Option<PortfolioItem> {
+        if let Some(pos) = self.items.iter().position(|c| CalculateZakat::get_id(c) == id) {
+            Some(self.items.remove(pos))
         } else {
             None
         }
     }
 
     /// Replaces an asset by its UUID.
-    pub fn replace<T: CalculateZakat + Send + Sync + 'static>(&mut self, id: Uuid, new_calculator: T) -> Result<(), ZakatError> {
-        if let Some(pos) = self.calculators.iter().position(|c| c.get_id() == id) {
-            self.calculators[pos] = Box::new(new_calculator);
+    pub fn replace<T: Into<PortfolioItem>>(&mut self, id: Uuid, new_item: T) -> Result<(), ZakatError> {
+        if let Some(pos) = self.items.iter().position(|c| CalculateZakat::get_id(c) == id) {
+            self.items[pos] = new_item.into();
             Ok(())
         } else {
-            Err(ZakatError::InvalidInput(format!("Asset with ID {} not found", id), None))
+            Err(ZakatError::InvalidInput {
+                field: "asset_id".to_string(),
+                value: id.to_string(),
+                reason: "Asset with ID not found".to_string(),
+                source_label: None
+            })
         }
     }
 
     /// Gets a reference to an asset by ID.
-    pub fn get(&self, id: Uuid) -> Option<&(dyn CalculateZakat + Send + Sync)> {
-        self.calculators.iter().find(|c| c.get_id() == id).map(|b| b.as_ref())
+    pub fn get(&self, id: Uuid) -> Option<&PortfolioItem> {
+        self.items.iter().find(|c| CalculateZakat::get_id(*c) == id)
+    }
+
+    /// Returns a slice of all items in the portfolio.
+    pub fn get_items(&self) -> &[PortfolioItem] {
+        &self.items
     }
 
     /// Calculates Zakat for all assets in the portfolio.
@@ -172,30 +179,30 @@ impl ZakatPortfolio {
                 }],
                 total_assets: Decimal::ZERO,
                 total_zakat_due: Decimal::ZERO,
-                items_attempted: self.calculators.len(),
-                items_failed: self.calculators.len(),
+                items_attempted: self.items.len(),
+                items_failed: self.items.len(),
             };
         }
 
         let mut results = Vec::new();
 
         // 1. Initial calculation for all assets
-        for (index, item) in self.calculators.iter().enumerate() {
+        for (index, item) in self.items.iter().enumerate() {
             match item.calculate_zakat(config) {
                 Ok(detail) => results.push(PortfolioItemResult::Success {
-                     asset_id: item.get_id(),
+                     asset_id: CalculateZakat::get_id(item),
                      details: detail 
                 }),
                 Err(e) => {
                     let mut err = e;
-                    let source = if let Some(lbl) = item.get_label() {
+                    let source = if let Some(lbl) = CalculateZakat::get_label(item) {
                         lbl
                     } else {
                         format!("Item {}", index + 1)
                     };
                     err = err.with_source(source.clone());
                     results.push(PortfolioItemResult::Failure {
-                        asset_id: item.get_id(),
+                        asset_id: CalculateZakat::get_id(item),
                         source,
                         error: err,
                     });
@@ -219,8 +226,8 @@ impl ZakatPortfolio {
                 }],
                 total_assets: Decimal::ZERO,
                 total_zakat_due: Decimal::ZERO,
-                items_attempted: self.calculators.len(),
-                items_failed: self.calculators.len(),
+                items_attempted: self.items.len(),
+                items_failed: self.items.len(),
             };
         }
 
@@ -253,9 +260,7 @@ impl ZakatPortfolio {
                              }
                          }
                      } else {
-                         // Calculator removed? Keep the error or mark as removed?
-                         // If removed, we probably shouldn't include it in the new result?
-                         // Or preserve the old error. preserving old error is safer.
+                         // If the calculator was removed, we preserve the original error to maintain history.
                          new_results.push(result.clone());
                      }
                 }
@@ -267,21 +272,22 @@ impl ZakatPortfolio {
 }
 
 #[cfg(feature = "async")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AsyncZakatPortfolio {
-    calculators: Vec<Box<dyn AsyncCalculateZakat>>,
+    items: Vec<PortfolioItem>,
 }
 
 #[cfg(feature = "async")]
 impl AsyncZakatPortfolio {
     pub fn new() -> Self {
         Self {
-            calculators: Vec::new(),
+            items: Vec::new(),
         }
     }
     
     #[allow(clippy::should_implement_trait)]
-    pub fn add<T: AsyncCalculateZakat + 'static>(mut self, calculator: T) -> Self {
-         self.calculators.push(Box::new(calculator));
+    pub fn add<T: Into<PortfolioItem>>(mut self, item: T) -> Self {
+         self.items.push(item.into());
          self
     }
     
@@ -300,29 +306,29 @@ impl AsyncZakatPortfolio {
                 }],
                 total_assets: Decimal::ZERO,
                 total_zakat_due: Decimal::ZERO,
-                items_attempted: self.calculators.len(),
-                items_failed: self.calculators.len(),
+                items_attempted: self.items.len(),
+                items_failed: self.items.len(),
             };
         }
 
         let mut results = Vec::new();
 
-        for (index, item) in self.calculators.iter().enumerate() {
+        for (index, item) in self.items.iter().enumerate() {
             match item.calculate_zakat_async(config).await {
                 Ok(detail) => results.push(PortfolioItemResult::Success {
-                     asset_id: item.get_id(),
+                     asset_id: CalculateZakat::get_id(item),
                      details: detail 
                 }),
                 Err(e) => {
                     let mut err = e;
-                    let source = if let Some(lbl) = item.get_label() {
+                    let source = if let Some(lbl) = CalculateZakat::get_label(item) {
                         lbl
                     } else {
                         format!("Item {}", index + 1)
                     };
                     err = err.with_source(source.clone());
                     results.push(PortfolioItemResult::Failure {
-                        asset_id: item.get_id(),
+                        asset_id: CalculateZakat::get_id(item),
                         source,
                         error: err,
                     });

@@ -11,11 +11,13 @@ pub mod pricing;
 pub mod traits;
 pub mod types;
 pub mod utils;
+pub mod assets;
 
 pub use config::ZakatConfig;
 pub use traits::CalculateZakat;
 pub use types::{ZakatDetails, ZakatError, WealthType};
 pub use portfolio::ZakatPortfolio;
+pub use assets::PortfolioItem;
 pub use pricing::{Prices, StaticPriceProvider};
 pub use madhab::{ZakatStrategy, ZakatRules};
 #[cfg(feature = "async")]

@@ -27,6 +27,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .income(5000)
         .expenses(0)
         .method(IncomeCalculationMethod::Gross)
+        .hawl(true)
         .label("Monthly Salary");
     
     // 2. Gold - integers work directly!
@@ -39,6 +40,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let crypto_calc = InvestmentAssets::new()
         .value(20000)
         .kind(InvestmentType::Crypto)
+        .hawl(true)
         .label("Bitcoin Holding");
     
     // 4. Portfolio with Debt Deduction on Crypto

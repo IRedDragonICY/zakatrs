@@ -11,11 +11,12 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
+use serde::{Serialize, Deserialize};
 use crate::traits::CalculateZakat;
 use crate::inputs::IntoZakatDecimal;
 use crate::config::ZakatConfig;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum InvestmentType {
     #[default]
     Stock,
@@ -23,7 +24,7 @@ pub enum InvestmentType {
     MutualFund,
 }
 
-#[derive(Default)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct InvestmentAssets {
     pub market_value: Decimal,
     pub investment_type: InvestmentType,
@@ -74,7 +75,12 @@ impl InvestmentAssets {
 impl CalculateZakat for InvestmentAssets {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
         if self.market_value < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput("Market value must be non-negative".to_string(), self.label.clone()));
+            return Err(ZakatError::InvalidInput {
+                field: "market_value".to_string(),
+                value: "negative".to_string(),
+                reason: "Market value must be non-negative".to_string(),
+                source_label: self.label.clone()
+            });
         }
 
         // For LowerOfTwo or Silver standard, we need silver price too
@@ -84,10 +90,16 @@ impl CalculateZakat for InvestmentAssets {
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError("Gold price needed for Investment Nisab".to_string(), self.label.clone()));
+            return Err(ZakatError::ConfigurationError {
+                reason: "Gold price needed for Investment Nisab".to_string(),
+                source_label: self.label.clone()
+            });
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Silver price needed for Investment Nisab with current standard".to_string(), self.label.clone()));
+            return Err(ZakatError::ConfigurationError {
+                reason: "Silver price needed for Investment Nisab with current standard".to_string(),
+                source_label: self.label.clone()
+            });
         }
         
         let nisab_threshold_value = config.get_monetary_nisab_threshold();

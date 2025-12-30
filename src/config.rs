@@ -69,7 +69,10 @@ impl std::str::FromStr for ZakatConfig {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         serde_json::from_str(s)
-            .map_err(|e| ZakatError::ConfigurationError(format!("Failed to parse config JSON: {}", e), None))
+            .map_err(|e| ZakatError::ConfigurationError {
+                reason: format!("Failed to parse config JSON: {}", e),
+                source_label: None,
+            })
     }
 }
 
@@ -81,10 +84,16 @@ impl ZakatConfig {
     /// Validates the configuration for logical consistency and safety.
     pub fn validate(&self) -> Result<(), ZakatError> {
         if self.gold_price_per_gram < Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Gold price must be non-negative".to_string(), None));
+            return Err(ZakatError::ConfigurationError {
+                reason: "Gold price must be non-negative".to_string(),
+                source_label: None,
+            });
         }
         if self.silver_price_per_gram < Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError("Silver price must be non-negative".to_string(), None));
+            return Err(ZakatError::ConfigurationError {
+                reason: "Silver price must be non-negative".to_string(),
+                source_label: None,
+            });
         }
 
         // Validation Logic based on Nisab Standard
@@ -99,19 +108,31 @@ impl ZakatConfig {
         }
         
         if self.cash_nisab_standard == NisabStandard::Gold && self.gold_price_per_gram <= Decimal::ZERO {
-             return Err(ZakatError::ConfigurationError("Gold price must be > 0 for Gold Nisab Standard".to_string(), None));
+             return Err(ZakatError::ConfigurationError {
+                 reason: "Gold price must be > 0 for Gold Nisab Standard".to_string(),
+                 source_label: None,
+             });
         }
 
         if self.cash_nisab_standard == NisabStandard::Silver && self.silver_price_per_gram <= Decimal::ZERO {
-             return Err(ZakatError::ConfigurationError("Silver price must be > 0 for Silver Nisab Standard".to_string(), None));
+             return Err(ZakatError::ConfigurationError {
+                 reason: "Silver price must be > 0 for Silver Nisab Standard".to_string(),
+                 source_label: None,
+             });
         }
 
         if self.cash_nisab_standard == NisabStandard::LowerOfTwo {
             if self.gold_price_per_gram <= Decimal::ZERO {
-                return Err(ZakatError::ConfigurationError("Missing 'Gold Price'. Required because 'LowerOfTwo' standard is active.".to_string(), Some("ZakatConfig validation".to_string())));
+                return Err(ZakatError::ConfigurationError {
+                    reason: "Missing 'Gold Price'. Required because 'LowerOfTwo' standard is active.".to_string(),
+                    source_label: Some("ZakatConfig validation".to_string()),
+                });
             }
             if self.silver_price_per_gram <= Decimal::ZERO {
-                return Err(ZakatError::ConfigurationError("Missing 'Silver Price'. Required because 'LowerOfTwo' standard is active.".to_string(), Some("ZakatConfig validation".to_string())));
+                return Err(ZakatError::ConfigurationError {
+                    reason: "Missing 'Silver Price'. Required because 'LowerOfTwo' standard is active.".to_string(),
+                    source_label: Some("ZakatConfig validation".to_string()),
+                });
             }
         }
 
@@ -121,14 +142,26 @@ impl ZakatConfig {
     /// Attempts to load configuration from environment variables.
     pub fn from_env() -> Result<Self, ZakatError> {
         let gold_str = env::var("ZAKAT_GOLD_PRICE")
-            .map_err(|_| ZakatError::ConfigurationError("ZAKAT_GOLD_PRICE env var not set".to_string(), None))?;
+            .map_err(|_| ZakatError::ConfigurationError {
+                reason: "ZAKAT_GOLD_PRICE env var not set".to_string(),
+                source_label: None,
+            })?;
         let silver_str = env::var("ZAKAT_SILVER_PRICE")
-            .map_err(|_| ZakatError::ConfigurationError("ZAKAT_SILVER_PRICE env var not set".to_string(), None))?;
+            .map_err(|_| ZakatError::ConfigurationError {
+                 reason: "ZAKAT_SILVER_PRICE env var not set".to_string(),
+                 source_label: None,
+            })?;
 
         let gold_price = gold_str.parse::<Decimal>()
-            .map_err(|e| ZakatError::ConfigurationError(format!("Invalid gold price format: {}", e), None))?;
+            .map_err(|e| ZakatError::ConfigurationError {
+                reason: format!("Invalid gold price format: {}", e),
+                source_label: None,
+            })?;
         let silver_price = silver_str.parse::<Decimal>()
-            .map_err(|e| ZakatError::ConfigurationError(format!("Invalid silver price format: {}", e), None))?;
+            .map_err(|e| ZakatError::ConfigurationError {
+                reason: format!("Invalid silver price format: {}", e),
+                source_label: None,
+            })?;
 
         Ok(Self {
             gold_price_per_gram: gold_price,
@@ -140,10 +173,16 @@ impl ZakatConfig {
     /// Attempts to load configuration from a JSON file.
     pub fn try_from_json(path: &str) -> Result<Self, ZakatError> {
         let content = fs::read_to_string(path)
-            .map_err(|e| ZakatError::ConfigurationError(format!("Failed to read config file: {}", e), None))?;
+            .map_err(|e| ZakatError::ConfigurationError {
+                reason: format!("Failed to read config file: {}", e),
+                source_label: None,
+            })?;
         
         let config: ZakatConfig = serde_json::from_str(&content)
-            .map_err(|e| ZakatError::ConfigurationError(format!("Failed to parse config JSON: {}", e), None))?;
+            .map_err(|e| ZakatError::ConfigurationError {
+                reason: format!("Failed to parse config JSON: {}", e),
+                source_label: None,
+            })?;
             
         config.validate()?;
         Ok(config)

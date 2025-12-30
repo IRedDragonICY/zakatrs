@@ -28,23 +28,24 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Zakat Fitrah
 - Configurable Nisab thresholds
 - Portfolio aggregation (Dam' al-Amwal)
-- **[NEW] Dynamic Portfolio** (Add, Remove, Replace assets with stable UUIDs)
-- **Asset Labeling** (e.g., "Main Store", "Crypto Wallet")
-- **Input Sanitization & Validation** (Rejects negative values, ensures safe configuration)
-- **Flexible Configuration** (Env Vars, JSON, Fluent API)
-- **Fiqh Compliance** (Jewelry exemptions, Madhab-specific rules, Hawl requirements)
-- **Async Support** (Optional integration with `tokio` and `async-trait`)
-- **Live Pricing Interface** (e.g. for API integration)
-- **Detailed Reporting** (Livestock in-kind details, calculation traces, metadata support)
-- **`explain()` Debugging** (Get human-readable trace of calculations)
-- **Custom Strategies** (Pluggable `ZakatStrategy` trait for custom rules)
+- Dynamic Portfolio (Add, Remove, Replace assets with stable UUIDs)
+- Asset Labeling (e.g., "Main Store", "Crypto Wallet")
+- Input Sanitization & Validation (Rejects negative values, ensures safe configuration)
+- Flexible Configuration (Env Vars, JSON, Fluent API)
+- Fiqh Compliance (Jewelry exemptions, Madhab-specific rules, Hawl requirements)
+- Async Support (Optional integration with `tokio` and `async-trait`)
+- Live Pricing Interface (e.g. for API integration)
+- Detailed Reporting (Livestock in-kind details, calculation traces, metadata support)
+- `explain()` Debugging (Get human-readable trace of calculations)
+- Custom Strategies (Pluggable `ZakatStrategy` trait for custom rules)
+- Full Serialization (Save/Load Portfolios via `serde` & JSON)
 
 ## Install
 
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.6.1"
+zakat = "0.7.0"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] } # Required if using async features
 ```
@@ -52,7 +53,7 @@ tokio = { version = "1", features = ["full"] } # Required if using async feature
 Synchronous Only (Lighter weight):
 ```toml
 [dependencies]
-zakat = { version = "0.6.1", default-features = false }
+zakat = { version = "0.7.0", default-features = false }
 rust_decimal = "1.39"
 ```
 
@@ -60,7 +61,7 @@ rust_decimal = "1.39"
 
 ### Business Zakat
 
-> **Note:** v0.5 uses a new **Fluent API**. No more Builders! You can pass standard Rust types (`i32`, `f64`, `&str`) directly.
+> **Note:** v0.7 continues to use the **Fluent API** introduced in v0.5. No more Builders!
 
 ```rust
 use zakat::prelude::*;

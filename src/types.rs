@@ -24,6 +24,38 @@ pub enum PaymentPayload {
     },
 }
 
+
+/// Represents the semantic operation performed in a calculation step.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum Operation {
+    Initial,
+    Add,
+    Subtract,
+    Multiply,
+    Divide,
+    Compare,
+    Rate,
+    Result,
+    Info,
+}
+
+impl std::fmt::Display for Operation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let symbol = match self {
+            Operation::Initial => " ",
+            Operation::Add => "+",
+            Operation::Subtract => "-",
+            Operation::Multiply => "*",
+            Operation::Divide => "/",
+            Operation::Compare => "?",
+            Operation::Rate => "x",
+            Operation::Result => "=",
+            Operation::Info => "i",
+        };
+        write!(f, "{}", symbol)
+    }
+}
+
 /// Represents a single step in the Zakat calculation process.
 ///
 /// This struct provides transparency into how the final Zakat amount was derived,
@@ -34,8 +66,8 @@ pub struct CalculationStep {
     pub description: String,
     /// The value at this step (if applicable).
     pub amount: Option<Decimal>,
-    /// The operation type: "Initial", "Add", "Subtract", "Compare", "Rate", "Result"
-    pub operation: String,
+    /// The semantic operation type.
+    pub operation: Operation,
 }
 
 impl CalculationStep {
@@ -43,7 +75,7 @@ impl CalculationStep {
         Self {
             description: description.into(),
             amount: Some(amount),
-            operation: "Initial".to_string(),
+            operation: Operation::Initial,
         }
     }
 
@@ -51,7 +83,7 @@ impl CalculationStep {
         Self {
             description: description.into(),
             amount: Some(amount),
-            operation: "Add".to_string(),
+            operation: Operation::Add,
         }
     }
 
@@ -59,7 +91,15 @@ impl CalculationStep {
         Self {
             description: description.into(),
             amount: Some(amount),
-            operation: "Subtract".to_string(),
+            operation: Operation::Subtract,
+        }
+    }
+
+    pub fn multiply(description: impl Into<String>, amount: Decimal) -> Self {
+         Self {
+            description: description.into(),
+            amount: Some(amount),
+            operation: Operation::Multiply,
         }
     }
 
@@ -67,7 +107,7 @@ impl CalculationStep {
         Self {
             description: description.into(),
             amount: Some(amount),
-            operation: "compare".to_string(),
+            operation: Operation::Compare,
         }
     }
 
@@ -75,7 +115,7 @@ impl CalculationStep {
         CalculationStep {
             description: description.into(),
             amount: Some(rate),
-            operation: "rate".to_string(),
+            operation: Operation::Rate,
         }
     }
 
@@ -83,7 +123,7 @@ impl CalculationStep {
         CalculationStep {
             description: description.into(),
             amount: Some(amount),
-            operation: "result".to_string(),
+            operation: Operation::Result,
         }
     }
 
@@ -91,8 +131,86 @@ impl CalculationStep {
         CalculationStep {
             description: description.into(),
             amount: None,
-            operation: "info".to_string(),
+            operation: Operation::Info,
         }
+    }
+}
+
+/// A collection of calculation steps that can be displayed or serialized.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct CalculationTrace(pub Vec<CalculationStep>);
+
+impl std::ops::Deref for CalculationTrace {
+    type Target = Vec<CalculationStep>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for CalculationTrace {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+// Allow creating from Vec
+impl From<Vec<CalculationStep>> for CalculationTrace {
+    fn from(v: Vec<CalculationStep>) -> Self {
+        CalculationTrace(v)
+    }
+}
+
+// Enable iteration
+impl IntoIterator for CalculationTrace {
+    type Item = CalculationStep;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl std::fmt::Display for CalculationTrace {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Find the maximum description length for alignment
+        let max_desc_len = self.0.iter()
+            .map(|step| step.description.len())
+            .max()
+            .unwrap_or(20)
+            .max(20);
+
+        for step in &self.0 {
+            let op_symbol = step.operation.to_string();
+
+            let amount_str = if let Some(amt) = step.amount {
+                if matches!(step.operation, Operation::Rate) {
+                     format!("{:.3}", amt)
+                } else {
+                     format!("{:.2}", amt)
+                }
+            } else {
+                String::new()
+            };
+
+            if matches!(step.operation, Operation::Info) {
+                 writeln!(f, "  INFO: {}", step.description)?;
+            } else if !amount_str.is_empty() {
+                 writeln!(f, "  {:<width$} : {} {:>10} ({:?})", 
+                    step.description, 
+                    op_symbol, 
+                    amount_str, 
+                    step.operation,
+                    width = max_desc_len
+                 )?;
+            } else {
+                 writeln!(f, "  {:<width$} : [No Amount] ({:?})", 
+                    step.description, 
+                    step.operation,
+                    width = max_desc_len
+                 )?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -120,7 +238,7 @@ pub struct ZakatDetails {
     /// Detailed payment payload (Monetary amount or specific assets like Livestock heads).
     pub payload: PaymentPayload,
     /// Step-by-step trace of how this calculation was derived.
-    pub calculation_trace: Vec<CalculationStep>,
+    pub calculation_trace: CalculationTrace,
 }
 
 impl ZakatDetails {
@@ -180,7 +298,7 @@ impl ZakatDetails {
             status_reason: None,
             label: None,
             payload: PaymentPayload::Monetary(zakat_due),
-            calculation_trace: trace,
+            calculation_trace: CalculationTrace(trace),
         }
     }
 
@@ -220,7 +338,7 @@ impl ZakatDetails {
             status_reason: None,
             label: None,
             payload: PaymentPayload::Monetary(zakat_due),
-            calculation_trace: trace,
+            calculation_trace: CalculationTrace(trace),
         }
     }
 
@@ -241,7 +359,7 @@ impl ZakatDetails {
             status_reason: Some(reason.to_string()),
             label: None,
             payload: PaymentPayload::Monetary(Decimal::ZERO),
-            calculation_trace: trace,
+            calculation_trace: CalculationTrace(trace),
         }
     }
 
@@ -293,52 +411,8 @@ impl ZakatDetails {
         writeln!(&mut output, "Explanation for '{}' ({:?}):", label, self.wealth_type).unwrap();
         writeln!(&mut output, "{:-<50}", "").unwrap(); // Separator
 
-        // Find the maximum description length for alignment
-        let max_desc_len = self.calculation_trace.iter()
-            .map(|step| step.description.len())
-            .max()
-            .unwrap_or(20)
-            .max(20);
-
-        for step in &self.calculation_trace {
-            let op_symbol = match step.operation.as_str() {
-                "Initial" => " ",
-                "Add" => "+",
-                "Subtract" => "-",
-                "rate" => "x",
-                "result" => "=",
-                "compare" => "?",
-                _ => " "
-            };
-
-            let amount_str = if let Some(amt) = step.amount {
-                if step.operation == "rate" {
-                     format!("{:.3}", amt) // Rates often have more precision e.g. 0.025
-                } else {
-                     format!("{:.2}", amt)
-                }
-            } else {
-                String::new()
-            };
-
-            if step.operation == "info" {
-                 writeln!(&mut output, "  INFO: {}", step.description).unwrap();
-            } else if !amount_str.is_empty() {
-                 writeln!(&mut output, "  {:<width$} : {} {:>10} ({})", 
-                    step.description, 
-                    op_symbol, 
-                    amount_str, 
-                    step.operation,
-                    width = max_desc_len
-                 ).unwrap();
-            } else {
-                 writeln!(&mut output, "  {:<width$} : [No Amount] ({})", 
-                    step.description, 
-                    step.operation,
-                    width = max_desc_len
-                 ).unwrap();
-            }
-        }
+        // Delegate trace printing to CalculationTrace
+        write!(&mut output, "{}", self.calculation_trace).unwrap();
         
         writeln!(&mut output, "{:-<50}", "").unwrap();
         writeln!(&mut output, "Status: {}", if self.is_payable { "PAYABLE" } else { "EXEMPT" }).unwrap();
@@ -372,88 +446,72 @@ impl std::fmt::Display for ZakatDetails {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, thiserror::Error)]
 pub enum ZakatError {
-    CalculationError(String, Option<String>), // Msg, Source
-    InvalidInput(String, Option<String>),
-    ConfigurationError(String, Option<String>),
+    #[error("Calculation error for '{source_label:?}': {reason}")]
+    CalculationError {
+        reason: String,
+        source_label: Option<String>,
+    },
+
+    #[error("Invalid input for asset '{source_label:?}': Field '{field}' (value: '{value}') - {reason}")]
+    InvalidInput {
+        field: String,
+        value: String,
+        reason: String,
+        source_label: Option<String>,
+    },
+
+    #[error("Configuration error for '{source_label:?}': {reason}")]
+    ConfigurationError {
+        reason: String,
+        source_label: Option<String>,
+    },
+    
+    #[error("Calculation overflow in '{operation}' for '{source_label:?}'")]
     Overflow {
         operation: String,
-        source: Option<String>,
+        source_label: Option<String>,
     },
+
+    #[error("Missing configuration for '{source_label:?}': Field '{field}' is required")]
     MissingConfig {
         field: String,
-        source: Option<String>,
+        source_label: Option<String>,
     },
 }
 
 impl ZakatError {
     pub fn with_source(self, source: String) -> Self {
         match self {
-            ZakatError::CalculationError(msg, _) => ZakatError::CalculationError(msg, Some(source)),
-            ZakatError::InvalidInput(msg, _) => ZakatError::InvalidInput(msg, Some(source)),
-            ZakatError::ConfigurationError(msg, _) => ZakatError::ConfigurationError(msg, Some(source)),
+            ZakatError::CalculationError { reason, .. } => ZakatError::CalculationError {
+                reason,
+                source_label: Some(source),
+            },
+            ZakatError::InvalidInput { field, value, reason, .. } => ZakatError::InvalidInput {
+                field,
+                value,
+                reason,
+                source_label: Some(source),
+            },
+            ZakatError::ConfigurationError { reason, .. } => ZakatError::ConfigurationError {
+                reason,
+                source_label: Some(source),
+            },
             ZakatError::Overflow { operation, .. } => ZakatError::Overflow {
                 operation,
-                source: Some(source),
+                source_label: Some(source),
             },
             ZakatError::MissingConfig { field, .. } => ZakatError::MissingConfig {
                 field,
-                source: Some(source),
+                source_label: Some(source),
             },
         }
     }
 }
 
-impl std::fmt::Display for ZakatError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ZakatError::CalculationError(msg, source) => {
-                let s = source.as_deref().unwrap_or("Unknown");
-                write!(f, "Calculation Error [Asset: {}]: {}", s, msg)
-            }
-            ZakatError::InvalidInput(msg, source) => {
-                let s = source.as_deref().unwrap_or("Unknown");
-                write!(f, "Invalid Input [Asset: {}]: {}", s, msg)
-            }
-            ZakatError::ConfigurationError(msg, source) => {
-                let s = source.as_deref().unwrap_or("Unknown");
-                write!(f, "Configuration Error [Asset: {}]: {}", s, msg)
-            }
-            ZakatError::Overflow { operation, source } => {
-                let s = source.as_deref().unwrap_or("Unknown");
-                write!(f, "Arithmetic Overflow [Asset: {}]: Operation '{}' failed", s, operation)
-            }
-            ZakatError::MissingConfig { field, source } => {
-                let s = source.as_deref().unwrap_or("Unknown");
-                write!(f, "Missing Configuration [Asset: {}]: Field '{}' is required", s, field)
-            }
-        }
-    }
-}
+// Removing ZakatErrorConstructors as we want to enforce structured creation
 
-impl std::error::Error for ZakatError {}
-
-/// Helper for backward compatibility or easy creation
-#[allow(non_snake_case)]
-pub mod ZakatErrorConstructors {
-    use super::ZakatError;
-    pub fn CalculationError(msg: impl Into<String>) -> ZakatError {
-        ZakatError::CalculationError(msg.into(), None)
-    }
-    pub fn InvalidInput(msg: impl Into<String>) -> ZakatError {
-        ZakatError::InvalidInput(msg.into(), None)
-    }
-    pub fn ConfigurationError(msg: impl Into<String>) -> ZakatError {
-        ZakatError::ConfigurationError(msg.into(), None)
-    }
-    pub fn Overflow(op: impl Into<String>) -> ZakatError {
-        ZakatError::Overflow { operation: op.into(), source: None }
-    }
-    pub fn MissingConfig(field: impl Into<String>) -> ZakatError {
-        ZakatError::MissingConfig { field: field.into(), source: None }
-    }
-}
 
 /// Helper enum to categorize wealth types
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]

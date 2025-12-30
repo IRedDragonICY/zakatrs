@@ -27,10 +27,12 @@ impl Prices {
         let silver = silver_per_gram.into_zakat_decimal()?;
 
         if gold < Decimal::ZERO || silver < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput(
-                "Prices must be non-negative".to_string(),
-                None,
-            ));
+            return Err(ZakatError::InvalidInput { 
+                field: "prices".to_string(),
+                value: "negative".to_string(),
+                reason: "Prices must be non-negative".to_string(),
+                source_label: None
+            });
         }
 
         Ok(Self {

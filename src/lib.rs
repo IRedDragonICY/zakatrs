@@ -13,6 +13,9 @@ pub mod types;
 pub mod utils;
 pub mod assets;
 
+#[cfg(target_arch = "wasm32")]
+pub mod wasm;
+
 pub use config::ZakatConfig;
 pub use traits::CalculateZakat;
 pub use types::{ZakatDetails, ZakatError, WealthType};

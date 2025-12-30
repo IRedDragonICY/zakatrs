@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Zakat WASM Demo</title>
+</head>
+<body>
+    <h1>Zakat Calculation (WASM)</h1>
+    <p id="status">Loading...</p>
+    
+    <button id="calc-btn" disabled>Calculate Zakat</button>
+    <pre id="output"></pre>
+
+    <script type="module">
+        // Note: In a real app, you'd use a bundler or load this from pkg/
+        // checking for wasm support
+        
+        async function run() {
+            try {
+                // This assumes `wasm-pack build --target web` was run and pkg is available
+                // Adjust path as needed for actual testing environment
+                const { default: init, greet, calculate_portfolio_wasm } = await import('../pkg/zakat.js');
+                await init();
+                
+                document.getElementById('status').innerText = "WASM Loaded: " + greet("User");
+                document.getElementById('calc-btn').disabled = false;
+                
+                document.getElementById('calc-btn').onclick = () => {
+                    const config = {
+                        gold_price_per_gram: "85.0",
+                        silver_price_per_gram: "1.0",
+                        cash_nisab_standard: "Gold", // String enum
+                        strategy: { nisab_standard: "Gold" } // Mock strategy object if needed, though simple config usually suffices
+                    };
+                    
+                    const assets = [
+                        {
+                            type: "PreciousMetals", // specific type
+                            gold_gram: "100.0",
+                            silver_gram: "0.0"
+                        }
+                    ];
+                    
+                    try {
+                        const result = calculate_portfolio_wasm(config, assets);
+                        document.getElementById('output').innerText = JSON.stringify(result, null, 2);
+                    } catch (e) {
+                         document.getElementById('output').innerText = "Error: " + e;
+                    }
+                };
+                
+            } catch (e) {
+                document.getElementById('status').innerText = "Failed to load WASM (Ensure you ran wasm-pack build --target web): " + e;
+                console.error(e);
+            }
+        }
+        
+        run();
+    </script>
+</body>
+</html>

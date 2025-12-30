@@ -131,9 +131,15 @@ impl ZakatDetails {
         rate: Decimal,
         wealth_type: WealthType,
     ) -> Self {
-        let net_assets = total_assets - liabilities_due_now;
-        // Business rule: If net assets are negative, they are treated as zero for logic,
-        // but it's good to preserve the actual value if needed.
+        let mut net_assets = total_assets - liabilities_due_now;
+        let mut clamped_msg = None;
+
+        // Business rule: If net assets are negative, clamp to zero.
+        if net_assets < Decimal::ZERO {
+            net_assets = Decimal::ZERO;
+            clamped_msg = Some("Net Assets are negative, clamped to zero for Zakat purposes");
+        }
+
         // For Nisab check: net_assets >= nisab_threshold
         let is_payable = net_assets >= nisab_threshold && net_assets > Decimal::ZERO;
         
@@ -147,9 +153,15 @@ impl ZakatDetails {
         let mut trace = vec![
             CalculationStep::initial("Total Assets", total_assets),
             CalculationStep::subtract("Liabilities Due Now", liabilities_due_now),
-            CalculationStep::result("Net Assets", net_assets),
-            CalculationStep::compare("Nisab Threshold", nisab_threshold),
         ];
+
+        if let Some(msg) = clamped_msg {
+            trace.push(CalculationStep::info(msg));
+        }
+
+        trace.push(CalculationStep::result("Net Assets", net_assets));
+        trace.push(CalculationStep::compare("Nisab Threshold", nisab_threshold));
+
         if is_payable {
             trace.push(CalculationStep::rate("Applied Rate", rate));
             trace.push(CalculationStep::result("Zakat Due", zakat_due));
@@ -180,9 +192,15 @@ impl ZakatDetails {
         nisab_threshold: Decimal,
         rate: Decimal,
         wealth_type: WealthType,
-        trace: Vec<CalculationStep>,
+        mut trace: Vec<CalculationStep>,
     ) -> Self {
-        let net_assets = total_assets - liabilities_due_now;
+        let mut net_assets = total_assets - liabilities_due_now;
+        
+        if net_assets < Decimal::ZERO {
+            net_assets = Decimal::ZERO;
+            trace.push(CalculationStep::info("Net Assets are negative, clamped to zero for Zakat purposes"));
+        }
+
         let is_payable = net_assets >= nisab_threshold && net_assets > Decimal::ZERO;
         
         let zakat_due = if is_payable {

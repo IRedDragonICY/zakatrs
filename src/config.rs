@@ -108,10 +108,10 @@ impl ZakatConfig {
 
         if self.cash_nisab_standard == NisabStandard::LowerOfTwo {
             if self.gold_price_per_gram <= Decimal::ZERO {
-                return Err(ZakatError::MissingConfig { field: "gold_price".to_string(), source: Some("ZakatConfig validation".to_string()) });
+                return Err(ZakatError::ConfigurationError("Missing 'Gold Price'. Required because 'LowerOfTwo' standard is active.".to_string(), Some("ZakatConfig validation".to_string())));
             }
             if self.silver_price_per_gram <= Decimal::ZERO {
-                return Err(ZakatError::MissingConfig { field: "silver_price".to_string(), source: Some("ZakatConfig validation".to_string()) });
+                return Err(ZakatError::ConfigurationError("Missing 'Silver Price'. Required because 'LowerOfTwo' standard is active.".to_string(), Some("ZakatConfig validation".to_string())));
             }
         }
 

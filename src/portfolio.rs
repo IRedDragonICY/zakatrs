@@ -129,6 +129,21 @@ impl ZakatPortfolio {
     /// combined when determining Zakat eligibility, benefiting the recipients
     /// of Zakat by ensuring wealth that collectively exceeds Nisab is not exempt.
     pub fn calculate_total(&self, config: &crate::config::ZakatConfig) -> PortfolioResult {
+        // Fail Fast: Validate config before processing any items
+        if let Err(e) = config.validate() {
+            return PortfolioResult {
+                status: PortfolioStatus::Failed,
+                results: vec![PortfolioItemResult::Failure {
+                    source: "Configuration".to_string(),
+                    error: e,
+                }],
+                total_assets: Decimal::ZERO,
+                total_zakat_due: Decimal::ZERO,
+                items_attempted: self.calculators.len(),
+                items_failed: self.calculators.len(),
+            };
+        }
+
         let mut results = Vec::new();
 
         // 1. Initial calculation for all assets
@@ -152,6 +167,105 @@ impl ZakatPortfolio {
         }
 
         aggregate_and_summarize(results, config)
+    }
+
+    /// Retries failed items from a previous calculation using a new (presumably fixed) configuration.
+    ///
+    /// This avoids re-calculating successful items, saving time and preserving manual overrides if any existed.
+    pub fn retry_failures(&self, previous_result: &PortfolioResult, config: &crate::config::ZakatConfig) -> PortfolioResult {
+        // If config is still invalid, fail immediately
+        if let Err(e) = config.validate() {
+             return PortfolioResult {
+                status: PortfolioStatus::Failed,
+                results: vec![PortfolioItemResult::Failure {
+                    source: "Configuration".to_string(),
+                    error: e,
+                }],
+                total_assets: Decimal::ZERO,
+                total_zakat_due: Decimal::ZERO,
+                items_attempted: self.calculators.len(),
+                items_failed: self.calculators.len(),
+            };
+        }
+
+        // Clone previous results to mutate
+        let mut new_results = Vec::with_capacity(previous_result.results.len());
+        
+        // If previous result was a total configuration failure (failed count == calculators count and 1 result), 
+        // we might want to just run calculate_total fresh.
+        // But assuming strict index alignment:
+        
+        let calculators_len = self.calculators.len();
+        
+        // Edge case: If previous result has different number of items than calculators, 
+        // we cannot reliably map indices. In that case, we must run full calculation.
+        // We also check if previous result has 1 item that is "Configuration" failure.
+        if previous_result.results.len() != calculators_len {
+             return self.calculate_total(config);
+        }
+
+        for (i, result) in previous_result.results.iter().enumerate() {
+            match result {
+                PortfolioItemResult::Success(_) => {
+                    // Keep existing success (deep clone via Serialize/Deserialize potentially, but here Clone is enough)
+                    // We assume PorterfoliItemResult implements Clone? 
+                    // Wait, PortfolioItemResult derives Serialize, Deserialize. Clone is NOT derived in the file view I saw.
+                    // I need to check if PortfolioItemResult implements Clone.
+                    // Looking at `view_file` output Step 14:
+                    // `#[derive(Debug, Serialize, Deserialize)]` -> No Clone!
+                    // Ah. I cannot clone `PortfolioItemResult` easily if it doesn't derive Clone.
+                    // ZakatDetails derives Clone. ZakatError does NOT derive Clone (it has String option).
+                    // Wait, ZakatError: `#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]`. It DOES derive Clone (Step 13).
+                    // Let's check PortfolioItemResult again.
+                    // Step 14: `#[derive(Debug, Serialize, Deserialize)] pub enum PortfolioItemResult` -> MISSING Clone.
+                    // I should add Clone to PortfolioItemResult in a separate step or just reconstruct it.
+                    // Or I can just match and rebuild.
+                    match result {
+                        PortfolioItemResult::Success(d) => new_results.push(PortfolioItemResult::Success(d.clone())),
+                        PortfolioItemResult::Failure { source, error } => {
+                             // Retry this index
+                             if i < calculators_len {
+                                 match self.calculators[i].calculate_zakat(config) {
+                                     Ok(d) => new_results.push(PortfolioItemResult::Success(d)),
+                                     Err(new_err) => {
+                                         let mut e = new_err;
+                                         e = e.with_source(source.clone());
+                                         new_results.push(PortfolioItemResult::Failure {
+                                             source: source.clone(),
+                                             error: e,
+                                         });
+                                     }
+                                 }
+                             } else {
+                                 // Index out of bounds? Should not happen if sizes match.
+                                 new_results.push(PortfolioItemResult::Failure { source: source.clone(), error: error.clone() });
+                             }
+                        },
+                    }
+                },
+                PortfolioItemResult::Failure { source, error } => {
+                     // Retry
+                     if i < calculators_len {
+                         match self.calculators[i].calculate_zakat(config) {
+                             Ok(d) => new_results.push(PortfolioItemResult::Success(d)),
+                             Err(new_err) => {
+                                 let mut e = new_err;
+                                 let s = if let Some(lbl) = self.calculators[i].get_label() { lbl } else { source.clone() };
+                                 e = e.with_source(s.clone());
+                                 new_results.push(PortfolioItemResult::Failure {
+                                     source: s,
+                                     error: e,
+                                 });
+                             }
+                         }
+                     } else {
+                         new_results.push(PortfolioItemResult::Failure { source: source.clone(), error: error.clone() });
+                     }
+                }
+            }
+        }
+        
+        aggregate_and_summarize(new_results, config)
     }
 }
 
@@ -178,6 +292,21 @@ impl AsyncZakatPortfolio {
     
     /// Calculates Zakat asynchronously for all assets in the portfolio.
     pub async fn calculate_total_async(&self, config: &crate::config::ZakatConfig) -> PortfolioResult {
+        // Fail Fast: Validate config before processing any items
+        if let Err(e) = config.validate() {
+            return PortfolioResult {
+                status: PortfolioStatus::Failed,
+                results: vec![PortfolioItemResult::Failure {
+                    source: "Configuration".to_string(),
+                    error: e,
+                }],
+                total_assets: Decimal::ZERO,
+                total_zakat_due: Decimal::ZERO,
+                items_attempted: self.calculators.len(),
+                items_failed: self.calculators.len(),
+            };
+        }
+
         let mut results = Vec::new();
 
         for (index, item) in self.calculators.iter().enumerate() {

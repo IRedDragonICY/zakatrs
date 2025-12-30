@@ -43,7 +43,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.6"
+zakat = "0.6.1"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] } # Required if using async features
 ```
@@ -51,7 +51,7 @@ tokio = { version = "1", features = ["full"] } # Required if using async feature
 Synchronous Only (Lighter weight):
 ```toml
 [dependencies]
-zakat = { version = "0.6", default-features = false }
+zakat = { version = "0.6.1", default-features = false }
 rust_decimal = "1.39"
 ```
 

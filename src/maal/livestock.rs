@@ -180,9 +180,9 @@ impl CalculateZakat for LivestockAssets {
         }
 
         let (zakat_value, nisab_count, heads_due) = match animal_type {
-            LivestockType::Sheep => calculate_sheep_zakat(self.count, self.prices.sheep_price).map_err(|_| ZakatError::Overflow { operation: "calculate_sheep_zakat".to_string(), source: self.label.clone() })?,
-            LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price).map_err(|_| ZakatError::Overflow { operation: "calculate_cow_zakat".to_string(), source: self.label.clone() })?,
-            LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices).map_err(|_| ZakatError::Overflow { operation: "calculate_camel_zakat".to_string(), source: self.label.clone() })?,
+            LivestockType::Sheep => calculate_sheep_zakat(self.count, self.prices.sheep_price)?,
+            LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price)?,
+            LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices)?,
         };
 
         // We construct ZakatDetails.
@@ -240,7 +240,7 @@ impl CalculateZakat for LivestockAssets {
 }
 
 #[allow(clippy::type_complexity)]
-fn calculate_sheep_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ()> {
+fn calculate_sheep_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
     let nisab = 40;
     if count < 40 {
         return Ok((Decimal::ZERO, nisab, vec![]));
@@ -259,13 +259,13 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Ve
 
     let zakat_value = Decimal::from(sheep_due)
         .checked_mul(price)
-        .ok_or(())?;
+        .ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Sheep Zakat".to_string())))?;
     Ok((zakat_value, nisab, vec![("Sheep".to_string(), sheep_due)]))
 }
 
 #[allow(clippy::type_complexity)]
 #[allow(clippy::manual_is_multiple_of)]
-fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ()> {
+fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
     let nisab = 30;
     if count < 30 {
         return Ok((Decimal::ZERO, nisab, vec![]));
@@ -330,12 +330,12 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<
     // Value estimation based on pricing ratios relative to a standard cow price:
     // Tabi (1yo) is estimated at 0.7x of standard price.
     // Musinnah (2yo) is estimated at 1.0x of standard price.
-    let val_tabi = price.checked_mul(dec!(0.7)).ok_or(())?;
+    let val_tabi = price.checked_mul(dec!(0.7)).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Cow Zakat".to_string())))?;
     let val_musinnah = price;
     
-    let tabi_total = Decimal::from(tabi).checked_mul(val_tabi).ok_or(())?;
-    let musinnah_total = Decimal::from(musinnah).checked_mul(val_musinnah).ok_or(())?;
-    let total_zakat_val = tabi_total.checked_add(musinnah_total).ok_or(())?;
+    let tabi_total = Decimal::from(tabi).checked_mul(val_tabi).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Cow Zakat".to_string())))?;
+    let musinnah_total = Decimal::from(musinnah).checked_mul(val_musinnah).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Cow Zakat".to_string())))?;
+    let total_zakat_val = tabi_total.checked_add(musinnah_total).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Cow Zakat".to_string())))?;
     
     let mut parts = Vec::new();
     if tabi > 0 { parts.push(("Tabi'".to_string(), tabi)); }
@@ -346,7 +346,7 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<
 
 #[allow(clippy::type_complexity)]
 #[allow(clippy::manual_is_multiple_of)]
-fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decimal, u32, Vec<(String, u32)>), ()> {
+fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
     let nisab = 5;
     if count < 5 {
         return Ok((Decimal::ZERO, nisab, vec![]));
@@ -413,16 +413,16 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decima
     // Pricing implementation:
     let v_sheep = prices.sheep_price;
     let v_camel = prices.camel_price; 
-    let v_bm = v_camel.checked_mul(dec!(0.5)).ok_or(())?;
-    let v_bl = v_camel.checked_mul(dec!(0.75)).ok_or(())?;
+    let v_bm = v_camel.checked_mul(dec!(0.5)).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?;
+    let v_bl = v_camel.checked_mul(dec!(0.75)).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?;
     let v_hq = v_camel;
-    let v_jz = v_camel.checked_mul(dec!(1.25)).ok_or(())?;
+    let v_jz = v_camel.checked_mul(dec!(1.25)).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?;
     
-    let total = Decimal::from(sheep).checked_mul(v_sheep).ok_or(())?
-        .checked_add(Decimal::from(b_makhad).checked_mul(v_bm).ok_or(())?).ok_or(())?
-        .checked_add(Decimal::from(b_labun).checked_mul(v_bl).ok_or(())?).ok_or(())?
-        .checked_add(Decimal::from(hiqqah).checked_mul(v_hq).ok_or(())?).ok_or(())?
-        .checked_add(Decimal::from(jazaah).checked_mul(v_jz).ok_or(())?).ok_or(())?;
+    let total = Decimal::from(sheep).checked_mul(v_sheep).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?
+        .checked_add(Decimal::from(b_makhad).checked_mul(v_bm).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?
+        .checked_add(Decimal::from(b_labun).checked_mul(v_bl).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?
+        .checked_add(Decimal::from(hiqqah).checked_mul(v_hq).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?
+        .checked_add(Decimal::from(jazaah).checked_mul(v_jz).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?).ok_or_else(|| ZakatError::CalculationError("Mathematical error in livestock logic (Internal)".to_string(), Some("Camel Zakat".to_string())))?;
         
     let mut parts = Vec::new();
     if sheep > 0 { parts.push(("Sheep".to_string(), sheep)); }

@@ -1,4 +1,12 @@
 
+//! # Fiqh Compliance: Madhab Strategy Pattern
+//!
+//! ## Principle: Ikhtilaf al-Fuqaha (Valid Divergence)
+//! This module implements the "Pluggable Strategy" pattern to honor valid juristic differences.
+//! - **LowerOfTwo**: Hanafi view for Nisab (Gold/Silver), prioritizing benefit for the poor (*Anfa' lil-fuqara*).
+//! - **Gold Standard**: Shafi'i/Maliki/Hanbali/Modern view (Qaradawi).
+//! - **Jewelry Exemption**: Toggles between Obligatory (Hanafi) and Exempt (Jumhur/Majority).
+
 use serde::{Deserialize, Serialize};
 
 /// Nisab standard for calculating the Zakat threshold on monetary wealth.

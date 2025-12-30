@@ -1,9 +1,19 @@
+//! # Fiqh Compliance: Professional Income (Zakat al-Mustafad)
+//!
+//! ## Concept
+//! - **Source**: Based on *Mal Mustafad* (wealth acquired during the year).
+//! - **Modern Ijtihad**: Dr. Yusuf Al-Qaradawi (*Fiqh al-Zakah*) argues for immediate payment upon receipt, analogous to agriculture (Harvest Tax).
+//!
+//! ## Calculation Methods
+//! - **Gross**: Pay immediately on total income (Stricter, similar to Ushr/Half-Ushr logic).
+//! - **Net**: Deduct basic needs (*Hajah Asliyyah*) and debts before calculating surplus (Lenient).
+
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
-use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
+use crate::config::ZakatConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum IncomeCalculationMethod {

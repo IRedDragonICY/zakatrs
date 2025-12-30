@@ -1,3 +1,9 @@
+//! # Fiqh Compliance: Portfolio Aggregation
+//!
+//! ## Principle: Dam' al-Amwal (Joining Wealth)
+//! - Implements the **Hanafi** and Majority view that Gold, Silver, Cash, and Trade Goods are of a single genus (*Thamaniyyah*) and must be combined to reach the Nisab.
+//! - **Benefit**: This ensures the poor receive their due from wealth that would otherwise be exempt if split (*Anfa' lil-fuqara*).
+
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
 

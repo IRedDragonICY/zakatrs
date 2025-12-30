@@ -1,3 +1,13 @@
+//! # Fiqh Compliance: Business Assets (Urud al-Tijarah)
+//!
+//! ## Obligation
+//! - Based on the Hadith of Samurah bin Jundub: "The Prophet (ﷺ) commanded us to pay Zakat from what we prepared for sale." (Sunan Abu Dawud 1562).
+//!
+//! ## Valuation Logic
+//! - **Formula**: `(Cash + Market Value of Inventory + Good Receivables) - Immediate Liabilities`.
+//! - **Valuation**: Inventory must be valued at current *Market Price* at the time of Zakat, not Cost Price.
+//! - **Debts**: Deducting `liabilities_due_now` aligns with the principle of *Dayn al-Hal* (immediate debt) preventing Zakat, as supported by AAOIFI Standard 35.
+
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
@@ -9,8 +19,10 @@ use crate::inputs::IntoZakatDecimal;
 crate::zakat_asset! {
     /// Represents Business Assets for Zakat Calculation.
     /// 
-    /// This struct unifies the assets data and calculation context (liabilities, hawl, etc.).
-    /// Use `BusinessZakat::new()` to construct and chain methods to set values.
+    /// # Fiqh Note on Liabilities
+    /// `liabilities_due_now` represents **Dayn al-Hal** (Immediate Debt). 
+    /// Long-term non-commercial debts (like 20-year mortgages) should not be fully deducted; 
+    /// only the upcoming year's payments should be considered (per AAOIFI).
     #[derive(Debug, Clone, PartialEq)]
     pub struct BusinessZakat {
         // Assets

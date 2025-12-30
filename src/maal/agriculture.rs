@@ -1,3 +1,14 @@
+//! # Fiqh Compliance: Agriculture
+//!
+//! ## Rates
+//! - **10% (Ushr)**: Rain-fed/Natural irrigation. (Source: Sahih Bukhari 1483).
+//! - **5% (Half-Ushr)**: Irrigated/Labor-intensive. (Source: Sahih Muslim 981).
+//! - **7.5%**: Mixed irrigation methods (derived via Ijtihad).
+//!
+//! ## Nisab
+//! - **Threshold**: 5 Awsuq. (Source: Sahih Muslim 979).
+//! - **Conversion**: Configurable, defaults to **653 kg** based on the research of Dr. Yusuf Al-Qaradawi (*Fiqh al-Zakah*).
+
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};

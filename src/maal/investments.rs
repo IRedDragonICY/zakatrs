@@ -1,9 +1,19 @@
+//! # Fiqh Compliance: Stocks & Investments
+//!
+//! ## Classification
+//! - **Stocks/Crypto**: Classified as *Urud al-Tijarah* (Trade Goods) when held for capital appreciation.
+//! - **Standard**: Subject to 2.5% Zakat on Market Value if Nisab is reached.
+//!
+//! ## Sources
+//! - **AAOIFI Sharia Standard No. 35**: Specifies that shares acquired for trading are Zakatable at market value.
+//! - **IIFA Resolutions**: Cryptocurrencies recognized as wealth (*Mal*) are subject to Zakat if they meet conditions of value and possession.
+
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::traits::CalculateZakat;
-use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
+use crate::config::ZakatConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum InvestmentType {

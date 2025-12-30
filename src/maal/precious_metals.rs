@@ -1,3 +1,19 @@
+//! # Fiqh Compliance: Precious Metals
+//!
+//! ## Nisab (Threshold)
+//! - **Gold**: 20 Dinars (approx. 85 grams).
+//! - **Silver**: 200 Dirhams (approx. 595 grams).
+//! - **Source**: Sunan Abu Dawud (1573) and Sahih Muslim (979).
+//!
+//! ## Jewelry Exemption (Huliyy al-Mubah)
+//! This module supports divergent Madhab views via `ZakatStrategy`:
+//! - **Shafi'i/Maliki/Hanbali**: Personal permissible jewelry is **EXEMPT** (Reference: *Al-Majmu'* by Al-Nawawi, *Al-Mughni* by Ibn Qudamah).
+//! - **Hanafi**: Personal jewelry is **ZAKATABLE** (Reference: *Al-Hidayah* by Al-Marghinani, *Bada'i al-Sana'i* by Al-Kasani).
+//!
+//! ## Purity Logic
+//! - Zakat is due on the *pure* metal content.
+//! - Logic: `weight * (karat / 24)` extracts the zakatable 24K equivalent.
+
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError, WealthType};
@@ -10,7 +26,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum JewelryUsage {
     Investment,    // Always Zakatable
-    PersonalUse,   // Exempt in Shafi/Maliki/Hanbali usually
+    PersonalUse,   // Exempt in Shafi/Maliki/Hanbali (Jumhur), Zakatable in Hanafi
 }
 
 pub struct PreciousMetals {
@@ -102,7 +118,7 @@ impl CalculateZakat for PreciousMetals {
              return Ok(ZakatDetails::below_threshold(
                  Decimal::ZERO, 
                  metal_type, 
-                 "Personal jewelry is exempt in this Madhab"
+                 "Exempt per Madhab (Huliyy al-Mubah)"
              ).with_label(self.label.clone().unwrap_or_default()));
         }
 
@@ -294,6 +310,6 @@ mod tests {
             
         let zakat = metal.calculate_zakat(&config).unwrap();
         assert!(!zakat.is_payable);
-        assert_eq!(zakat.status_reason, Some("Personal jewelry is exempt in this Madhab".to_string()));
+        assert_eq!(zakat.status_reason, Some("Exempt per Madhab (Huliyy al-Mubah)".to_string()));
     }
 }

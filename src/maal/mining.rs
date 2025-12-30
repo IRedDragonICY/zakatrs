@@ -1,3 +1,10 @@
+//! # Fiqh Compliance: Mining & Rikaz
+//!
+//! ## Classifications
+//! - **Rikaz (Buried Treasure)**: Pre-Islamic buried wealth found without labor and extraction cost. Rate is **20% (Khumus)** immediately. No Nisab, No Debt deductions.
+//!   - Source: "In Rikaz is the Khumus (one-fifth)." (Sahih Bukhari 1499).
+//! - **Ma'adin (Mines)**: Extracted minerals. Treated as gold/silver assets with **2.5%** rate and 85g Gold Nisab. (Subject to Ikhtilaf, default implemented as 2.5%).
+
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};

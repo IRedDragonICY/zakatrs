@@ -1,3 +1,11 @@
+//! # Fiqh Compliance: Livestock
+//!
+//! ## Logic
+//! - Implements the specific camel age tiers (Bint Makhad, Bint Labun, Hiqqah, Jaza'ah) as defined in the **Letter of Abu Bakr (ra)** (Sahih Bukhari 1454).
+//!
+//! ## Conditions
+//! - **Saimah**: Zakat is only calculated if `grazing_method` is Natural/Saimah, adhering to the majority view (Jumhur) that fodder-fed animals are exempt from Livestock Zakat.
+
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};

@@ -43,7 +43,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.5"
+zakat = "0.6"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] } # Required if using async features
 ```
@@ -51,7 +51,7 @@ tokio = { version = "1", features = ["full"] } # Required if using async feature
 Synchronous Only (Lighter weight):
 ```toml
 [dependencies]
-zakat = { version = "0.5", default-features = false }
+zakat = { version = "0.6", default-features = false }
 rust_decimal = "1.39"
 ```
 
@@ -340,3 +340,35 @@ Key changes:
 ## License
 
 MIT
+
+## Fiqh References & Compliance
+
+We built this library with a deep respect for Islamic Jurisprudence (Fiqh), ensuring that every calculation isn't just mathematically correct, but religiously valid. Here is the breakdown of the scholarly sources (Dalil) and methodlologies we rely on.
+
+### 1. Precious Metals (Gold & Silver)
+For gold and silver, we adhere to the standard Nisab thresholds established in the Sunnah: **85 grams for Gold** (20 Dinars) and **595 grams for Silver** (200 Dirhams). This is based on the Hadith of Ali (ra) in *[Sunan Abu Dawud 1573](https://sunnah.com/abudawud:1573)* and *[Sahih Muslim 979](https://sunnah.com/muslim:979)*.
+
+**What about Jewelry?**
+This is a classic area of valid difference (*Ikhtilaf*). By default, we follow the **Hanafi view** (as found in *Al-Hidayah*) which regards personal jewelry as Zakatable wealth, citing the Hadith of the bracelets of fire (*[Sunan Abu Dawud 1558](https://sunnah.com/abudawud:1558)*). However, we fully support the majority opinion (**Shafi'i, Maliki, Hanbali**) which treats permissible personal jewelry as exempt. You can easily toggle this in your configuration to match your Madhab.
+
+### 2. Business Assets (Urud al-Tijarah)
+All trade goods are valued at their **current market price**, not the cost price. This comes from the Prophet's (ﷺ) command to Samurah bin Jundub to pay Zakat on what is "prepared for sale" (*[Sunan Abu Dawud 1562](https://sunnah.com/abudawud:1562)*).
+
+Regarding debts: We deduct **Immediate Liabilities** (*Dayn al-Hal*) before calculation. This prevents you from paying Zakat on money that essentially belongs to your creditors, a principle supported by classical texts like *Al-Mughni* and modern standards like **[AAOIFI No. 35](https://aaoifi.com)**.
+
+### 3. Agriculture (Zuru' wal-Thimar)
+We handle the varying rates for crops based on how much effort goes into watering them:
+*   **10% (Ushr)** for crops watered naturally by rain (*[Sahih Bukhari 1483](https://sunnah.com/bukhari:1483)*).
+*   **5% (Half-Ushr)** for strictly irrigated crops requiring cost and labor (*[Sahih Muslim 981](https://sunnah.com/muslim:981)*).
+
+For the Nisab (5 Awsuq), we use the standard conversion of approximately **653 kg** (derived from *[Sahih Muslim 979](https://sunnah.com/muslim:979)*), following the research of Dr. Yusuf Al-Qaradawi in his monumental work, *Fiqh al-Zakah*.
+
+### 4. Livestock (An'am)
+Our camel Zakat calculator is meticulously coded to follow the exact age tiers (like *Bint Makhad*, *Bint Labun*) outlined in the famous **Letter of Abu Bakr (ra)** preserved in *[Sahih Bukhari 1454](https://sunnah.com/bukhari:1454)*.
+
+Crucially, we enforce the **Saimah** condition: Zakat is only due if your livestock grazes freely on open pastures for the majority of the year. Feed-lot animals are generally exempt from this specific category.
+
+### 5. Modern Assets & Portfolio
+*   **Stocks & Crypto**: We treat these as Trade Goods (*Urud*), subjecting them to a 2.5% rate on their market value, consistent with **[AAOIFI Standard 35](https://aaoifi.com)**.
+*   **Professional Income**: We support Dr. Al-Qaradawi's view on *Zakat al-Mustafad*, allowing you to calculate Zakat either on your Gross income (like a harvest) or Net income (after basic needs).
+*   **The "Dam' al-Amwal" Principle**: To ensure the computation is most beneficial for the poor (*Anfa' lil-fuqara*), we follow the **Hanafi** methodology of aggregating all your monetary assets (Gold, Silver, Cash, Stocks) into a single pot to check against the Nisab, rather than isolating them.

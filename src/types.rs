@@ -514,7 +514,7 @@ impl ZakatError {
 
 
 /// Helper enum to categorize wealth types
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum WealthType {
     Fitrah,
     Gold,
@@ -526,6 +526,7 @@ pub enum WealthType {
     Investment,
     Mining,
     Rikaz,
+    Other(String),
 }
 
 impl WealthType {

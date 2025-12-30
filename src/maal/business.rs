@@ -11,6 +11,7 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
+use crate::math::ZakatDecimal;
 use serde::{Serialize, Deserialize};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
@@ -134,48 +135,43 @@ impl CalculateZakat for BusinessZakat {
                 .with_label(self.label.clone().unwrap_or_default()));
         }
         
-        let gross_assets = self.cash_on_hand
-            .checked_add(self.inventory_value)
-            .and_then(|v| v.checked_add(self.receivables))
-            .ok_or(ZakatError::CalculationError {
-                reason: "Overflow summing business assets".to_string(),
-                source_label: self.label.clone()
-            })?;
+        let gross_assets = ZakatDecimal::new(self.cash_on_hand)
+            .safe_add(self.inventory_value)?
+            .safe_add(self.receivables)?
+            .with_source(self.label.clone());
             
-        let total_liabilities = self.short_term_liabilities
-            .checked_add(self.liabilities_due_now)
-            .ok_or(ZakatError::CalculationError {
-                reason: "Overflow summing business liabilities".to_string(),
-                source_label: self.label.clone()
-            })?;
+        let total_liabilities = ZakatDecimal::new(self.short_term_liabilities)
+            .safe_add(self.liabilities_due_now)?
+            .with_source(self.label.clone());
 
         // Zakat Rate is 2.5%
         let rate = dec!(0.025);
 
         // Build calculation trace
-        let net_assets = gross_assets - total_liabilities;
+        // Note: gross_assets and total_liabilities are ZakatDecimal wrapper
+        let net_assets_dec = gross_assets.safe_sub(*total_liabilities)?.0;
         let mut trace = vec![
             crate::types::CalculationStep::initial("Cash on Hand", self.cash_on_hand),
             crate::types::CalculationStep::add("Inventory Value", self.inventory_value),
             crate::types::CalculationStep::add("Receivables", self.receivables),
-            crate::types::CalculationStep::result("Gross Assets", gross_assets),
+            crate::types::CalculationStep::result("Gross Assets", *gross_assets),
             crate::types::CalculationStep::subtract("Short-term Liabilities", self.short_term_liabilities),
             crate::types::CalculationStep::subtract("Debts Due Now", self.liabilities_due_now),
-            crate::types::CalculationStep::result("Net Business Assets", net_assets),
+            crate::types::CalculationStep::result("Net Business Assets", net_assets_dec),
             crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value),
         ];
 
         // We rely on ZakatDetails::with_trace to calculate final amounts, 
         // but we add a trace step for rate/info.
-        if net_assets >= nisab_threshold_value && net_assets > Decimal::ZERO {
+        if net_assets_dec >= nisab_threshold_value && net_assets_dec > Decimal::ZERO {
             trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
         } else {
              trace.push(crate::types::CalculationStep::info("Net Assets below Nisab - No Zakat Due"));
         }
 
         Ok(ZakatDetails::with_trace(
-            gross_assets, 
-            total_liabilities, 
+            *gross_assets, 
+            *total_liabilities, 
             nisab_threshold_value, 
             rate, 
             crate::types::WealthType::Business, 

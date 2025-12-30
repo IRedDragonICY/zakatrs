@@ -109,6 +109,48 @@ impl ZakatPortfolio {
         }
     }
 
+    pub fn add_business<F>(self, f: F) -> Self 
+    where F: FnOnce(crate::maal::business::BusinessZakat) -> crate::maal::business::BusinessZakat {
+        let asset = f(crate::maal::business::BusinessZakat::new());
+        self.add(asset)
+    }
+
+    pub fn add_agriculture<F>(self, f: F) -> Self 
+    where F: FnOnce(crate::maal::agriculture::AgricultureAssets) -> crate::maal::agriculture::AgricultureAssets {
+        let asset = f(crate::maal::agriculture::AgricultureAssets::new());
+        self.add(asset)
+    }
+
+    pub fn add_livestock<F>(self, f: F) -> Self 
+    where F: FnOnce(crate::maal::livestock::LivestockAssets) -> crate::maal::livestock::LivestockAssets {
+        let asset = f(crate::maal::livestock::LivestockAssets::new());
+        self.add(asset)
+    }
+
+    pub fn add_income<F>(self, f: F) -> Self 
+    where F: FnOnce(crate::maal::income::IncomeZakatCalculator) -> crate::maal::income::IncomeZakatCalculator {
+        let asset = f(crate::maal::income::IncomeZakatCalculator::new());
+        self.add(asset)
+    }
+
+    pub fn add_investment<F>(self, f: F) -> Self 
+    where F: FnOnce(crate::maal::investments::InvestmentAssets) -> crate::maal::investments::InvestmentAssets {
+        let asset = f(crate::maal::investments::InvestmentAssets::new());
+        self.add(asset)
+    }
+
+    pub fn add_mining<F>(self, f: F) -> Self 
+    where F: FnOnce(crate::maal::mining::MiningAssets) -> crate::maal::mining::MiningAssets {
+        let asset = f(crate::maal::mining::MiningAssets::new());
+        self.add(asset)
+    }
+
+    pub fn add_precious_metals<F>(self, f: F) -> Self 
+    where F: FnOnce(crate::maal::precious_metals::PreciousMetals) -> crate::maal::precious_metals::PreciousMetals {
+        let asset = f(crate::maal::precious_metals::PreciousMetals::new());
+        self.add(asset)
+    }
+
     #[allow(clippy::should_implement_trait)]
     pub fn add<T: Into<PortfolioItem>>(mut self, item: T) -> Self {
          self.items.push(item.into());

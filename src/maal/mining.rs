@@ -12,6 +12,7 @@ use serde::{Serialize, Deserialize};
 use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
+use crate::math::ZakatDecimal;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum MiningType {
@@ -103,16 +104,13 @@ impl CalculateZakat for MiningAssets {
                     .with_label(self.label.clone().unwrap_or_default()))
             },
             MiningType::Mines => {
-                let nisab_threshold = config.gold_price_per_gram
-                    .checked_mul(config.get_nisab_gold_grams())
-                    .ok_or(ZakatError::CalculationError {
-                        reason: "Overflow calculating mining nisab threshold".to_string(),
-                        source_label: self.label.clone()
-                    })?;
+                let nisab_threshold = ZakatDecimal::new(config.gold_price_per_gram)
+                    .safe_mul(config.get_nisab_gold_grams())?
+                    .with_source(self.label.clone());
                 
                 // Rate: 2.5%. Nisab: 85g Gold.
                 if !self.hawl_satisfied {
-                     return Ok(ZakatDetails::below_threshold(nisab_threshold, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met")
+                     return Ok(ZakatDetails::below_threshold(*nisab_threshold, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met")
                         .with_label(self.label.clone().unwrap_or_default()));
                 }
                 let rate = dec!(0.025);
@@ -122,17 +120,19 @@ impl CalculateZakat for MiningAssets {
                 let mut trace = Vec::new();
                 trace.push(crate::types::CalculationStep::initial("Extracted Value", self.value));
                 trace.push(crate::types::CalculationStep::subtract("Debts Due Now", liabilities));
-                let net_val = self.value - liabilities;
-                trace.push(crate::types::CalculationStep::result("Net Mining Assets", net_val));
-                trace.push(crate::types::CalculationStep::compare("Nisab Threshold (85g Gold)", nisab_threshold));
+                let net_val = ZakatDecimal::new(self.value)
+                    .safe_sub(liabilities)?
+                    .with_source(self.label.clone());
+                trace.push(crate::types::CalculationStep::result("Net Mining Assets", *net_val));
+                trace.push(crate::types::CalculationStep::compare("Nisab Threshold (85g Gold)", *nisab_threshold));
                 
-                if net_val >= nisab_threshold && net_val > Decimal::ZERO {
+                if *net_val >= *nisab_threshold && *net_val > Decimal::ZERO {
                     trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
                 } else {
                      trace.push(crate::types::CalculationStep::info("Net Value below Nisab - No Zakat Due"));
                 }
                 
-                Ok(ZakatDetails::with_trace(self.value, liabilities, nisab_threshold, rate, crate::types::WealthType::Mining, trace)
+                Ok(ZakatDetails::with_trace(self.value, liabilities, *nisab_threshold, rate, crate::types::WealthType::Mining, trace)
                     .with_label(self.label.clone().unwrap_or_default()))
             }
         }

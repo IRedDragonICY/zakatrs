@@ -14,6 +14,7 @@ use crate::types::{ZakatDetails, ZakatError};
 use serde::{Serialize, Deserialize};
 use crate::traits::CalculateZakat;
 use crate::inputs::IntoZakatDecimal;
+use crate::math::ZakatDecimal;
 use crate::config::ZakatConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -131,13 +132,10 @@ impl CalculateZakat for IncomeZakatCalculator {
             IncomeCalculationMethod::Net => {
                 // Net means (Income - Basic Living Expenses).
                 // Then we also deduct any extra debts.
-                let combined_liabilities = self.basic_expenses
-                    .checked_add(external_debt)
-                    .ok_or(ZakatError::CalculationError {
-                        reason: "Overflow summing income liabilities".to_string(),
-                        source_label: self.label.clone()
-                    })?;
-                (self.total_income, combined_liabilities)
+                let combined_liabilities = ZakatDecimal::new(self.basic_expenses)
+                    .safe_add(external_debt)?
+                    .with_source(self.label.clone());
+                (self.total_income, *combined_liabilities)
             }
         };
 
@@ -155,12 +153,14 @@ impl CalculateZakat for IncomeZakatCalculator {
         }
 
         trace.push(crate::types::CalculationStep::subtract("Debts Due Now", external_debt));
-        let net_income = total_assets - liabilities;
-        trace.push(crate::types::CalculationStep::result("Net Zakatable Income", net_income));
+        let net_income = ZakatDecimal::new(total_assets)
+            .safe_sub(liabilities)?
+            .with_source(self.label.clone());
+        trace.push(crate::types::CalculationStep::result("Net Zakatable Income", *net_income));
         
         trace.push(crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value));
         
-        if net_income >= nisab_threshold_value && net_income > Decimal::ZERO {
+        if *net_income >= nisab_threshold_value && *net_income > Decimal::ZERO {
             trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
         } else {
             trace.push(crate::types::CalculationStep::info("Net Income below Nisab - No Zakat Due"));

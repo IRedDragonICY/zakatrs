@@ -14,6 +14,7 @@ use crate::types::{ZakatDetails, ZakatError};
 use serde::{Serialize, Deserialize};
 use crate::traits::CalculateZakat;
 use crate::inputs::IntoZakatDecimal;
+use crate::math::ZakatDecimal;
 use crate::config::ZakatConfig;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -127,11 +128,13 @@ impl CalculateZakat for InvestmentAssets {
         trace.push(crate::types::CalculationStep::initial(format!("Market Value ({})", type_desc), total_assets));
         trace.push(crate::types::CalculationStep::subtract("Debts Due Now", liabilities));
         
-        let net_assets = total_assets - liabilities;
-        trace.push(crate::types::CalculationStep::result("Net Investment Assets", net_assets));
+        let net_assets = ZakatDecimal::new(total_assets)
+            .safe_sub(liabilities)?
+            .with_source(self.label.clone());
+        trace.push(crate::types::CalculationStep::result("Net Investment Assets", *net_assets));
         trace.push(crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value));
         
-        if net_assets >= nisab_threshold_value && net_assets > Decimal::ZERO {
+        if *net_assets >= nisab_threshold_value && *net_assets > Decimal::ZERO {
             trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
         } else {
              trace.push(crate::types::CalculationStep::info("Net Assets below Nisab - No Zakat Due"));

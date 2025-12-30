@@ -11,6 +11,82 @@ use crate::maal::investments::InvestmentAssets;
 use crate::maal::mining::MiningAssets;
 use crate::maal::precious_metals::PreciousMetals;
 use crate::fitrah::FitrahCalculator;
+use rust_decimal::Decimal;
+use uuid::Uuid;
+
+/// Generic asset type for user-defined assets.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomAsset {
+    pub id: Uuid,
+    pub label: String,
+    pub value: Decimal,
+    pub rate: Decimal,
+    pub nisab_threshold: Decimal,
+    pub hawl_satisfied: bool,
+    pub wealth_type_name: String,
+}
+
+impl CustomAsset {
+    pub fn new(
+        label: impl Into<String>,
+        value: Decimal,
+        rate: Decimal,
+        nisab_threshold: Decimal
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            label: label.into(),
+            value,
+            rate,
+            nisab_threshold,
+            hawl_satisfied: true,
+            wealth_type_name: "Custom".to_string()
+        }
+    }
+
+    pub fn with_hawl(mut self, satisfied: bool) -> Self {
+        self.hawl_satisfied = satisfied;
+        self
+    }
+}
+
+impl CalculateZakat for CustomAsset {
+    fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+        let wealth_type = crate::types::WealthType::Other(self.wealth_type_name.clone());
+        
+        if !self.hawl_satisfied {
+            return Ok(ZakatDetails::below_threshold(
+                self.nisab_threshold, 
+                wealth_type, 
+                "Hawl (1 lunar year) not met"
+            ).with_label(self.label.clone()));
+        }
+
+        // Custom logic: simple Value * Rate check against Threshold
+        // Assuming value is net assets for simplicity, or we can assume 0 liabilities.
+        // If user wants liabilities, they should net them out in 'value' or we add liabilities field.
+        // For 'Generic Asset', let's stick to simplest: Value is Net.
+        
+        let liabilities = Decimal::ZERO;
+        
+        // Use ZakatDetails builder logic
+        Ok(ZakatDetails::new(
+            self.value,
+            liabilities,
+            self.nisab_threshold,
+            self.rate,
+            wealth_type
+        ).with_label(self.label.clone()))
+    }
+
+    fn get_label(&self) -> Option<String> {
+        Some(self.label.clone())
+    }
+
+    fn get_id(&self) -> Uuid {
+        self.id
+    }
+}
 
 /// A wrapper enum for all zakatable asset types.
 /// This enables serialization and uniform handling in a portfolio.
@@ -24,7 +100,8 @@ pub enum PortfolioItem {
     Investment(InvestmentAssets),
     Mining(MiningAssets),
     PreciousMetals(PreciousMetals),
-    Fitrah(FitrahCalculator), // Although usually separate, useful to track in user portfolio
+    Fitrah(FitrahCalculator),
+    Custom(CustomAsset),
 }
 
 impl CalculateZakat for PortfolioItem {
@@ -38,6 +115,7 @@ impl CalculateZakat for PortfolioItem {
             PortfolioItem::Mining(asset) => asset.calculate_zakat(config),
             PortfolioItem::PreciousMetals(asset) => asset.calculate_zakat(config),
             PortfolioItem::Fitrah(asset) => asset.calculate_zakat(config),
+            PortfolioItem::Custom(asset) => asset.calculate_zakat(config),
         }
     }
 
@@ -51,6 +129,7 @@ impl CalculateZakat for PortfolioItem {
             PortfolioItem::Mining(asset) => asset.get_label(),
             PortfolioItem::PreciousMetals(asset) => asset.get_label(),
             PortfolioItem::Fitrah(asset) => asset.get_label(),
+            PortfolioItem::Custom(asset) => asset.get_label(),
         }
     }
 
@@ -64,6 +143,7 @@ impl CalculateZakat for PortfolioItem {
             PortfolioItem::Mining(asset) => asset.get_id(),
             PortfolioItem::PreciousMetals(asset) => asset.get_id(),
             PortfolioItem::Fitrah(asset) => asset.get_id(),
+            PortfolioItem::Custom(asset) => asset.get_id(),
         }
     }
 }
@@ -115,5 +195,11 @@ impl From<PreciousMetals> for PortfolioItem {
 impl From<FitrahCalculator> for PortfolioItem {
     fn from(asset: FitrahCalculator) -> Self {
         PortfolioItem::Fitrah(asset)
+    }
+}
+
+impl From<CustomAsset> for PortfolioItem {
+    fn from(asset: CustomAsset) -> Self {
+        PortfolioItem::Custom(asset)
     }
 }

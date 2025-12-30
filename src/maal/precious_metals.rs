@@ -21,6 +21,7 @@ use crate::traits::CalculateZakat;
 use crate::config::ZakatConfig;
 
 use crate::inputs::IntoZakatDecimal;
+use crate::math::ZakatDecimal;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -104,7 +105,7 @@ impl PreciousMetals {
 
 impl CalculateZakat for PreciousMetals {
     fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
-        let metal_type = self.metal_type.ok_or_else(|| 
+        let metal_type = self.metal_type.clone().ok_or_else(|| 
             ZakatError::InvalidInput { 
                 field: "metal_type".to_string(),
                 value: "None".to_string(),
@@ -159,36 +160,28 @@ impl CalculateZakat for PreciousMetals {
              });
         }
 
-        let nisab_value = nisab_threshold_grams
-            .checked_mul(price_per_gram)
-            .ok_or(ZakatError::CalculationError { 
-                reason: "Overflow calculating metal nisab value".to_string(), 
-                source_label: self.label.clone() 
-            })?;
+        let nisab_value = ZakatDecimal::new(nisab_threshold_grams)
+            .safe_mul(price_per_gram)?
+            .with_source(self.label.clone());
         if !self.hawl_satisfied {
-            return Ok(ZakatDetails::below_threshold(nisab_value, metal_type, "Hawl (1 lunar year) not met")
+            return Ok(ZakatDetails::below_threshold(*nisab_value, metal_type, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }
 
         // Normalize weight if it's Gold and not 24K
         let effective_weight = if metal_type == WealthType::Gold && self.purity < 24 {
             // formula: weight * (karat / 24)
-            let purity_ratio = Decimal::from(self.purity)
-                .checked_div(Decimal::from(24))
-                .ok_or(ZakatError::CalculationError { reason: "Error calculating purity ratio".to_string(), source_label: self.label.clone() })?;
-            self.weight_grams
-                .checked_mul(purity_ratio)
-                .ok_or(ZakatError::CalculationError { reason: "Overflow calculating effective gold weight".to_string(), source_label: self.label.clone() })?
+            let purity_ratio = ZakatDecimal::new(Decimal::from(self.purity))
+                .safe_div(Decimal::from(24))?.with_source(self.label.clone());
+            ZakatDecimal::new(self.weight_grams)
+                .safe_mul(*purity_ratio)?.with_source(self.label.clone())
         } else {
-            self.weight_grams
+            ZakatDecimal::new(self.weight_grams)
         };
 
         let total_value = effective_weight
-            .checked_mul(price_per_gram)
-            .ok_or(ZakatError::CalculationError { 
-                reason: "Overflow calculating metal total value".to_string(), 
-                source_label: self.label.clone() 
-            })?;
+            .safe_mul(price_per_gram)?
+            .with_source(self.label.clone());
         let liabilities = self.liabilities_due_now;
 
         let rate = dec!(0.025); // 2.5%
@@ -200,23 +193,25 @@ impl CalculateZakat for PreciousMetals {
         
         if metal_type == crate::types::WealthType::Gold && self.purity < 24 {
              trace.push(crate::types::CalculationStep::info(format!("Purity Adjustment ({}K / 24K)", self.purity)));
-             trace.push(crate::types::CalculationStep::result("Effective 24K Weight", effective_weight));
+             trace.push(crate::types::CalculationStep::result("Effective 24K Weight", *effective_weight));
         }
         
-        trace.push(crate::types::CalculationStep::result("Total Value", total_value));
+        trace.push(crate::types::CalculationStep::result("Total Value", *total_value));
         trace.push(crate::types::CalculationStep::subtract("Debts Due Now", liabilities));
         
-        let net_val = total_value - liabilities;
-        trace.push(crate::types::CalculationStep::result("Net Value", net_val));
-        trace.push(crate::types::CalculationStep::compare("Nisab Threshold", nisab_value));
+        let net_val = total_value
+            .safe_sub(liabilities)?
+            .with_source(self.label.clone());
+        trace.push(crate::types::CalculationStep::result("Net Value", *net_val));
+        trace.push(crate::types::CalculationStep::compare("Nisab Threshold", *nisab_value));
 
-        if net_val >= nisab_value && net_val > Decimal::ZERO {
+        if *net_val >= *nisab_value && *net_val > Decimal::ZERO {
             trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
         } else {
              trace.push(crate::types::CalculationStep::info("Net Value below Nisab - No Zakat Due"));
         }
 
-        Ok(ZakatDetails::with_trace(total_value, liabilities, nisab_value, rate, metal_type, trace)
+        Ok(ZakatDetails::with_trace(*total_value, liabilities, *nisab_value, rate, metal_type, trace)
             .with_label(self.label.clone().unwrap_or_default()))
     }
 

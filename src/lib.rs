@@ -12,6 +12,7 @@ pub mod traits;
 pub mod types;
 pub mod utils;
 pub mod assets;
+pub mod math;
 
 #[cfg(target_arch = "wasm32")]
 pub mod wasm;

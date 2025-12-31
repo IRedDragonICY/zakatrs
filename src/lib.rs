@@ -15,7 +15,7 @@ pub mod assets;
 pub mod math;
 pub mod i18n;
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(any(target_arch = "wasm32", feature = "wasm"))]
 pub mod wasm;
 
 pub use config::ZakatConfig;

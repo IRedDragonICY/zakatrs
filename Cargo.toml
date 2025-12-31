@@ -10,10 +10,16 @@ repository = "https://github.com/IRedDragonICY/zakatrs"
 keywords = ["zakat", "islamic-finance", "fiqh", "finance", "halal"]
 categories = ["algorithms", "mathematics", "science"]
 
+[package.metadata.wasm-pack.profile.release]
+wasm-opt = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [features]
 default = ["async"]
 async = ["dep:async-trait"]
-wasm = []
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook"]
 
 [dependencies]
 rust_decimal = { version = "1.39", features = ["serde"] }

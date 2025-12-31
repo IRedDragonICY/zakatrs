@@ -66,7 +66,7 @@ println!("{}", details.summary_in(ZakatLocale::IdID));
 println!("{}", details.explain_in(ZakatLocale::ArSA));
 ```
 
-## 📦 Installation
+## Installation
 
 With Async Support (Default):
 ```toml

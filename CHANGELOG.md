@@ -9,6 +9,10 @@ All notable changes to this project will be documented in this file.
     - Setters like `weight()`, `debt()`, `income()`, `value()` no longer panic on invalid input.
     - Errors are deferred and reported via `validate()` or `calculate_zakat()`.
 - **Validation**: Added `validate()` method to `InvestmentAssets` and `IncomeZakatCalculator`.
+- **NPM Publication**: Published as `@islamic/zakat` on NPM with full WebAssembly support.
+    - **WASM bindings**: `src/wasm.rs` exposes `calculate_portfolio_wasm` and `calculate_single_asset` for JS consumers.
+    - **Hybrid Build**: Configured for both Node.js and Browser environments via `wasm-pack`.
+    - **Public Access**: Scoped package `@islamic` is configured for public access.
 
 ### Fixed
 - **Trace Output**: Fixed deserialization of `CalculationStep` in tests.

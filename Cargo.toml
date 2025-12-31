@@ -20,6 +20,7 @@ crate-type = ["cdylib", "rlib"]
 default = ["async"]
 async = ["dep:async-trait"]
 wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook"]
+python = ["dep:pyo3"]
 
 [dependencies]
 rust_decimal = { version = "1.39", features = ["serde"] }
@@ -32,6 +33,7 @@ async-trait = { version = "0.1.89", optional = true }
 wasm-bindgen = { version = "0.2.106", optional = true }
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 console_error_panic_hook = { version = "0.1", optional = true }
+pyo3 = { version = "0.27.2", features = ["extension-module"], optional = true }
 futures = "0.3.31"
 tracing = "0.1.44"
 fluent = "0.16.0"

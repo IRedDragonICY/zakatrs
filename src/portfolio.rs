@@ -52,7 +52,7 @@ pub enum PortfolioStatus {
 }
 
 /// Result of a portfolio calculation, including successes and partial failures.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PortfolioResult {
     pub status: PortfolioStatus,
     pub results: Vec<PortfolioItemResult>,

@@ -18,6 +18,9 @@ pub mod i18n;
 #[cfg(any(target_arch = "wasm32", feature = "wasm"))]
 pub mod wasm;
 
+#[cfg(feature = "python")]
+pub mod python;
+
 pub use config::ZakatConfig;
 pub use traits::CalculateZakat;
 pub use types::{ZakatDetails, ZakatError, WealthType, ZakatExplanation};

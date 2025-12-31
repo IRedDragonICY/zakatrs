@@ -22,6 +22,7 @@
 [![Crates.io](https://img.shields.io/crates/v/zakat.svg)](https://crates.io/crates/zakat)
 [![PyPI](https://img.shields.io/pypi/v/zakatrs.svg)](https://pypi.org/project/zakatrs/)
 [![NPM](https://img.shields.io/npm/v/@islamic/zakat.svg)](https://www.npmjs.com/package/@islamic/zakat)
+[![JSR](https://jsr.io/badges/@islam/zakat)](https://jsr.io/@islam/zakat)
 [![Documentation](https://docs.rs/zakat/badge.svg)](https://docs.rs/zakat)
 ![License](https://img.shields.io/crates/l/zakat.svg)
 
@@ -91,8 +92,14 @@ pip install zakatrs
 ```
 
 ### Node.js / Web
+**NPM:**
 ```bash
 npm install @islamic/zakat
+```
+
+**JSR:**
+```bash
+npx jsr add @islam/zakat
 ```
 
 ## Modules

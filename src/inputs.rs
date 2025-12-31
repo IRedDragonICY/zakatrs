@@ -2,6 +2,8 @@ use rust_decimal::Decimal;
 use std::str::FromStr;
 use crate::types::ZakatError;
 
+const MAX_INPUT_LEN: usize = 64;
+
 /// Trait for converting various types into `Decimal` for Zakat calculations.
 /// 
 /// This trait allows users to pass `i32`, `f64`, `&str`, etc. directly into
@@ -76,10 +78,26 @@ impl_into_zakat_decimal_float!(f32, f64);
 /// - `"١٢٣٤.٥٠"` → `"1234.50"` (Eastern Arabic numerals)
 ///
 /// Negative numbers and decimal points are preserved.
-fn sanitize_numeric_string(s: &str) -> String {
+/// Negative numbers and decimal points are preserved.
+fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
+    if s.len() > MAX_INPUT_LEN {
+        return Err(ZakatError::InvalidInput {
+            field: "input".to_string(),
+            value: format!("{}...", &s[..std::cmp::min(s.len(), 20)]),
+            reason: format!("Input exceeds maximum length of {}", MAX_INPUT_LEN),
+            source_label: None,
+            asset_id: None,
+        });
+    }
+
     // First normalize Arabic numerals to ASCII
     let normalized = normalize_arabic_numerals(s);
-    let mut result = normalized.trim().to_string();
+    
+    // Remove non-breaking spaces and control characters
+    let mut result = normalized.replace('\u{00A0}', "");
+    result.retain(|c| !c.is_control());
+    result = result.replace(' ', ""); // Remove regular spaces
+    result = result.trim().to_string();
     
     // Remove currency symbols and underscores
     result = result.replace(['$', '£', '€', '¥', '_'], "");
@@ -107,7 +125,7 @@ fn sanitize_numeric_string(s: &str) -> String {
         }
     }
     
-    result
+    Ok(result)
 }
 
 /// Normalizes Arabic numerals to ASCII digits.
@@ -129,7 +147,7 @@ fn normalize_arabic_numerals(s: &str) -> String {
 
 impl IntoZakatDecimal for &str {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
-        let sanitized = sanitize_numeric_string(self);
+        let sanitized = sanitize_numeric_string(self)?;
         Decimal::from_str(&sanitized).map_err(|e| ZakatError::InvalidInput {
             field: "string".to_string(),
             value: self.to_string(),
@@ -142,7 +160,7 @@ impl IntoZakatDecimal for &str {
 
 impl IntoZakatDecimal for String {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
-        let sanitized = sanitize_numeric_string(&self);
+        let sanitized = sanitize_numeric_string(&self)?;
         Decimal::from_str(&sanitized).map_err(|e| ZakatError::InvalidInput {
             field: "string".to_string(),
             value: self.clone(),
@@ -209,6 +227,16 @@ pub fn with_locale(val: &str, locale: InputLocale) -> LocalizedInput<'_> {
 
 impl IntoZakatDecimal for LocalizedInput<'_> {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
+        if self.value.len() > MAX_INPUT_LEN {
+            return Err(ZakatError::InvalidInput {
+                field: "localized_input".to_string(),
+                value: format!("{}...", &self.value[..std::cmp::min(self.value.len(), 20)]),
+                reason: format!("Input exceeds maximum length of {}", MAX_INPUT_LEN),
+                source_label: None,
+                asset_id: None,
+            });
+        }
+
         // First normalize Arabic numerals
         let normalized = normalize_arabic_numerals(self.value);
         let mut result = normalized.trim().to_string();

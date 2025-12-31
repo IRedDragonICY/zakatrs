@@ -48,7 +48,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.13.0"
+zakat = "0.14.0"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] } # Required if using async features
 ```
@@ -56,7 +56,7 @@ tokio = { version = "1", features = ["full"] } # Required if using async feature
 Synchronous Only (Lighter weight):
 ```toml
 [dependencies]
-zakat = { version = "0.13.0", default-features = false }
+zakat = { version = "0.14.0", default-features = false }
 rust_decimal = "1.39"
 ```
 
@@ -248,6 +248,12 @@ let config = ZakatConfig::new()
 // NEW (v0.7+): Quick Config Presets
 let config = ZakatConfig::hanafi(100, 1); // Sets Madhab=Hanafi, Nisab=LowerOfTwo, Prices
 let config = ZakatConfig::shafi(100);     // Sets Madhab=Shafi, Nisab=Gold, Prices
+
+// NEW (v0.14+): Merge Configurations (Layering)
+let base_config = ZakatConfig::default();
+let env_config = ZakatConfig::from_env().unwrap_or_default();
+// Env values override defaults
+let final_config = base_config.merge(env_config);
 ```
 
 ### Custom Zakat Strategy (Advanced)

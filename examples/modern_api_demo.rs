@@ -9,6 +9,9 @@ use zakat::portfolio::ZakatPortfolio;
 fn main() {
     println!("=== Zakat Modern API Demo ===\n");
 
+    // Initialize tracing
+    tracing_subscriber::fmt::init();
+    
     // 1. Semantic Configuration (Hanafi Preset)
     // Gold Price: $80/g, Silver Price: $1/g
     let config = ZakatConfig::hanafi(80, 1);

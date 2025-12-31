@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.14.0] - 2025-12-31
+
+### Added
+- **Security Hardening**:
+    - **DoS Prevention**: Implemented `MAX_INPUT_LEN` (64 chars) check for all numeric inputs to prevent memory exhaustion attacks.
+    - **Robust Sanitization**: Stripped non-breaking spaces (`\u{00A0}`) and invisible control characters from inputs.
+    - **Safe Env Loading**: `ZakatConfig::from_env()` now trims whitespace to prevent parsing errors from accidental padding.
+- **Async Performance**:
+    - **Parallel Execution**: Refactored `calculate_total_async` to use `FuturesUnordered`, allowing concurrent asset calculations (e.g., fetching multiple live prices in parallel).
+- **Observability**:
+    - **Tracing Integration**: Added `tracing` instrumentation to core portfolio methods (`calculate_total`, `calculate_total_async`).
+    - **Validation Logs**: Validation failures and value clamping (e.g., negative net assets) are now logged as `warn!`.
+- **Developer Ergonomics**:
+    - **Config Layering**: Added `ZakatConfig::merge(self, other)` to support hierarchical configuration (e.g., defaults -> config file -> env vars).
+
 ## [0.13.0] - 2025-12-31
 
 ### Added

@@ -13,6 +13,7 @@ use crate::traits::CalculateZakat;
 #[cfg(feature = "async")]
 use crate::traits::AsyncCalculateZakat;
 use crate::types::{ZakatDetails, ZakatError};
+use tracing::{instrument, info, warn};
 
 /// Individual result for an asset in the portfolio.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -230,7 +231,9 @@ impl ZakatPortfolio {
     }
 
     /// Calculates Zakat for all assets in the portfolio.
+    #[instrument(skip(self, config), fields(items_count = self.items.len()))]
     pub fn calculate_total(&self, config: &crate::config::ZakatConfig) -> PortfolioResult {
+        info!("Starting portfolio calculation");
         // Fail Fast: Validate config before processing any items
         if let Err(e) = config.validate() {
             return PortfolioResult {
@@ -263,6 +266,7 @@ impl ZakatPortfolio {
                     } else {
                         format!("Item {}", index + 1)
                     };
+                    warn!(error = ?err, source = %source, "Asset calculation failed");
                     err = err.with_source(source.clone());
                     results.push(PortfolioItemResult::Failure {
                         asset_id: CalculateZakat::get_id(item),
@@ -357,7 +361,9 @@ impl AsyncZakatPortfolio {
     // Helper methods for specific calculator types can be added here.
     
     /// Calculates Zakat asynchronously for all assets in the portfolio.
+    #[instrument(skip(self, config), fields(items_count = self.items.len()))]
     pub async fn calculate_total_async(&self, config: &crate::config::ZakatConfig) -> PortfolioResult {
+        info!("Starting async portfolio calculation");
         // Fail Fast: Validate config before processing any items
         if let Err(e) = config.validate() {
             return PortfolioResult {
@@ -374,30 +380,47 @@ impl AsyncZakatPortfolio {
             };
         }
 
-        let mut results = Vec::new();
+        use futures::stream::StreamExt;
+        let mut futures = futures::stream::FuturesUnordered::new();
 
         for (index, item) in self.items.iter().enumerate() {
-            match item.calculate_zakat_async(config).await {
-                Ok(detail) => results.push(PortfolioItemResult::Success {
-                     asset_id: CalculateZakat::get_id(item),
+            let config = config.clone();
+            let item = item.clone();
+            
+            futures.push(async move {
+                let res = item.calculate_zakat_async(&config).await;
+                (index, item, res)
+            });
+        }
+
+        let mut temp_results = Vec::with_capacity(self.items.len());
+
+        while let Some((index, item, res)) = futures.next().await {
+            match res {
+                Ok(detail) => temp_results.push((index, PortfolioItemResult::Success {
+                     asset_id: CalculateZakat::get_id(&item),
                      details: detail 
-                }),
+                })),
                 Err(e) => {
                     let mut err = e;
-                    let source = if let Some(lbl) = CalculateZakat::get_label(item) {
+                    let source = if let Some(lbl) = CalculateZakat::get_label(&item) {
                         lbl
                     } else {
                         format!("Item {}", index + 1)
                     };
                     err = err.with_source(source.clone());
-                    results.push(PortfolioItemResult::Failure {
-                        asset_id: CalculateZakat::get_id(item),
+                    temp_results.push((index, PortfolioItemResult::Failure {
+                        asset_id: CalculateZakat::get_id(&item),
                         source,
                         error: err,
-                    });
+                    }));
                 },
             }
         }
+        
+        // Restore order
+        temp_results.sort_by_key(|(i, _)| *i);
+        let results = temp_results.into_iter().map(|(_, r)| r).collect();
         
         aggregate_and_summarize(results, config)
     }

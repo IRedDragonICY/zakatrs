@@ -6,6 +6,7 @@ use std::fs;
 use std::sync::Arc;
 use crate::types::ZakatError;
 use crate::inputs::IntoZakatDecimal;
+use tracing::{instrument, debug};
 
 use crate::madhab::{Madhab, NisabStandard, ZakatStrategy};
 
@@ -108,6 +109,7 @@ impl ZakatConfig {
     }
 
     /// Validates the configuration for logical consistency and safety.
+    #[instrument(skip(self))]
     pub fn validate(&self) -> Result<(), ZakatError> {
         if self.gold_price_per_gram < Decimal::ZERO {
             return Err(ZakatError::ConfigurationError {
@@ -172,7 +174,9 @@ impl ZakatConfig {
     }
 
     /// Attempts to load configuration from environment variables.
+    #[instrument]
     pub fn from_env() -> Result<Self, ZakatError> {
+        debug!("Loading configuration from environment variables");
         let gold_str = env::var("ZAKAT_GOLD_PRICE")
             .map_err(|_| ZakatError::ConfigurationError {
                 reason: "ZAKAT_GOLD_PRICE env var not set".to_string(),
@@ -186,13 +190,13 @@ impl ZakatConfig {
                 asset_id: None,
             })?;
 
-        let gold_price = gold_str.parse::<Decimal>()
+        let gold_price = gold_str.trim().parse::<Decimal>()
             .map_err(|e| ZakatError::ConfigurationError {
                 reason: format!("Invalid gold price format: {}", e),
                 source_label: None,
                 asset_id: None,
             })?;
-        let silver_price = silver_str.parse::<Decimal>()
+        let silver_price = silver_str.trim().parse::<Decimal>()
             .map_err(|e| ZakatError::ConfigurationError {
                 reason: format!("Invalid silver price format: {}", e),
                 source_label: None,
@@ -247,6 +251,54 @@ impl ZakatConfig {
         self.silver_price_per_gram = prices.silver_per_gram;
         self.validate()?;
         Ok(())
+    }
+
+    /// Merges another configuration into this one.
+    /// 
+    /// Values in `self` take precedence if they are set (non-zero/Some).
+    /// If `self` has missing/default values, `other`'s values are used.
+    ///
+    /// # Example
+    /// ```
+    /// use zakat::prelude::*;
+    /// let base_config = ZakatConfig::default();
+    /// let env_config = ZakatConfig::from_env().unwrap_or_default();
+    /// let final_config = base_config.merge(env_config);
+    /// ```
+    pub fn merge(mut self, other: ZakatConfig) -> Self {
+        if self.gold_price_per_gram == Decimal::ZERO {
+            self.gold_price_per_gram = other.gold_price_per_gram;
+        }
+        if self.silver_price_per_gram == Decimal::ZERO {
+            self.silver_price_per_gram = other.silver_price_per_gram;
+        }
+        if self.rice_price_per_kg.is_none() {
+            self.rice_price_per_kg = other.rice_price_per_kg;
+        }
+        if self.rice_price_per_liter.is_none() {
+            self.rice_price_per_liter = other.rice_price_per_liter;
+        }
+        if self.nisab_gold_grams.is_none() {
+            self.nisab_gold_grams = other.nisab_gold_grams;
+        }
+        if self.nisab_silver_grams.is_none() {
+            self.nisab_silver_grams = other.nisab_silver_grams;
+        }
+        if self.nisab_agriculture_kg.is_none() {
+            self.nisab_agriculture_kg = other.nisab_agriculture_kg;
+        }
+        // Strategy merging?
+        // Strategy is Arc<dyn ZakatStrategy>. We can't easily check equality.
+        // We assume 'self' strategy is preferred unless it's default and 'other' is not?
+        // But default strategy is acceptable.
+        // We won't merge strategy for now, or assume self is correct.
+        
+        // Nisab Standard:
+        // If self is default (Silver/LowerOfTwo depending on impl), should we take other?
+        // NisabStandard default is usually valid. Hard to know if "unset".
+        // We'll leave it as self.
+        
+        self
     }
 
     // ========== Fluent Helper Methods ========== 

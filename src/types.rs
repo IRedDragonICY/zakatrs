@@ -1,5 +1,6 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 /// Represents the type of Zakat payment due.
 ///
@@ -311,6 +312,7 @@ impl ZakatDetails {
 
         // Business rule: If net assets are negative, clamp to zero.
         if net_assets < Decimal::ZERO {
+            warn!("Net assets were negative ({}), clamped to zero.", net_assets);
             net_assets = Decimal::ZERO;
             clamped_msg = Some("Net Assets are negative, clamped to zero for Zakat purposes");
             warnings.push("Net assets were negative and clamped to zero.".to_string());
@@ -375,6 +377,7 @@ impl ZakatDetails {
         let mut warnings = Vec::new();
         
         if net_assets < Decimal::ZERO {
+            warn!("Net assets were negative ({}), clamped to zero.", net_assets);
             net_assets = Decimal::ZERO;
             trace.push(CalculationStep::info("Net Assets are negative, clamped to zero for Zakat purposes"));
             warnings.push("Net assets were negative and clamped to zero.".to_string());

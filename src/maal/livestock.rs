@@ -264,6 +264,7 @@ impl CalculateZakat for LivestockAssets {
                 heads_due 
             },
             calculation_trace: crate::types::CalculationTrace(trace),
+            warnings: Vec::new(),
         })
     }
 

@@ -106,6 +106,7 @@ impl PriceProvider for StaticPriceProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_prices_creation() {

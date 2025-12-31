@@ -189,6 +189,7 @@ impl CalculateZakat for AgricultureAssets {
                 crop_value: *zakat_due,
             },
             calculation_trace: crate::types::CalculationTrace(trace),
+            warnings: Vec::new(),
         })
     }
 

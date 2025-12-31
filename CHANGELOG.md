@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.9.0] - 2025-12-31
+
+### Added
+- **Robust Input Sanitization**:
+    - `IntoZakatDecimal` for `&str` and `String` now automatically sanitizes input.
+    - Removes commas (`,`), underscores (`_`), and currency symbols (`$`, `£`, `€`, `¥`).
+    - Handles whitespace gracefully (e.g., `"$1,000.00"` -> `1000.00`).
+- **Structured Warning System**:
+    - Added `warnings` field to `ZakatDetails`.
+    - Non-fatal issues (like negative net assets clamped to zero) are now reported in the `warnings` vector.
+    - Updated `explain()` output to include a "WARNINGS" section when applicable.
+
 ## [0.8.0] - 2025-12-31
 
 ### Added

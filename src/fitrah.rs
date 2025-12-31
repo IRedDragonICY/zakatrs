@@ -91,6 +91,7 @@ impl CalculateZakat for FitrahCalculator {
             label: self.label.clone(),
             payload: crate::types::PaymentPayload::Monetary(total_value),
             calculation_trace: crate::types::CalculationTrace(trace),
+            warnings: Vec::new(),
         })
     }
 

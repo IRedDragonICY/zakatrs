@@ -239,6 +239,8 @@ pub struct ZakatDetails {
     pub payload: PaymentPayload,
     /// Step-by-step trace of how this calculation was derived.
     pub calculation_trace: CalculationTrace,
+    /// Non-fatal warnings about the calculation (e.g., negative values clamped).
+    pub warnings: Vec<String>,
 }
 
 impl ZakatDetails {
@@ -251,11 +253,13 @@ impl ZakatDetails {
     ) -> Self {
         let mut net_assets = total_assets - liabilities_due_now;
         let mut clamped_msg = None;
+        let mut warnings = Vec::new();
 
         // Business rule: If net assets are negative, clamp to zero.
         if net_assets < Decimal::ZERO {
             net_assets = Decimal::ZERO;
             clamped_msg = Some("Net Assets are negative, clamped to zero for Zakat purposes");
+            warnings.push("Net assets were negative and clamped to zero.".to_string());
         }
 
         // For Nisab check: net_assets >= nisab_threshold
@@ -299,6 +303,7 @@ impl ZakatDetails {
             label: None,
             payload: PaymentPayload::Monetary(zakat_due),
             calculation_trace: CalculationTrace(trace),
+            warnings,
         }
     }
 
@@ -313,10 +318,12 @@ impl ZakatDetails {
         mut trace: Vec<CalculationStep>,
     ) -> Self {
         let mut net_assets = total_assets - liabilities_due_now;
+        let mut warnings = Vec::new();
         
         if net_assets < Decimal::ZERO {
             net_assets = Decimal::ZERO;
             trace.push(CalculationStep::info("Net Assets are negative, clamped to zero for Zakat purposes"));
+            warnings.push("Net assets were negative and clamped to zero.".to_string());
         }
 
         let is_payable = net_assets >= nisab_threshold && net_assets > Decimal::ZERO;
@@ -339,6 +346,7 @@ impl ZakatDetails {
             label: None,
             payload: PaymentPayload::Monetary(zakat_due),
             calculation_trace: CalculationTrace(trace),
+            warnings,
         }
     }
 
@@ -360,6 +368,7 @@ impl ZakatDetails {
             label: None,
             payload: PaymentPayload::Monetary(Decimal::ZERO),
             calculation_trace: CalculationTrace(trace),
+            warnings: Vec::new(),
         }
     }
 
@@ -403,6 +412,7 @@ impl ZakatDetails {
     ///
     /// The output is formatted as a step-by-step list or table, showing operations
     /// and their results, helping users understand exactly how the `zakat_due` was determined.
+    /// If there are any warnings (e.g., negative values clamped), they are appended at the end.
     pub fn explain(&self) -> String {
         use std::fmt::Write;
         let mut output = String::new();
@@ -420,6 +430,15 @@ impl ZakatDetails {
             writeln!(&mut output, "Amount Due: {}", self.format_amount()).unwrap();
         } else if let Some(reason) = &self.status_reason {
             writeln!(&mut output, "Reason: {}", reason).unwrap();
+        }
+
+        // Append warnings section if any
+        if !self.warnings.is_empty() {
+            writeln!(&mut output).unwrap();
+            writeln!(&mut output, "WARNINGS:").unwrap();
+            for warning in &self.warnings {
+                writeln!(&mut output, " - {}", warning).unwrap();
+            }
         }
 
         output

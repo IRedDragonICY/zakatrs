@@ -16,6 +16,6 @@ mod tests {
     fn test_grams_to_tola() {
         let grams = dec!(11.66);
         let tola = grams_to_tola(grams);
-        assert_eq!(tola, dec!(1.0));
+        assert_eq!(tola, dec!(1));
     }
 }

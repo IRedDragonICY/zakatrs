@@ -5,6 +5,7 @@
 //! - **Benefit**: This ensures the poor receive their due from wealth that would otherwise be exempt if split (*Anfa' lil-fuqara*).
 
 use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -109,42 +110,49 @@ impl ZakatPortfolio {
         }
     }
 
+    #[deprecated(since = "0.2.0", note = "Use generic .add(BusinessZakat::cash_only(...)) instead")]
     pub fn add_business<F>(self, f: F) -> Self 
     where F: FnOnce(crate::maal::business::BusinessZakat) -> crate::maal::business::BusinessZakat {
         let asset = f(crate::maal::business::BusinessZakat::new());
         self.add(asset)
     }
 
+    #[deprecated(since = "0.2.0", note = "Use generic .add(AgricultureAssets::new()...) instead")]
     pub fn add_agriculture<F>(self, f: F) -> Self 
     where F: FnOnce(crate::maal::agriculture::AgricultureAssets) -> crate::maal::agriculture::AgricultureAssets {
         let asset = f(crate::maal::agriculture::AgricultureAssets::new());
         self.add(asset)
     }
 
+    #[deprecated(since = "0.2.0", note = "Use generic .add(LivestockAssets::new()...) instead")]
     pub fn add_livestock<F>(self, f: F) -> Self 
     where F: FnOnce(crate::maal::livestock::LivestockAssets) -> crate::maal::livestock::LivestockAssets {
         let asset = f(crate::maal::livestock::LivestockAssets::new());
         self.add(asset)
     }
 
+    #[deprecated(since = "0.2.0", note = "Use generic .add(IncomeZakatCalculator::from_salary(...)) instead")]
     pub fn add_income<F>(self, f: F) -> Self 
     where F: FnOnce(crate::maal::income::IncomeZakatCalculator) -> crate::maal::income::IncomeZakatCalculator {
         let asset = f(crate::maal::income::IncomeZakatCalculator::new());
         self.add(asset)
     }
 
+    #[deprecated(since = "0.2.0", note = "Use generic .add(InvestmentAssets::stock(...)) instead")]
     pub fn add_investment<F>(self, f: F) -> Self 
     where F: FnOnce(crate::maal::investments::InvestmentAssets) -> crate::maal::investments::InvestmentAssets {
         let asset = f(crate::maal::investments::InvestmentAssets::new());
         self.add(asset)
     }
 
+    #[deprecated(since = "0.2.0", note = "Use generic .add(MiningAssets::new()...) instead")]
     pub fn add_mining<F>(self, f: F) -> Self 
     where F: FnOnce(crate::maal::mining::MiningAssets) -> crate::maal::mining::MiningAssets {
         let asset = f(crate::maal::mining::MiningAssets::new());
         self.add(asset)
     }
 
+    #[deprecated(since = "0.2.0", note = "Use generic .add(PreciousMetals::gold(...)) instead")]
     pub fn add_precious_metals<F>(self, f: F) -> Self 
     where F: FnOnce(crate::maal::precious_metals::PreciousMetals) -> crate::maal::precious_metals::PreciousMetals {
         let asset = f(crate::maal::precious_metals::PreciousMetals::new());
@@ -410,7 +418,7 @@ fn aggregate_and_summarize(mut results: Vec<PortfolioItemResult>, config: &crate
     let global_nisab = config.get_monetary_nisab_threshold();
     
     if monetary_net_assets >= global_nisab && monetary_net_assets > Decimal::ZERO {
-        let standard_rate = rust_decimal_macros::dec!(0.025);
+        let standard_rate = dec!(0.025);
 
         for i in monetary_indices {
             // We need to mutate the result.

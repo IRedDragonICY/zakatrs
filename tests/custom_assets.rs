@@ -1,16 +1,18 @@
+
 use rust_decimal_macros::dec;
 use zakat::assets::CustomAsset;
 use zakat::portfolio::ZakatPortfolio;
 use zakat::config::ZakatConfig;
 use zakat::traits::CalculateZakat;
+use zakat::maal::business::BusinessZakat;
 
 #[test]
 fn test_custom_asset_calculation() {
     let asset = CustomAsset::new(
         "Real Estate Fund", 
-        dec!(100_000), 
-        dec!(0.025), 
-        dec!(85) * dec!(65) // Approx Gold Nisab Value
+        100_000, 
+        0.025, 
+        5525 // Approx Gold Nisab Value
     );
 
     let config = ZakatConfig::default();
@@ -26,9 +28,9 @@ fn test_custom_asset_calculation() {
 fn test_custom_asset_below_nisab() {
     let asset = CustomAsset::new(
         "Small Savings", 
-        dec!(100), 
-        dec!(0.025), 
-        dec!(5000) 
+        100, 
+        0.025, 
+        5000 
     );
 
     let config = ZakatConfig::default();
@@ -44,22 +46,20 @@ fn test_custom_asset_in_portfolio() {
     
     portfolio = portfolio.add(CustomAsset::new(
         "Crypto Staking", 
-        dec!(50_000), 
-        dec!(0.025), 
-        dec!(1000)
+        50_000, 
+        0.025, 
+        1000
     ));
 
     // Add standard asset too
-    portfolio = portfolio.add_business(|b| b
-        .cash(dec!(10000))
-        .liabilities(dec!(0))
+    portfolio = portfolio.add(BusinessZakat::new()
+        .cash(10000)
+        .liabilities(0)
     );
 
-    let config = ZakatConfig {
-        gold_price_per_gram: dec!(100.0),
-        silver_price_per_gram: dec!(1.0),
-        ..ZakatConfig::default()
-    };
+    let config = ZakatConfig::new()
+        .with_gold_price(100.0)
+        .with_silver_price(1.0);
     let result = portfolio.calculate_total(&config);
 
     assert!(result.is_clean());

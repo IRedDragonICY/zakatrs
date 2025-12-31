@@ -478,7 +478,7 @@ mod tests {
 
     #[test]
     fn test_sheep() {
-        let prices = LivestockPrices::new().sheep_price(dec!(100.0));
+        let prices = LivestockPrices::new().sheep_price(100.0);
         // 1-39 -> 0
         let stock = LivestockAssets::new()
             .count(39)
@@ -496,7 +496,7 @@ mod tests {
             .hawl(true);
         let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
         assert!(res.is_payable);
-        assert_eq!(res.zakat_due, dec!(100.0));
+        assert_eq!(res.zakat_due, Decimal::from(100));
 
         let stock = LivestockAssets::new()
             .count(120)
@@ -504,7 +504,7 @@ mod tests {
             .prices(prices)
             .hawl(true);
         let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
-        assert_eq!(res.zakat_due, dec!(100.0));
+        assert_eq!(res.zakat_due, Decimal::from(100));
         
          // 121-200 -> 2 sheep
         let stock = LivestockAssets::new()
@@ -513,14 +513,14 @@ mod tests {
             .prices(prices)
             .hawl(true);
         let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
-        assert_eq!(res.zakat_due, dec!(200.0));
+        assert_eq!(res.zakat_due, Decimal::from(200));
     }
 
     #[test]
     fn test_camels() {
          let prices = LivestockPrices::new()
-            .camel_price(dec!(1000.0))
-            .sheep_price(dec!(100.0));
+            .camel_price(1000.0)
+            .sheep_price(100.0);
          
          // 1-4 -> 0
          let stock = LivestockAssets::new()
@@ -539,7 +539,7 @@ mod tests {
             .hawl(true);
          let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
          assert!(res.is_payable);
-         assert_eq!(res.zakat_due, dec!(100.0)); // 1 sheep value
+         assert_eq!(res.zakat_due, Decimal::from(100)); // 1 sheep value
          
          // 25-35 -> 1 Bint Makhad (Camel)
          let stock = LivestockAssets::new()
@@ -548,12 +548,12 @@ mod tests {
             .prices(prices)
             .hawl(true);
          let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
-         assert_eq!(res.zakat_due, dec!(500.0)); // 1 Bint Makhad (0.5x camel_price)
+         assert_eq!(res.zakat_due, Decimal::from(500)); // 1 Bint Makhad (0.5x camel_price)
     }
 
     #[test]
     fn test_cows() {
-         let prices = LivestockPrices::new().cow_price(dec!(500.0));
+         let prices = LivestockPrices::new().cow_price(500.0);
          
          // 1-29 -> 0
          let stock = LivestockAssets::new()
@@ -573,12 +573,12 @@ mod tests {
             .hawl(true);
          let res = stock.calculate_zakat(&ZakatConfig::default()).unwrap();
          assert!(res.is_payable);
-         assert_eq!(res.zakat_due, dec!(350.0)); // 1 Tabi (0.7x cow_price)
+         assert_eq!(res.zakat_due, Decimal::from(350)); // 1 Tabi (0.7x cow_price)
     }
 
     #[test]
     fn test_maalufah_below_threshold() {
-        let prices = LivestockPrices::new().sheep_price(dec!(100.0));
+        let prices = LivestockPrices::new().sheep_price(100.0);
         // 50 Sheep (usually payable) but Feed-lot (Maalufah)
         let stock = LivestockAssets::new()
             .count(50)
@@ -595,7 +595,7 @@ mod tests {
     #[test]
     fn test_large_number_success() {
         let prices = LivestockPrices::new()
-            .cow_price(dec!(500.0));
+            .cow_price(500.0);
 
         // 100M + 1 cows. Previously failed due to complexity/iteration limit.
         // Now should pass instantly with O(1) logic.
@@ -611,7 +611,7 @@ mod tests {
         assert!(res_large.is_ok()); 
         let details = res_large.unwrap();
         assert!(details.is_payable);
-        assert!(details.zakat_due > dec!(0));
+        assert!(details.zakat_due > Decimal::ZERO);
         
         // Value sanity check: 100M cows * $500 = $50B. Zakat should be roughly 2.5% value.
         // Actually Livestock Zakat is approx 2.5% value but calculated via heads.

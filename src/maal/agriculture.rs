@@ -214,52 +214,52 @@ mod tests {
         // Due 100.
         
         let agri = AgricultureAssets::new()
-            .harvest_weight(dec!(1000.0))
-            .price(dec!(1.0))
+            .harvest_weight(1000.0)
+            .price(1.0)
             .irrigation(IrrigationMethod::Rain);
             
         let res = agri.hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(res.is_payable);
-        assert_eq!(res.zakat_due, dec!(100.0));
+        assert_eq!(res.zakat_due, dec!(100));
     }
 
     #[test]
     fn test_agriculture_irrigated() {
         let config = ZakatConfig::default();
         let agri = AgricultureAssets::new()
-            .harvest_weight(dec!(1000.0))
-            .price(dec!(1.0))
+            .harvest_weight(1000.0)
+            .price(1.0)
             .irrigation(IrrigationMethod::Irrigated);
             
         let res = agri.hawl(true).calculate_zakat(&config).unwrap();
         
         // Irrigated -> 5%.
         // Due 50.
-        assert_eq!(res.zakat_due, dec!(50.0));
+        assert_eq!(res.zakat_due, Decimal::from(50));
     }
     
     #[test]
     fn test_agriculture_mixed() {
         let config = ZakatConfig::default();
         let agri = AgricultureAssets::new()
-            .harvest_weight(dec!(1000.0))
-            .price(dec!(1.0))
+            .harvest_weight(1000.0)
+            .price(1.0)
             .irrigation(IrrigationMethod::Mixed);
             
         let res = agri.hawl(true).calculate_zakat(&config).unwrap();
         
         // Mixed -> 7.5%.
         // Due 75.
-        assert_eq!(res.zakat_due, dec!(75.0));
+        assert_eq!(res.zakat_due, Decimal::from(75));
     }
     
     #[test]
     fn test_below_nisab() {
          let config = ZakatConfig::default(); // 653kg
          let agri = AgricultureAssets::new()
-            .harvest_weight(dec!(600.0))
-            .price(dec!(1.0))
+            .harvest_weight(600.0)
+            .price(1.0)
             .irrigation(IrrigationMethod::Rain);
             
          let res = agri.hawl(true).calculate_zakat(&config).unwrap();
@@ -270,17 +270,17 @@ mod tests {
     fn test_agriculture_payload() {
         let config = ZakatConfig::default();
         let agri = AgricultureAssets::new()
-            .harvest_weight(dec!(1000.0))
-            .price(dec!(1.0))
+            .harvest_weight(1000.0)
+            .price(1.0)
             .irrigation(IrrigationMethod::Rain);
             
         let res = agri.hawl(true).calculate_zakat(&config).unwrap();
         
         match res.payload {
             crate::types::PaymentPayload::Agriculture { harvest_weight, irrigation_method, crop_value } => {
-                assert_eq!(harvest_weight, dec!(1000.0));
+                assert_eq!(harvest_weight, Decimal::from(1000));
                 assert_eq!(irrigation_method, "Rain-fed (10%)");
-                assert_eq!(crop_value, dec!(100.0));
+                assert_eq!(crop_value, Decimal::from(100));
             },
             _ => panic!("Expected Agriculture payload"),
         }

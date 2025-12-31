@@ -1,4 +1,4 @@
-use rust_decimal_macros::dec;
+use rust_decimal::Decimal;
 use zakat::{ZakatConfig, ZakatPortfolio, WealthType};
 use zakat::maal::precious_metals::{PreciousMetals};
 use zakat::maal::investments::{InvestmentAssets, InvestmentType};
@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let portfolio = ZakatPortfolio::new()
         .add(income_calc) // $5000 * 2.5% = $125
         .add(gold_calc)   // $5000 * 2.5% = $125 (100g * 50)
-        .add(crypto_calc.debt(dec!(2000.0))); // ($20,000 - $2,000) * 2.5% = $450
+        .add(crypto_calc.debt(2000.0)); // ($20,000 - $2,000) * 2.5% = $450
         
     let result = portfolio.calculate_total(&config);
     
@@ -67,7 +67,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Assertions to ensure correctness (Self-verifying example)
     // Total: 125 + 125 + 450 = 700.0
-    assert_eq!(result.total_zakat_due, dec!(700.0));
+    assert_eq!(result.total_zakat_due, Decimal::from(700));
     println!("\n[SUCCESS] Calculation verified successfully.");
     Ok(())
 }

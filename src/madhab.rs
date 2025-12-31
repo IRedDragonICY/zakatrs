@@ -42,6 +42,8 @@ pub struct ZakatRules {
     pub agriculture_rates: (Decimal, Decimal, Decimal), // Rain, Irrigated, Mixed
 }
 
+use crate::inputs::IntoZakatDecimal;
+
 impl Default for ZakatRules {
     fn default() -> Self {
         Self {
@@ -50,6 +52,47 @@ impl Default for ZakatRules {
             trade_goods_rate: dec!(0.025),
             agriculture_rates: (dec!(0.10), dec!(0.05), dec!(0.075)),
         }
+    }
+}
+
+impl ZakatRules {
+    /// Sets the Nisab standard.
+    pub fn with_nisab_standard(mut self, standard: NisabStandard) -> Self {
+        self.nisab_standard = standard;
+        self
+    }
+
+    /// Sets whether jewelry is exempt.
+    pub fn with_jewelry_exempt(mut self, exempt: bool) -> Self {
+        self.jewelry_exempt = exempt;
+        self
+    }
+
+    /// Sets the trade goods Zakat rate using a semantic decimal type.
+    /// Accepts literals like `0.025` directly.
+    pub fn with_trade_goods_rate(mut self, rate: impl IntoZakatDecimal) -> Self {
+        if let Ok(rate) = rate.into_zakat_decimal() {
+            self.trade_goods_rate = rate;
+        }
+        self
+    }
+
+    /// Sets the agriculture rates (Rain-fed, Irrigated, Mixed).
+    /// Accepts literals directly.
+    pub fn with_agriculture_rates(
+        mut self, 
+        rain: impl IntoZakatDecimal, 
+        irrigated: impl IntoZakatDecimal, 
+        mixed: impl IntoZakatDecimal
+    ) -> Self {
+        if let (Ok(r), Ok(i), Ok(m)) = (
+            rain.into_zakat_decimal(), 
+            irrigated.into_zakat_decimal(), 
+            mixed.into_zakat_decimal()
+        ) {
+            self.agriculture_rates = (r, i, m);
+        }
+        self
     }
 }
 

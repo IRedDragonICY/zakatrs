@@ -29,16 +29,16 @@ pub struct CustomAsset {
 impl CustomAsset {
     pub fn new(
         label: impl Into<String>,
-        value: Decimal,
-        rate: Decimal,
-        nisab_threshold: Decimal
+        value: impl crate::inputs::IntoZakatDecimal,
+        rate: impl crate::inputs::IntoZakatDecimal,
+        nisab_threshold: impl crate::inputs::IntoZakatDecimal
     ) -> Self {
         Self {
             id: Uuid::new_v4(),
             label: label.into(),
-            value,
-            rate,
-            nisab_threshold,
+            value: value.into_zakat_decimal().unwrap_or(Decimal::ZERO),
+            rate: rate.into_zakat_decimal().unwrap_or(Decimal::ZERO),
+            nisab_threshold: nisab_threshold.into_zakat_decimal().unwrap_or(Decimal::ZERO),
             hawl_satisfied: true,
             wealth_type_name: "Custom".to_string()
         }

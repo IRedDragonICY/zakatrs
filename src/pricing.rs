@@ -5,6 +5,7 @@
 //! with live APIs, databases, or static test data.
 
 use rust_decimal::Decimal;
+
 use crate::types::ZakatError;
 use crate::inputs::IntoZakatDecimal;
 
@@ -105,7 +106,6 @@ impl PriceProvider for StaticPriceProvider {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_decimal_macros::dec;
 
     #[test]
     fn test_prices_creation() {

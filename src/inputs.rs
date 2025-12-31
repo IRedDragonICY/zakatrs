@@ -5,7 +5,7 @@ use crate::types::ZakatError;
 /// Trait for converting various types into `Decimal` for Zakat calculations.
 /// 
 /// This trait allows users to pass `i32`, `f64`, `&str`, etc. directly into
-/// constructors without needing to wrap them in `dec!()` or `Decimal::from()`.
+/// constructors without needing to wrap them in `Decimal` conversion methods.
 pub trait IntoZakatDecimal {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError>;
 }
@@ -38,13 +38,15 @@ macro_rules! impl_into_zakat_decimal_float {
         $(
             impl IntoZakatDecimal for $t {
                 fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
-                    Decimal::from_f64_retain(self as f64)
-                        .ok_or_else(|| ZakatError::InvalidInput {
-                            field: "fractional".to_string(),
-                            value: self.to_string(),
-                            reason: "Invalid float value".to_string(),
-                            source_label: None,
-                        })
+                     // Use string formatting to avoid binary precision noise.
+                     // This aligns with user expectations for simple decimals like 0.025.
+                    let s = self.to_string();
+                    Decimal::from_str(&s).map_err(|_| ZakatError::InvalidInput {
+                        field: "fractional".to_string(),
+                        value: s,
+                        reason: "Invalid float value".to_string(),
+                        source_label: None,
+                    })
                 }
             }
         )*

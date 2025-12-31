@@ -1,7 +1,8 @@
 use zakat::prelude::*;
 use zakat::pricing::{PriceProvider, Prices};
 use zakat::types::ZakatError;
-use rust_decimal_macros::dec;
+use rust_decimal::Decimal;
+
 use std::time::Duration;
 use tokio::time::sleep;
 use async_trait::async_trait;
@@ -33,8 +34,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 1. Setup Live Price Provider
     let provider = MockApiPriceProvider {
-        gold: dec!(95.0),    // Assume fetched from API
-        silver: dec!(1.20),
+        gold: Decimal::from(95),    // Assume fetched from API
+        silver: Decimal::from_f64_retain(1.20).unwrap(),
     };
 
     // 2. Async Config Initialization
@@ -50,9 +51,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .weight(100)
             .metal_type(WealthType::Gold)) // 100g Gold
         .add(BusinessZakat::new()
-            .cash(dec!(5000))
-            .inventory(dec!(2000))
-            .liabilities(dec!(1000)));
+            .cash(5000)
+            .inventory(2000)
+            .liabilities(1000));
 
     // 4. Calculate Asynchronously
     println!("\nCalculating Portfolio...");

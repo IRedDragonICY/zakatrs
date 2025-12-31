@@ -155,31 +155,31 @@ mod tests {
     fn test_rikaz() {
         let config = ZakatConfig::default();
         let mining = MiningAssets::new()
-            .value(dec!(1000.0))
+            .value(1000.0)
             .kind(MiningType::Rikaz);
         // Rikaz (Buried Treasure) is taxed at 20% on the gross value.
         // Debts and Hawl are not considered for Rikaz.
         
-        let res = mining.debt(dec!(500.0)).hawl(false).calculate_zakat(&config).unwrap();
+        let res = mining.debt(500.0).hawl(false).calculate_zakat(&config).unwrap();
         // Calculation: 1000 * 0.20 = 200. (Debt of 500 is ignored).
         
         assert!(res.is_payable);
-        assert_eq!(res.zakat_due, dec!(200.0));
+        assert_eq!(res.zakat_due, Decimal::from(200));
     }
     
     #[test]
     fn test_minerals() {
-         let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
+         let config = ZakatConfig::new().with_gold_price(100);
          // Nisab 85g = 8500.
          
          let mining = MiningAssets::new()
-             .value(dec!(10000.0))
+             .value(10000.0)
              .kind(MiningType::Mines);
          let res = mining.hawl(true).calculate_zakat(&config).unwrap();
          
          // 10000 > 8500. Rate 2.5%.
          // Due 250.
          assert!(res.is_payable);
-         assert_eq!(res.zakat_due, dec!(250.0));
+         assert_eq!(res.zakat_due, dec!(250));
     }
 }

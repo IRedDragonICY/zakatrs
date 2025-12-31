@@ -1,4 +1,3 @@
-use rust_decimal_macros::dec;
 use zakat::{ZakatConfig, CalculateZakat, WealthType};
 use zakat::maal::business::BusinessZakat;
 use zakat::maal::income::{IncomeZakatCalculator, IncomeCalculationMethod};
@@ -89,7 +88,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Value: $500. Zakat: 10% = $50.
     let farmer_rain = AgricultureAssets::new()
         .harvest_weight(1000)
-        .price(dec!(0.50))
+        .price(0.50)
         .irrigation(IrrigationMethod::Rain)
         .label("Paddy Field A");
     print_case("Case 5: Rice Farmer (Rain Fed)", farmer_rain.hawl(true).calculate_zakat(&config), true);
@@ -99,7 +98,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Rate 5%. Zakat: $25.
     let farmer_irr = AgricultureAssets::new()
         .harvest_weight(1000)
-        .price(dec!(0.50))
+        .price(0.50)
         .irrigation(IrrigationMethod::Irrigated)
         .label("Greenhouse B");
     print_case("Case 6: Modern Farmer (Irrigated)", farmer_irr.hawl(true).calculate_zakat(&config), true);
@@ -147,7 +146,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 2.5kg per person.
     // Total kg: 12.5kg.
     // Total Value: 12.5 * 1.5 = $18.75.
-    let fitrah_res = calculate_fitrah(5, dec!(1.50), None); // Default 2.5kg
+    let fitrah_res = calculate_fitrah(5, 1.50, None); // Default 2.5kg
     print_case("Case 10: Family Fitrah (5 People)", fitrah_res, true);
     
     Ok(())

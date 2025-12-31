@@ -1,13 +1,10 @@
 use zakat::prelude::*;
-use rust_decimal_macros::dec;
+
 use zakat::types::ZakatError;
 
 #[test]
 fn test_labeling_workflow() {
-    let config = ZakatConfig {
-        gold_price_per_gram: dec!(100.0),
-        ..Default::default()
-    };
+    let config = ZakatConfig::new().with_gold_price(100);
 
     let business_a = BusinessZakat::new()
         .cash(10000)

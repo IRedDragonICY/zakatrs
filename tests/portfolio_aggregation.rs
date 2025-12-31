@@ -39,11 +39,11 @@ fn test_portfolio_aggregation_mix_gold_and_cash() {
     // Gold: 50 * 100 = 5000
     // Cash: 4000
     // Total: 9000
-    assert_eq!(result.total_assets, dec!(9000.0), "Total assets should match");
+    assert_eq!(result.total_assets, dec!(9000), "Total assets should match");
 
     // Verify Zakat Due
     // 9000 * 0.025 = 225.0
-    assert_eq!(result.total_zakat_due, dec!(225.0), "Total zakat should be calculated on aggregated sum");
+    assert_eq!(result.total_zakat_due, dec!(225), "Total zakat should be calculated on aggregated sum");
 
     // Verify Individual Details updated
     for detail in result.successes() {
@@ -83,7 +83,7 @@ fn test_portfolio_no_aggregation_if_total_below_nisab() {
     let result = portfolio.calculate_total(&config);
     assert!(result.is_clean());
 
-    assert_eq!(result.total_assets, dec!(5000.0));
+    assert_eq!(result.total_assets, dec!(5000));
     assert_eq!(result.total_zakat_due, dec!(0.0));
     
     for detail in result.successes() {

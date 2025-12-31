@@ -71,58 +71,58 @@ pub struct CalculationStep {
 }
 
 impl CalculationStep {
-    pub fn initial(description: impl Into<String>, amount: Decimal) -> Self {
+    pub fn initial(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
         Self {
             description: description.into(),
-            amount: Some(amount),
+            amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Initial,
         }
     }
 
-    pub fn add(description: impl Into<String>, amount: Decimal) -> Self {
+    pub fn add(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
         Self {
             description: description.into(),
-            amount: Some(amount),
+            amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Add,
         }
     }
 
-    pub fn subtract(description: impl Into<String>, amount: Decimal) -> Self {
+    pub fn subtract(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
         Self {
             description: description.into(),
-            amount: Some(amount),
+            amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Subtract,
         }
     }
 
-    pub fn multiply(description: impl Into<String>, amount: Decimal) -> Self {
+    pub fn multiply(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
          Self {
             description: description.into(),
-            amount: Some(amount),
+            amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Multiply,
         }
     }
 
-    pub fn compare(description: impl Into<String>, amount: Decimal) -> Self {
+    pub fn compare(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
         Self {
             description: description.into(),
-            amount: Some(amount),
+            amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Compare,
         }
     }
 
-    pub fn rate(description: impl Into<String>, rate: Decimal) -> Self {
+    pub fn rate(description: impl Into<String>, rate: impl crate::inputs::IntoZakatDecimal) -> Self {
         CalculationStep {
             description: description.into(),
-            amount: Some(rate),
+            amount: rate.into_zakat_decimal().ok(),
             operation: Operation::Rate,
         }
     }
 
-    pub fn result(description: impl Into<String>, amount: Decimal) -> Self {
+    pub fn result(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
         CalculationStep {
             description: description.into(),
-            amount: Some(amount),
+            amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Result,
         }
     }
@@ -507,6 +507,54 @@ impl ZakatError {
                 source_label: Some(source),
             },
         }
+    }
+
+    /// Generates a user-friendly error report.
+    /// 
+    /// Format includes:
+    /// - The Asset Source (if available)
+    /// - The Error Reason
+    /// - A hinted remediation (if applicable)
+    pub fn report(&self) -> String {
+        let label = match self {
+            ZakatError::CalculationError { source_label, .. } => source_label,
+            ZakatError::InvalidInput { source_label, .. } => source_label,
+            ZakatError::ConfigurationError { source_label, .. } => source_label,
+            ZakatError::Overflow { source_label, .. } => source_label,
+            ZakatError::MissingConfig { source_label, .. } => source_label,
+        }.as_deref().unwrap_or("Unknown Source");
+
+        let reason = match self {
+            ZakatError::CalculationError { reason, .. } => reason.clone(),
+            ZakatError::InvalidInput { field, value, reason, .. } => format!("Field '{}' has invalid value '{}' - {}", field, value, reason),
+            ZakatError::ConfigurationError { reason, .. } => reason.clone(),
+            ZakatError::Overflow { operation, .. } => format!("Overflow occurred during '{}'", operation),
+            ZakatError::MissingConfig { field, .. } => format!("Missing required configuration field '{}'", field),
+        };
+
+        let hint = match self {
+            ZakatError::ConfigurationError { reason, .. } => {
+                if reason.contains("Gold price") || reason.contains("Silver price") {
+                    "Suggestion: Set prices in ZakatConfig using .with_gold_price() / .with_silver_price()"
+                } else {
+                    "Suggestion: Check ZakatConfig setup."
+                }
+            },
+            ZakatError::MissingConfig { field, .. } => {
+                if field.contains("price") {
+                     "Suggestion: Set missing price in ZakatConfig."
+                } else {
+                     "Suggestion: Ensure all required configuration fields are set."
+                }
+            },
+            ZakatError::InvalidInput { .. } => "Suggestion: Ensure all input values are non-negative and correct.",
+            _ => "Suggestion: Check input data accuracy."
+        };
+
+        format!(
+            "Diagnostic Report:\n  Asset: {}\n  Error: {}\n  Hint: {}",
+            label, reason, hint
+        )
     }
 }
 

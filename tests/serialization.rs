@@ -14,8 +14,8 @@ fn test_portfolio_serialization() {
     // Business Asset
     portfolio = portfolio.add(
         BusinessZakat::new()
-            .cash(dec!(10000))
-            .inventory(dec!(5000))
+            .cash(10000)
+            .inventory(5000)
             .label("Main Store")
     );
     
@@ -32,7 +32,7 @@ fn test_portfolio_serialization() {
         LivestockAssets::new()
             .count(40)
             .animal_type(LivestockType::Sheep)
-            .prices(LivestockPrices::new().sheep_price(dec!(100)))
+            .prices(LivestockPrices::new().sheep_price(100))
             .label("Sheep Herd")
     );
 
@@ -69,12 +69,12 @@ fn test_portfolio_serialization() {
     // Gold: 10000 * 0.025 = 250.
     // Sheep: 40 sheep -> 1 sheep * 100 = 100.
     // Total Zakat = 375 + 250 + 100 = 725.
-    assert_eq!(report.total_zakat_due, dec!(725.0));
+    assert_eq!(report.total_zakat_due, dec!(725));
 }
 
 #[test]
 fn test_individual_asset_serialization() {
-    let asset = BusinessZakat::new().cash(dec!(500));
+    let asset = BusinessZakat::new().cash(500);
     let json = serde_json::to_string(&asset).unwrap();
     let back: BusinessZakat = serde_json::from_str(&json).unwrap();
     assert_eq!(back.cash_on_hand, dec!(500));

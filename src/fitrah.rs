@@ -130,28 +130,28 @@ mod tests {
     
     #[test]
     fn test_fitrah_basic() {
-        let price = dec!(10.0); // 10 currency per kg
+        let price = 10.0; // 10 currency per kg
         let people = 4;
         // Default 2.5kg * 4 people * 10 = 100
         let result = calculate_fitrah(people, price, None).unwrap();
-        assert_eq!(result.zakat_due, dec!(100.0));
+        assert_eq!(result.zakat_due, dec!(100));
         assert!(result.is_payable);
     }
 
     #[test]
     fn test_fitrah_custom_amount() {
-        let price = dec!(2.0);
+        let price = 2.0;
         let people = 1;
-        let amount = dec!(3.5); // Using liters or different mazhab
+        let amount = dec!(3.5); // 3.5 Using liters or different mazhab
         // 1 * 3.5 * 2 = 7
         let result = calculate_fitrah(people, price, Some(amount)).unwrap();
-        assert_eq!(result.zakat_due, dec!(7.0));
+        assert_eq!(result.zakat_due, dec!(7));
     }
     
     #[test]
     fn test_fitrah_calculator_usage() {
-        let calc = FitrahCalculator::new(2, dec!(5.0), None::<Decimal>).unwrap();
+        let calc = FitrahCalculator::new(2, 5.0, None::<Decimal>).unwrap();
         let res = calc.calculate_zakat(&ZakatConfig::default()).unwrap();
-        assert_eq!(res.zakat_due, dec!(25.0)); // 2 * 2.5 * 5 = 25
+        assert_eq!(res.zakat_due, dec!(25)); // 2 * 2.5 * 5 = 25
     }
 }

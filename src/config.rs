@@ -1,4 +1,5 @@
 use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
@@ -79,6 +80,30 @@ impl std::str::FromStr for ZakatConfig {
 impl ZakatConfig {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Creates a pre-configured ZakatConfig for the Hanafi Madhab.
+    /// Sets strategy to Hanafi and Nisab standard to LowerOfTwo (typically Silver).
+    pub fn hanafi(gold_price: impl IntoZakatDecimal, silver_price: impl IntoZakatDecimal) -> Self {
+        let gold = gold_price.into_zakat_decimal().unwrap_or(Decimal::ZERO);
+        let silver = silver_price.into_zakat_decimal().unwrap_or(Decimal::ZERO);
+        
+        Self::new()
+            .with_madhab(Madhab::Hanafi)
+            .with_nisab_standard(NisabStandard::LowerOfTwo)
+            .with_gold_price(gold)
+            .with_silver_price(silver)
+    }
+
+    /// Creates a pre-configured ZakatConfig for the Shafi Madhab.
+    /// Sets strategy to Shafi and Nisab standard to Gold.
+    pub fn shafi(gold_price: impl IntoZakatDecimal) -> Self {
+        let gold = gold_price.into_zakat_decimal().unwrap_or(Decimal::ZERO);
+        
+        Self::new()
+            .with_madhab(Madhab::Shafi)
+            .with_nisab_standard(NisabStandard::Gold)
+            .with_gold_price(gold)
     }
 
     /// Validates the configuration for logical consistency and safety.
@@ -293,18 +318,15 @@ impl ZakatConfig {
 
     // Getters
     pub fn get_nisab_gold_grams(&self) -> Decimal {
-        use rust_decimal_macros::dec;
-        self.nisab_gold_grams.unwrap_or(dec!(85.0))
+        self.nisab_gold_grams.unwrap_or(dec!(85))
     }
 
     pub fn get_nisab_silver_grams(&self) -> Decimal {
-        use rust_decimal_macros::dec;
-        self.nisab_silver_grams.unwrap_or(dec!(595.0))
+        self.nisab_silver_grams.unwrap_or(dec!(595))
     }
 
     pub fn get_nisab_agriculture_kg(&self) -> Decimal {
-        use rust_decimal_macros::dec;
-        self.nisab_agriculture_kg.unwrap_or(dec!(653.0))
+        self.nisab_agriculture_kg.unwrap_or(dec!(653))
     }
 
     pub fn get_monetary_nisab_threshold(&self) -> Decimal {
@@ -322,15 +344,14 @@ impl ZakatConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rust_decimal_macros::dec;
 
     #[test]
     fn test_validate_prices() {
         // Zero prices with default settings.
         // Whether this fails depends on the default Madhab/NisabStandard.
         let config = ZakatConfig::new()
-            .with_gold_price(dec!(0))
-            .with_silver_price(dec!(0));
+            .with_gold_price(0)
+            .with_silver_price(0);
         let _res = config.validate();
     }
 }

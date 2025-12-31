@@ -63,6 +63,27 @@ impl PreciousMetals {
         Self::default()
     }
 
+    /// Creates a Gold asset with the specified weight in grams.
+    /// Defaults to 24K purity, Investment usage, and Hawl satisfied.
+    pub fn gold(weight: impl IntoZakatDecimal) -> Self {
+        Self::new()
+            .weight(weight)
+            .metal_type(WealthType::Gold)
+            .purity(24)
+            .usage(JewelryUsage::Investment)
+            .hawl(true)
+    }
+
+    /// Creates a Silver asset with the specified weight in grams.
+    /// Defaults to Investment usage and Hawl satisfied.
+    pub fn silver(weight: impl IntoZakatDecimal) -> Self {
+        Self::new()
+            .weight(weight)
+            .metal_type(WealthType::Silver)
+            .usage(JewelryUsage::Investment)
+            .hawl(true)
+    }
+
     pub fn weight(mut self, weight: impl IntoZakatDecimal) -> Self {
         if let Ok(w) = weight.into_zakat_decimal() {
             self.weight_grams = w;
@@ -231,9 +252,9 @@ mod tests {
 
     #[test]
     fn test_gold_below_nisab() {
-        let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
+        let config = ZakatConfig::new().with_gold_price(100);
         let metal = PreciousMetals::new()
-            .weight(dec!(84.0))
+            .weight(84.0)
             .metal_type(WealthType::Gold)
             .hawl(true);
             
@@ -246,9 +267,9 @@ mod tests {
 
     #[test]
     fn test_gold_above_nisab() {
-        let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
+        let config = ZakatConfig::new().with_gold_price(100);
         let metal = PreciousMetals::new()
-            .weight(dec!(85.0))
+            .weight(85.0)
             .metal_type(WealthType::Gold)
             .hawl(true);
         let zakat = metal.calculate_zakat(&config).unwrap();
@@ -257,20 +278,20 @@ mod tests {
         // Value = 8500
         // Due = 8500 * 0.025 = 212.5
         assert!(zakat.is_payable);
-        assert_eq!(zakat.zakat_due, dec!(212.5));
+        assert_eq!(zakat.zakat_due, dec!(212.5)); // 212.5
     }
 
     #[test]
     fn test_gold_with_debt() {
-         let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
+         let config = ZakatConfig::new().with_gold_price(100);
         // 100g Gold ($10,000). Debt $2,000. Net $8,000.
         // Nisab 85g = $8,500.
         // Net ($8,000) < Nisab ($8,500) -> Not Payable.
         
         let metal = PreciousMetals::new()
-            .weight(dec!(100.0))
+            .weight(100.0)
             .metal_type(WealthType::Gold)
-            .debt(dec!(2000.0))
+            .debt(2000.0)
             .hawl(true);
             
         let zakat = metal.calculate_zakat(&config).unwrap();
@@ -281,7 +302,7 @@ mod tests {
 
     #[test]
     fn test_gold_purity_18k() {
-        let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
+        let config = ZakatConfig::new().with_gold_price(100);
         
         // 100g of 18K Gold.
         // Effective Weight = 100 * (18/24) = 75g.
@@ -290,7 +311,7 @@ mod tests {
         // If it were treated as 24K, it would be payable.
         
         let metal = PreciousMetals::new()
-            .weight(dec!(100.0))
+            .weight(100.0)
             .metal_type(WealthType::Gold)
             .purity(18)
             .hawl(true);
@@ -302,7 +323,7 @@ mod tests {
         
         // Test 24K explicit
         let metal24 = PreciousMetals::new()
-            .weight(dec!(100.0))
+            .weight(100.0)
             .metal_type(WealthType::Gold)
             .purity(24)
             .hawl(true);
@@ -313,12 +334,12 @@ mod tests {
     fn test_personal_jewelry_hanafi_payable() {
         // Hanafi uses LowerOfTwo. Personal jewelry is Zakatable.
         let config = ZakatConfig::new()
-            .with_gold_price(dec!(100.0))
+            .with_gold_price(100)
             .with_madhab(Madhab::Hanafi);
         
         // 100g > 85g Nisab
         let metal = PreciousMetals::new()
-            .weight(dec!(100.0))
+            .weight(100.0)
             .metal_type(WealthType::Gold)
             .usage(JewelryUsage::PersonalUse)
             .hawl(true);
@@ -331,11 +352,11 @@ mod tests {
     fn test_personal_jewelry_shafi_exempt() {
         // Shafi uses Gold Standard. Personal jewelry is Exempt.
         let config = ZakatConfig::new()
-            .with_gold_price(dec!(100.0))
+            .with_gold_price(100)
             .with_madhab(Madhab::Shafi);
         
         let metal = PreciousMetals::new()
-            .weight(dec!(100.0))
+            .weight(100.0)
             .metal_type(WealthType::Gold)
             .usage(JewelryUsage::PersonalUse)
             .hawl(true);

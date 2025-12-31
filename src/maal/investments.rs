@@ -43,6 +43,24 @@ impl InvestmentAssets {
         }
     }
 
+    /// Creates a Stock investment asset with the specified market value.
+    /// Defaults to Hawl satisfied.
+    pub fn stock(value: impl IntoZakatDecimal) -> Self {
+        Self::new()
+            .value(value)
+            .kind(InvestmentType::Stock)
+            .hawl(true)
+    }
+
+    /// Creates a Crypto investment asset with the specified market value.
+    /// Defaults to Hawl satisfied.
+    pub fn crypto(value: impl IntoZakatDecimal) -> Self {
+        Self::new()
+            .value(value)
+            .kind(InvestmentType::Crypto)
+            .hawl(true)
+    }
+
     pub fn value(mut self, value: impl IntoZakatDecimal) -> Self {
         if let Ok(v) = value.into_zakat_decimal() {
             self.market_value = v;
@@ -159,18 +177,18 @@ mod tests {
 
     #[test]
     fn test_crypto_investment() {
-        let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
+        let config = ZakatConfig { gold_price_per_gram: dec!(100), ..Default::default() };
         // Nisab 8500.
         // Crypto worth 10,000.
         // Due 250.
         
         let inv = InvestmentAssets::new()
-            .value(dec!(10000.0))
+            .value(10000.0)
             .kind(InvestmentType::Crypto);
             
         let res = inv.hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(res.is_payable);
-        assert_eq!(res.zakat_due, dec!(250.0));
+        assert_eq!(res.zakat_due, dec!(250));
     }
 }

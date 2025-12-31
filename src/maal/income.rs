@@ -43,6 +43,15 @@ impl IncomeZakatCalculator {
         }
     }
 
+    /// Creates an Income Zakat calculator for a salary amount.
+    /// Defaults to Gross calculation method and Hawl satisfied (immediate payment).
+    pub fn from_salary(amount: impl IntoZakatDecimal) -> Self {
+        Self::new()
+            .income(amount)
+            .method(IncomeCalculationMethod::Gross)
+            .hawl(true)
+    }
+
     pub fn income(mut self, income: impl IntoZakatDecimal) -> Self {
         if let Ok(i) = income.into_zakat_decimal() {
             self.total_income = i;
@@ -185,31 +194,31 @@ mod tests {
 
     #[test]
     fn test_income_gross() {
-        let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
+        let config = ZakatConfig { gold_price_per_gram: dec!(100), ..Default::default() };
         // Nisab 8500.
         // Income 10,000. Gross.
         // Due 250.
         
         let calc = IncomeZakatCalculator::new()
-            .income(dec!(10000.0))
-            .expenses(dec!(5000.0)) // Ignored in Gross
+            .income(10000.0)
+            .expenses(5000.0) // Ignored in Gross
             .method(IncomeCalculationMethod::Gross);
         let res = calc.hawl(true).calculate_zakat(&config).unwrap();
         
         assert!(res.is_payable);
-        assert_eq!(res.zakat_due, dec!(250.0));
+        assert_eq!(res.zakat_due, dec!(250));
     }
 
     #[test]
     fn test_income_net() {
-        let config = ZakatConfig { gold_price_per_gram: dec!(100.0), ..Default::default() };
+        let config = ZakatConfig { gold_price_per_gram: dec!(100), ..Default::default() };
         // Nisab 8500.
         // Income 12,000. Expenses 4,000. Net 8,000.
         // Net < Nisab. Not Payable.
         
         let calc = IncomeZakatCalculator::new()
-            .income(dec!(12000.0))
-            .expenses(dec!(4000.0))
+            .income(12000.0)
+            .expenses(4000.0)
             .method(IncomeCalculationMethod::Net);
         let res = calc.hawl(true).calculate_zakat(&config).unwrap();
         

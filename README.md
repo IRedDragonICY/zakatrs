@@ -45,7 +45,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.7.0"
+zakat = "0.8.0"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] } # Required if using async features
 ```
@@ -53,7 +53,7 @@ tokio = { version = "1", features = ["full"] } # Required if using async feature
 Synchronous Only (Lighter weight):
 ```toml
 [dependencies]
-zakat = { version = "0.7.0", default-features = false }
+zakat = { version = "0.8.0", default-features = false }
 rust_decimal = "1.39"
 ```
 
@@ -72,11 +72,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_silver_price(1); // $1/g
 
     // Fluent API: Infallible construction, chained setters
-    let store = BusinessZakat::new()
-        .cash(10_000)
+    // Newer "Semantic Constructor" (v0.7+) makes common cases even faster:
+    let store = BusinessZakat::cash_only(10_000)
         .inventory(50_000)
-        .label("Main Store")
-        .hawl(true);
+        .label("Main Store");
+        // .hawl(true) is default in cash_only(), so we can skip it if strictly satisfied
 
     // Validation & Calculation happens here
     let result = store.calculate_zakat(&config)?;
@@ -121,17 +121,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_silver_price(1);
 
     let portfolio = ZakatPortfolio::new()
-        .add(IncomeZakatCalculator::new()
-            .income(5000)
-            .method(IncomeCalculationMethod::Gross)
+        .add(IncomeZakatCalculator::from_salary(5000)
             .label("Monthly Salary"))
-        .add(PreciousMetals::new()
-            .weight(100)
-            .metal_type(WealthType::Gold)
+        .add(PreciousMetals::gold(100)
             .label("Wife's Gold"))
-        .add(InvestmentAssets::new()
-            .value(20000)
-            .kind(InvestmentType::Crypto)
+        .add(InvestmentAssets::crypto(20000)
             .debt(2000)
             .label("Binance Portfolio"));
 
@@ -178,7 +172,7 @@ fn main() {
     // Or push to mutable reference
     let mut portfolio = portfolio;
     let id_2 = portfolio.push(
-        BusinessZakat::new().cash(5_000).label("Branch B")
+        BusinessZakat::cash_only(5_000).label("Branch B")
     );
     
     // Replace an asset (e.g. updating values)
@@ -245,6 +239,10 @@ let config = ZakatConfig::new()
     .with_gold_price(100)
     .with_silver_price(1)
     .with_madhab(Madhab::Hanafi);
+
+// NEW (v0.7+): Quick Config Presets
+let config = ZakatConfig::hanafi(100, 1); // Sets Madhab=Hanafi, Nisab=LowerOfTwo, Prices
+let config = ZakatConfig::shafi(100);     // Sets Madhab=Shafi, Nisab=Gold, Prices
 ```
 
 ### Custom Zakat Strategy (Advanced)
@@ -260,12 +258,11 @@ struct GregorianTaxStrategy;
 
 impl ZakatStrategy for GregorianTaxStrategy {
     fn get_rules(&self) -> ZakatRules {
-        ZakatRules {
-            nisab_standard: NisabStandard::Gold,
-            jewelry_exempt: false,
-            trade_goods_rate: rust_decimal_macros::dec!(0.02577), // 2.577%
-            ..Default::default()
-        }
+        // v0.7 allows fluent configuration with direct literals
+        ZakatRules::default()
+            .with_nisab_standard(NisabStandard::Gold)
+            .with_trade_goods_rate(0.02577) // 2.577%
+    }
     }
 }
 
@@ -288,9 +285,7 @@ fn main() {
 use zakat::prelude::*;
 
 // Personal Jewelry (Exempt in Shafi/Maliki, Payable in Hanafi)
-let necklace = PreciousMetals::new()
-    .weight(100)
-    .metal_type(WealthType::Gold)
+let necklace = PreciousMetals::gold(100)
     .usage(JewelryUsage::PersonalUse)
     .label("Wife's Wedding Necklace");
 

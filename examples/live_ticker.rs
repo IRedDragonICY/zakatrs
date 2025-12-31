@@ -1,4 +1,3 @@
-use rust_decimal_macros::dec;
 use zakat::prelude::*;
 
 
@@ -64,7 +63,7 @@ fn print_summary(day: &str, result: &PortfolioResult) {
     println!("Total Assets : ${}", result.total_assets);
     // Portfolio doesn't have a single Nisab threshold, it's per asset type.
     println!("Zakat Due    : ${}", result.total_zakat_due);
-    if result.total_zakat_due > dec!(0) {
+    if result.total_zakat_due > rust_decimal::Decimal::ZERO {
         println!("Status       : PAYABLE");
     } else {
         println!("Status       : NOT PAYABLE (Below Nisab)");

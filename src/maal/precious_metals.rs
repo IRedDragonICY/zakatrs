@@ -40,6 +40,9 @@ pub struct PreciousMetals {
     pub hawl_satisfied: bool,
     pub label: Option<String>,
     pub id: uuid::Uuid,
+    // Hidden field for deferred input validation errors
+    #[serde(skip)]
+    _input_errors: Vec<ZakatError>,
 }
 
 impl Default for PreciousMetals {
@@ -53,6 +56,7 @@ impl Default for PreciousMetals {
             hawl_satisfied: true,
             label: None,
             id: uuid::Uuid::new_v4(),
+            _input_errors: Vec::new(),
         }
     }
 }
@@ -99,14 +103,21 @@ impl PreciousMetals {
     }
 
     /// Sets gold purity in Karat (1-24).
-    /// 
-    /// # Panics
-    /// Panics if purity is 0 or greater than 24.
+    ///
+    /// If purity is 0 or greater than 24, the error is collected and will
+    /// be returned by `validate()` or `calculate_zakat()`.
     pub fn purity(mut self, purity: u32) -> Self {
         if purity == 0 || purity > 24 {
-            panic!("Gold purity must be between 1 and 24 Karat (got {})", purity);
+            self._input_errors.push(ZakatError::InvalidInput {
+                field: "purity".to_string(),
+                value: purity.to_string(),
+                reason: "Gold purity must be between 1 and 24 Karat".to_string(),
+                source_label: self.label.clone(),
+                asset_id: Some(self.id),
+            });
+        } else {
+            self.purity = purity;
         }
-        self.purity = purity;
         self
     }
 
@@ -140,10 +151,26 @@ impl PreciousMetals {
         self.id = id;
         self
     }
+
+    /// Validates the asset and returns any input errors.
+    ///
+    /// - If no errors, returns `Ok(())`.
+    /// - If 1 error, returns `Err(that_error)`.
+    /// - If >1 errors, returns `Err(ZakatError::MultipleErrors(...))`.
+    pub fn validate(&self) -> Result<(), ZakatError> {
+        match self._input_errors.len() {
+            0 => Ok(()),
+            1 => Err(self._input_errors[0].clone()),
+            _ => Err(ZakatError::MultipleErrors(self._input_errors.clone())),
+        }
+    }
 }
 
 impl CalculateZakat for PreciousMetals {
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        // Validate deferred input errors first
+        self.validate()?;
+
         let config_cow = config.resolve_config();
         let config = config_cow.as_ref();
 

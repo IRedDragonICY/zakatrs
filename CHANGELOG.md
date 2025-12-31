@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.13.0] - 2025-12-31
+
+### Added
+- **Structured Explanation API**: New `ZakatExplanation` struct for API consumers (React, Vue, etc.).
+    - Added `to_explanation(&self) -> ZakatExplanation` method to `ZakatDetails`.
+    - Refactored `explain()` to use `to_explanation().to_string()`.
+- **Aggregated Validation Errors**: New `ZakatError::MultipleErrors(Vec<ZakatError>)` variant.
+    - `validate()` now returns all collected errors, not just the first.
+    - Updated `with_source()`, `with_asset_id()`, and `report()` to handle `MultipleErrors`.
+- **Portfolio Mutability**: Added `get_mut(&mut self, id: Uuid) -> Option<&mut PortfolioItem>` method.
+    - Allows in-place modification of portfolio assets without remove/re-add.
+- **Explicit Locale Handling**: New `InputLocale` enum and `LocalizedInput` struct.
+    - Added `with_locale(val, locale)` helper for unambiguous parsing.
+    - Locales: `US` (1,000.00), `EU` (1.000,00), `EasternArabic`.
+    - Example: `with_locale("€1.234,50", InputLocale::EU)` → `1234.50`.
+
+### Changed
+- **Panic-Free Purity Setter**: `PreciousMetals::purity()` no longer panics on invalid input.
+    - Errors are collected in `_input_errors` and surfaced via `validate()` or `calculate_zakat()`.
+    - Added `_input_errors: Vec<ZakatError>` field to `PreciousMetals`.
+
+### Fixed
+- **Non-Exhaustive Pattern**: Fixed `report()` method to handle `MultipleErrors` variant.
+
 ## [0.12.0] - 2025-12-31
 
 ### Added

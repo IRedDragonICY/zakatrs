@@ -38,6 +38,8 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Live Pricing Interface (e.g. for API integration)
 - Detailed Reporting (Livestock in-kind details, calculation traces, metadata support)
 - `explain()` Debugging (Get human-readable trace of calculations)
+- `to_explanation()` Structured API (Get structured data for frontend rendering)
+- `with_locale()` Input Parsing (Explicit EU/US/Arabic locale handling)
 - Custom Strategies (Pluggable `ZakatStrategy` trait for custom rules)
 - Full Serialization (Save/Load Portfolios via `serde` & JSON)
 
@@ -46,7 +48,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.12.0"
+zakat = "0.13.0"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] } # Required if using async features
 ```
@@ -54,7 +56,7 @@ tokio = { version = "1", features = ["full"] } # Required if using async feature
 Synchronous Only (Lighter weight):
 ```toml
 [dependencies]
-zakat = { version = "0.12.0", default-features = false }
+zakat = { version = "0.13.0", default-features = false }
 rust_decimal = "1.39"
 ```
 

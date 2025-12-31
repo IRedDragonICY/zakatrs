@@ -243,6 +243,60 @@ pub struct ZakatDetails {
     pub warnings: Vec<String>,
 }
 
+/// Structured representation of a Zakat calculation for API consumers.
+///
+/// This struct allows frontend applications (e.g., React, Vue) to render their
+/// own UI without parsing pre-formatted strings.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ZakatExplanation {
+    /// Label of the asset (e.g., "Main Store", "Gold Necklace").
+    pub label: String,
+    /// Type of wealth (e.g., "Gold", "Business").
+    pub wealth_type: String,
+    /// Status of the calculation: "Payable" or "Exempt".
+    pub status: String,
+    /// The amount of Zakat due.
+    pub amount_due: Decimal,
+    /// Step-by-step calculation steps.
+    pub steps: Vec<CalculationStep>,
+    /// Non-fatal warnings about the calculation.
+    pub warnings: Vec<String>,
+    /// Additional notes (e.g., exemption reason).
+    pub notes: Vec<String>,
+}
+
+impl std::fmt::Display for ZakatExplanation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Explanation for '{}' ({}):", self.label, self.wealth_type)?;
+        writeln!(f, "{:-<50}", "")?;
+
+        // Print steps using CalculationTrace Display
+        let trace = CalculationTrace(self.steps.clone());
+        write!(f, "{}", trace)?;
+        
+        writeln!(f, "{:-<50}", "")?;
+        writeln!(f, "Status: {}", self.status)?;
+        
+        if self.status == "PAYABLE" {
+            writeln!(f, "Amount Due: {:.2}", self.amount_due)?;
+        }
+        
+        for note in &self.notes {
+            writeln!(f, "Reason: {}", note)?;
+        }
+
+        if !self.warnings.is_empty() {
+            writeln!(f)?;
+            writeln!(f, "WARNINGS:")?;
+            for warning in &self.warnings {
+                writeln!(f, " - {}", warning)?;
+            }
+        }
+
+        Ok(())
+    }
+}
+
 impl ZakatDetails {
     pub fn new(
         total_assets: Decimal,
@@ -408,40 +462,39 @@ impl ZakatDetails {
         format!("{}: {}{} - Due: {}", label_str, status, reason, self.format_amount())
     }
 
+    /// Converts this ZakatDetails into a structured `ZakatExplanation`.
+    ///
+    /// This is preferred for API consumers who want to render their own UI.
+    pub fn to_explanation(&self) -> ZakatExplanation {
+        let label = self.label.clone().unwrap_or_else(|| "Asset".to_string());
+        let wealth_type = format!("{:?}", self.wealth_type);
+        let status = if self.is_payable { "PAYABLE".to_string() } else { "EXEMPT".to_string() };
+        
+        let mut notes = Vec::new();
+        if let Some(reason) = &self.status_reason {
+            notes.push(reason.clone());
+        }
+
+        ZakatExplanation {
+            label,
+            wealth_type,
+            status,
+            amount_due: self.zakat_due,
+            steps: self.calculation_trace.0.clone(),
+            warnings: self.warnings.clone(),
+            notes,
+        }
+    }
+
     /// Generates a human-readable explanation of the Zakat calculation.
     ///
     /// The output is formatted as a step-by-step list or table, showing operations
     /// and their results, helping users understand exactly how the `zakat_due` was determined.
     /// If there are any warnings (e.g., negative values clamped), they are appended at the end.
+    ///
+    /// For structured data (e.g., for API consumers), use `to_explanation()` instead.
     pub fn explain(&self) -> String {
-        use std::fmt::Write;
-        let mut output = String::new();
-        let label = self.label.as_deref().unwrap_or("Asset");
-        
-        writeln!(&mut output, "Explanation for '{}' ({:?}):", label, self.wealth_type).unwrap();
-        writeln!(&mut output, "{:-<50}", "").unwrap(); // Separator
-
-        // Delegate trace printing to CalculationTrace
-        write!(&mut output, "{}", self.calculation_trace).unwrap();
-        
-        writeln!(&mut output, "{:-<50}", "").unwrap();
-        writeln!(&mut output, "Status: {}", if self.is_payable { "PAYABLE" } else { "EXEMPT" }).unwrap();
-        if self.is_payable {
-            writeln!(&mut output, "Amount Due: {}", self.format_amount()).unwrap();
-        } else if let Some(reason) = &self.status_reason {
-            writeln!(&mut output, "Reason: {}", reason).unwrap();
-        }
-
-        // Append warnings section if any
-        if !self.warnings.is_empty() {
-            writeln!(&mut output).unwrap();
-            writeln!(&mut output, "WARNINGS:").unwrap();
-            for warning in &self.warnings {
-                writeln!(&mut output, " - {}", warning).unwrap();
-            }
-        }
-
-        output
+        self.to_explanation().to_string()
     }
 }
 
@@ -503,6 +556,9 @@ pub enum ZakatError {
         source_label: Option<String>,
         asset_id: Option<uuid::Uuid>,
     },
+
+    #[error("Multiple validation errors occurred")]
+    MultipleErrors(Vec<ZakatError>),
 }
 
 impl ZakatError {
@@ -532,9 +588,12 @@ impl ZakatError {
             },
             ZakatError::MissingConfig { field, asset_id, .. } => ZakatError::MissingConfig {
                 field,
-                source_label: Some(source),
+                source_label: Some(source.clone()),
                 asset_id,
             },
+            ZakatError::MultipleErrors(errors) => ZakatError::MultipleErrors(
+                errors.into_iter().map(|e| e.with_source(source.clone())).collect()
+            ),
         }
     }
 
@@ -568,6 +627,9 @@ impl ZakatError {
                 source_label,
                 asset_id: Some(id),
             },
+            ZakatError::MultipleErrors(errors) => ZakatError::MultipleErrors(
+                errors.into_iter().map(|e| e.with_asset_id(id)).collect()
+            ),
         }
     }
 
@@ -579,12 +641,22 @@ impl ZakatError {
     /// - The Error Reason
     /// - A hinted remediation (if applicable)
     pub fn report(&self) -> String {
+        // Handle MultipleErrors specially by combining reports
+        if let ZakatError::MultipleErrors(errors) = self {
+            let mut output = format!("Multiple Validation Errors ({} total):\n", errors.len());
+            for (i, err) in errors.iter().enumerate() {
+                output.push_str(&format!("\n--- Error {} ---\n{}", i + 1, err.report()));
+            }
+            return output;
+        }
+
         let label = match self {
             ZakatError::CalculationError { source_label, .. } => source_label,
             ZakatError::InvalidInput { source_label, .. } => source_label,
             ZakatError::ConfigurationError { source_label, .. } => source_label,
             ZakatError::Overflow { source_label, .. } => source_label,
             ZakatError::MissingConfig { source_label, .. } => source_label,
+            ZakatError::MultipleErrors(_) => unreachable!(), // Handled above
         }.as_deref().unwrap_or("Unknown Source");
 
         let asset_id = match self {
@@ -593,6 +665,7 @@ impl ZakatError {
             ZakatError::ConfigurationError { asset_id, .. } => asset_id,
             ZakatError::Overflow { asset_id, .. } => asset_id,
             ZakatError::MissingConfig { asset_id, .. } => asset_id,
+            ZakatError::MultipleErrors(_) => unreachable!(), // Handled above
         };
 
         let reason = match self {
@@ -601,6 +674,7 @@ impl ZakatError {
             ZakatError::ConfigurationError { reason, .. } => reason.clone(),
             ZakatError::Overflow { operation, .. } => format!("Overflow occurred during '{}'", operation),
             ZakatError::MissingConfig { field, .. } => format!("Missing required configuration field '{}'", field),
+            ZakatError::MultipleErrors(_) => unreachable!(), // Handled above
         };
 
         let hint = match self {

@@ -19,11 +19,12 @@ pub mod wasm;
 
 pub use config::ZakatConfig;
 pub use traits::CalculateZakat;
-pub use types::{ZakatDetails, ZakatError, WealthType};
+pub use types::{ZakatDetails, ZakatError, WealthType, ZakatExplanation};
 pub use portfolio::ZakatPortfolio;
 pub use assets::PortfolioItem;
 pub use pricing::{Prices, StaticPriceProvider};
 pub use madhab::{ZakatStrategy, ZakatRules};
+pub use inputs::{IntoZakatDecimal, InputLocale, LocalizedInput, with_locale};
 #[cfg(feature = "async")]
 pub use pricing::PriceProvider;
 

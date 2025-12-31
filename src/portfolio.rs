@@ -214,6 +214,16 @@ impl ZakatPortfolio {
         self.items.iter().find(|c| CalculateZakat::get_id(*c) == id)
     }
 
+    /// Gets a mutable reference to an asset by ID.
+    ///
+    /// This allows users to modify an existing asset in the portfolio directly:
+    /// ```rust,ignore
+    /// portfolio.get_mut(id).map(|item| { /* modify item */ });
+    /// ```
+    pub fn get_mut(&mut self, id: Uuid) -> Option<&mut PortfolioItem> {
+        self.items.iter_mut().find(|c| CalculateZakat::get_id(*c) == id)
+    }
+
     /// Returns a slice of all items in the portfolio.
     pub fn get_items(&self) -> &[PortfolioItem] {
         &self.items

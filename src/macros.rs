@@ -98,15 +98,19 @@ macro_rules! zakat_asset {
                 self
             }
 
-            /// Validates the asset and returns the first input error, if any.
-            /// 
-            /// This method checks for any errors that were collected during
-            /// setter calls (e.g., invalid numeric conversions).
+            /// Validates the asset and returns any input errors.
+            ///
+            /// - If no errors, returns `Ok(())`.
+            /// - If 1 error, returns `Err(that_error)`.
+            /// - If >1 errors, returns `Err(ZakatError::MultipleErrors(...))`.
             pub fn validate(&self) -> Result<(), $crate::types::ZakatError> {
-                if let Some(err) = self._input_errors.first() {
-                    return Err(err.clone());
+                match self._input_errors.len() {
+                    0 => Ok(()),
+                    1 => Err(self._input_errors[0].clone()),
+                    _ => Err($crate::types::ZakatError::MultipleErrors(
+                        self._input_errors.clone()
+                    )),
                 }
-                Ok(())
             }
 
             /// Returns the unique ID of the asset.

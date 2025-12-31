@@ -153,6 +153,100 @@ impl IntoZakatDecimal for String {
     }
 }
 
+/// Locale specification for unambiguous numeric input parsing.
+///
+/// The heuristic-based parsing in `IntoZakatDecimal` for `&str` can be ambiguous
+/// (e.g., "1,234" could be US thousands or EU decimal). Use `LocalizedInput` with
+/// an explicit locale when you need guaranteed correct parsing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum InputLocale {
+    /// US/UK format: comma = thousands, dot = decimal (e.g., "1,000.00")
+    US,
+    /// European format: dot = thousands, comma = decimal (e.g., "1.000,00")
+    EU,
+    /// Eastern Arabic format: Arabic-Indic numerals with Arabic decimal separator
+    EasternArabic,
+}
+
+/// A string input with an explicit locale for unambiguous parsing.
+///
+/// This struct is used with the `with_locale` helper function to specify
+/// the exact format of a numeric string.
+///
+/// # Example
+/// ```rust,ignore
+/// use zakat::{with_locale, InputLocale};
+///
+/// // European format: "1.234,50" means 1234.50
+/// let value = with_locale("1.234,50", InputLocale::EU);
+/// let decimal = value.into_zakat_decimal().unwrap();
+/// ```
+#[derive(Debug, Clone)]
+pub struct LocalizedInput<'a> {
+    value: &'a str,
+    locale: InputLocale,
+}
+
+/// Creates a `LocalizedInput` for explicit locale-aware parsing.
+///
+/// # Arguments
+/// * `val` - The numeric string to parse.
+/// * `locale` - The locale specifying the number format.
+///
+/// # Example
+/// ```rust,ignore
+/// use zakat::{with_locale, InputLocale};
+///
+/// // US format: "1,234.50" means 1234.50
+/// let decimal = with_locale("$1,234.50", InputLocale::US).into_zakat_decimal().unwrap();
+///
+/// // EU format: "1.234,50" means 1234.50
+/// let decimal = with_locale("€1.234,50", InputLocale::EU).into_zakat_decimal().unwrap();
+/// ```
+pub fn with_locale(val: &str, locale: InputLocale) -> LocalizedInput<'_> {
+    LocalizedInput { value: val, locale }
+}
+
+impl IntoZakatDecimal for LocalizedInput<'_> {
+    fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
+        // First normalize Arabic numerals
+        let normalized = normalize_arabic_numerals(self.value);
+        let mut result = normalized.trim().to_string();
+        
+        // Remove currency symbols and underscores
+        result = result.replace(['$', '£', '€', '¥', '_'], "");
+        
+        match self.locale {
+            InputLocale::US => {
+                // US format: comma = thousands separator, dot = decimal
+                result = result.replace(',', "");
+                // Dot remains as decimal separator
+            }
+            InputLocale::EU => {
+                // EU format: dot = thousands separator, comma = decimal
+                result = result.replace('.', "");  // Remove thousands separators
+                result = result.replace(',', "."); // Convert comma decimal to dot
+            }
+            InputLocale::EasternArabic => {
+                // Arabic decimal separator (٫) replaced with dot
+                result = result.replace('٫', ".");
+                // Remove Arabic thousands separator (٬)
+                result = result.replace('٬', "");
+                // Also handle comma/dot if mixed with Arabic numerals
+                result = result.replace(',', "");
+            }
+        }
+        
+        Decimal::from_str(&result).map_err(|e| ZakatError::InvalidInput {
+            field: "localized_input".to_string(),
+            value: self.value.to_string(),
+            reason: format!("Parse error with {:?} locale: {}", self.locale, e),
+            source_label: None,
+            asset_id: None,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,6 +358,36 @@ mod tests {
         // Mixed: Eastern Arabic with common formatting
         let result = "١,٠٠٠.٥٠".into_zakat_decimal().unwrap();
         assert_eq!(result, Decimal::from_str("1000.50").unwrap());
+    }
+
+    // === Explicit LocalizedInput Tests ===
+    
+    #[test]
+    fn test_localized_input_us() {
+        // US format with explicit locale
+        let result = with_locale("$1,234.56", InputLocale::US).into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("1234.56").unwrap());
+    }
+
+    #[test]
+    fn test_localized_input_eu() {
+        // EU format: dot = thousands, comma = decimal
+        let result = with_locale("€1.234,56", InputLocale::EU).into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("1234.56").unwrap());
+    }
+
+    #[test]
+    fn test_localized_input_eu_no_thousands() {
+        // EU format without thousands separator
+        let result = with_locale("€12,50", InputLocale::EU).into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("12.50").unwrap());
+    }
+
+    #[test]
+    fn test_localized_input_eastern_arabic() {
+        // Eastern Arabic numerals with Arabic decimal separator
+        let result = with_locale("١٢٣٤.٥٠", InputLocale::EasternArabic).into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("1234.50").unwrap());
     }
 }
 

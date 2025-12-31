@@ -31,23 +31,29 @@ pub struct MiningAssets {
     pub hawl_satisfied: bool,
     pub label: Option<String>,
     pub id: uuid::Uuid,
+    // Hidden field for deferred input validation errors
+    #[serde(skip)]
+    _input_errors: Vec<ZakatError>,
 }
 
 impl MiningAssets {
     pub fn new() -> Self {
         Self {
             id: uuid::Uuid::new_v4(),
+            _input_errors: Vec::new(),
             ..Default::default()
         }
     }
 
     /// Sets the mining value.
     /// 
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
+    /// If the value cannot be converted to a valid decimal, the error is
+    /// collected and will be returned by `validate()` or `calculate_zakat()`.
     pub fn value(mut self, value: impl IntoZakatDecimal) -> Self {
-        self.value = value.into_zakat_decimal()
-            .expect("Invalid numeric value for 'value'");
+        match value.into_zakat_decimal() {
+            Ok(v) => self.value = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
@@ -58,11 +64,13 @@ impl MiningAssets {
 
     /// Sets deductible debt.
     /// 
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
+    /// If the value cannot be converted to a valid decimal, the error is
+    /// collected and will be returned by `validate()` or `calculate_zakat()`.
     pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        self.liabilities_due_now = debt.into_zakat_decimal()
-            .expect("Invalid numeric value for 'debt'");
+        match debt.into_zakat_decimal() {
+            Ok(v) => self.liabilities_due_now = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
@@ -81,10 +89,21 @@ impl MiningAssets {
         self.id = id;
         self
     }
+
+    /// Validates the asset and returns the first input error, if any.
+    pub fn validate(&self) -> Result<(), ZakatError> {
+        if let Some(err) = self._input_errors.first() {
+            return Err(err.clone());
+        }
+        Ok(())
+    }
 }
 
 impl CalculateZakat for MiningAssets {
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        // Validate deferred input errors first
+        self.validate()?;
+        
         let config_cow = config.resolve_config();
         let config = config_cow.as_ref();
 
@@ -93,7 +112,8 @@ impl CalculateZakat for MiningAssets {
                 field: "value".to_string(),
                 value: "negative".to_string(),
                 reason: "Mining value must be non-negative".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             });
         }
 

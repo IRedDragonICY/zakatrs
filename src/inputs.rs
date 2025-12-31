@@ -46,6 +46,7 @@ macro_rules! impl_into_zakat_decimal_float {
                         value: s,
                         reason: "Invalid float value".to_string(),
                         source_label: None,
+                        asset_id: None,
                     })
                 }
             }
@@ -60,6 +61,7 @@ impl_into_zakat_decimal_float!(f32, f64);
 /// Sanitizes a numeric string by removing common formatting characters.
 /// 
 /// This function handles:
+/// - Arabic numerals: Eastern Arabic (`٠` through `٩`) and Perso-Arabic (`۰` through `۹`) normalized to ASCII
 /// - Currency symbols (`$`, `£`, `€`, `¥`) - removed
 /// - Underscores (`_`) - Rust-style numeric separators, removed
 /// - Commas (`,`) - intelligently handled:
@@ -71,10 +73,13 @@ impl_into_zakat_decimal_float!(f32, f64);
 /// - `"$1,000.00"` → `"1000.00"` (US format)
 /// - `"€12,50"` → `"12.50"` (European format)
 /// - `"1.234,56"` → `"1234.56"` (European thousands + decimal)
+/// - `"١٢٣٤.٥٠"` → `"1234.50"` (Eastern Arabic numerals)
 ///
 /// Negative numbers and decimal points are preserved.
 fn sanitize_numeric_string(s: &str) -> String {
-    let mut result = s.trim().to_string();
+    // First normalize Arabic numerals to ASCII
+    let normalized = normalize_arabic_numerals(s);
+    let mut result = normalized.trim().to_string();
     
     // Remove currency symbols and underscores
     result = result.replace(['$', '£', '€', '¥', '_'], "");
@@ -105,6 +110,23 @@ fn sanitize_numeric_string(s: &str) -> String {
     result
 }
 
+/// Normalizes Arabic numerals to ASCII digits.
+/// 
+/// Handles:
+/// - Eastern Arabic numerals: ٠١٢٣٤٥٦٧٨٩ (U+0660..U+0669)
+/// - Perso-Arabic numerals: ۰۱۲۳۴۵۶۷۸۹ (U+06F0..U+06F9)
+fn normalize_arabic_numerals(s: &str) -> String {
+    s.chars().map(|c| {
+        match c {
+            // Eastern Arabic numerals (٠-٩)
+            '\u{0660}'..='\u{0669}' => char::from_u32(c as u32 - 0x0660 + '0' as u32).unwrap_or(c),
+            // Perso-Arabic numerals (۰-۹)
+            '\u{06F0}'..='\u{06F9}' => char::from_u32(c as u32 - 0x06F0 + '0' as u32).unwrap_or(c),
+            _ => c,
+        }
+    }).collect()
+}
+
 impl IntoZakatDecimal for &str {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
         let sanitized = sanitize_numeric_string(self);
@@ -113,6 +135,7 @@ impl IntoZakatDecimal for &str {
             value: self.to_string(),
             reason: format!("Parse error: {}", e),
             source_label: None,
+            asset_id: None,
         })
     }
 }
@@ -125,6 +148,7 @@ impl IntoZakatDecimal for String {
             value: self.clone(),
             reason: format!("Parse error: {}", e),
             source_label: None,
+            asset_id: None,
         })
     }
 }
@@ -217,6 +241,29 @@ mod tests {
         // "€1.234.567,89" should become 1234567.89
         let result = "€1.234.567,89".into_zakat_decimal().unwrap();
         assert_eq!(result, Decimal::from_str("1234567.89").unwrap());
+    }
+
+    // === Arabic Numeral Tests ===
+
+    #[test]
+    fn test_eastern_arabic_numerals() {
+        // Eastern Arabic: "١٢٣٤.٥٠" should become 1234.50
+        let result = "١٢٣٤.٥٠".into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("1234.50").unwrap());
+    }
+
+    #[test]
+    fn test_perso_arabic_numerals() {
+        // Perso-Arabic: "۱۲۳۴.۵۰" should become 1234.50
+        let result = "۱۲۳۴.۵۰".into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("1234.50").unwrap());
+    }
+
+    #[test]
+    fn test_arabic_with_currency() {
+        // Mixed: Eastern Arabic with common formatting
+        let result = "١,٠٠٠.٥٠".into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("1000.50").unwrap());
     }
 }
 

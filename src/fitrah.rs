@@ -32,7 +32,8 @@ impl FitrahCalculator {
                 field: "person_count".to_string(),
                 value: "0".to_string(),
                 reason: "Person count must be greater than 0".to_string(),
-                source_label: None
+                source_label: None,
+                asset_id: None,
             });
         }
         if price < Decimal::ZERO {
@@ -40,7 +41,8 @@ impl FitrahCalculator {
                 field: "price_per_unit".to_string(),
                 value: "negative".to_string(),
                 reason: "Price per unit must be non-negative".to_string(),
-                source_label: None
+                source_label: None,
+                asset_id: None,
             });
         }
 
@@ -70,7 +72,8 @@ impl CalculateZakat for FitrahCalculator {
             .and_then(|v| v.checked_mul(self.price_per_unit))
             .ok_or(ZakatError::CalculationError {
                 reason: "Overflow calculating Fitrah total".to_string(),
-                source_label: None
+                source_label: None,
+                asset_id: None,
             })?;
 
         // Build calculation trace

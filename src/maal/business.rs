@@ -47,6 +47,7 @@ impl Default for BusinessZakat {
             hawl_satisfied: true,
             label: None,
             _id: uuid::Uuid::new_v4(),
+            _input_errors: Vec::new(),
         }
     }
 }
@@ -64,47 +65,58 @@ impl BusinessZakat {
 
     /// Sets cash on hand.
     /// 
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
+    /// If the value cannot be converted to a valid decimal, the error is
+    /// collected and will be returned by `validate()` or `calculate_zakat()`.
     pub fn cash(mut self, cash: impl IntoZakatDecimal) -> Self {
-        self.cash_on_hand = cash.into_zakat_decimal()
-            .expect("Invalid numeric value for 'cash'");
+        match cash.into_zakat_decimal() {
+            Ok(v) => self.cash_on_hand = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
     /// Sets inventory value.
     /// 
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
+    /// If the value cannot be converted to a valid decimal, the error is
+    /// collected and will be returned by `validate()` or `calculate_zakat()`.
     pub fn inventory(mut self, inventory: impl IntoZakatDecimal) -> Self {
-        self.inventory_value = inventory.into_zakat_decimal()
-            .expect("Invalid numeric value for 'inventory'");
+        match inventory.into_zakat_decimal() {
+            Ok(v) => self.inventory_value = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
     /// Sets receivables (money owed to the business).
     /// 
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
+    /// If the value cannot be converted to a valid decimal, the error is
+    /// collected and will be returned by `validate()` or `calculate_zakat()`.
     pub fn receivables(mut self, receivables: impl IntoZakatDecimal) -> Self {
-        self.receivables = receivables.into_zakat_decimal()
-            .expect("Invalid numeric value for 'receivables'");
+        match receivables.into_zakat_decimal() {
+            Ok(v) => self.receivables = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
     /// Sets short-term business liabilities (deducted from gross assets).
     /// 
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
+    /// If the value cannot be converted to a valid decimal, the error is
+    /// collected and will be returned by `validate()` or `calculate_zakat()`.
     pub fn liabilities(mut self, liabilities: impl IntoZakatDecimal) -> Self {
-        self.short_term_liabilities = liabilities.into_zakat_decimal()
-            .expect("Invalid numeric value for 'liabilities'");
+        match liabilities.into_zakat_decimal() {
+            Ok(v) => self.short_term_liabilities = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 }
 
 impl CalculateZakat for BusinessZakat {
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        // Validate deferred input errors first
+        self.validate()?;
+        
         let config_cow = config.resolve_config();
         let config = config_cow.as_ref();
 
@@ -114,7 +126,8 @@ impl CalculateZakat for BusinessZakat {
                 field: "business_assets".to_string(),
                 value: "negative".to_string(),
                 reason: "Business assets must be non-negative".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             });
         }
         if self.short_term_liabilities < Decimal::ZERO || self.liabilities_due_now < Decimal::ZERO {
@@ -122,7 +135,8 @@ impl CalculateZakat for BusinessZakat {
                 field: "liabilities".to_string(),
                 value: "negative".to_string(),
                 reason: "Liabilities must be non-negative".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
              });
         }
 
@@ -135,13 +149,15 @@ impl CalculateZakat for BusinessZakat {
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
             return Err(ZakatError::ConfigurationError {
                 reason: "Gold price needed for Business Nisab".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             });
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
             return Err(ZakatError::ConfigurationError {
                 reason: "Silver price needed for Business Nisab with current standard".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             });
         }
         

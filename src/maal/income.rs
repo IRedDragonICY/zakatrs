@@ -113,7 +113,8 @@ impl CalculateZakat for IncomeZakatCalculator {
                 field: "income_expenses".to_string(),
                 value: "negative".to_string(),
                 reason: "Income and expenses must be non-negative".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             });
         }
 
@@ -126,13 +127,15 @@ impl CalculateZakat for IncomeZakatCalculator {
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
             return Err(ZakatError::ConfigurationError {
                 reason: "Gold price needed for Income Nisab".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             });
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
             return Err(ZakatError::ConfigurationError {
                 reason: "Silver price needed for Income Nisab with current standard".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             });
         }
         

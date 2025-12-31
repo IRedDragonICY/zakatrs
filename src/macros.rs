@@ -7,10 +7,16 @@
 ///
 /// This macro generates:
 /// - The struct definition with user-defined fields plus common fields
-///   (`liabilities_due_now`, `hawl_satisfied`, `label`)
+///   (`liabilities_due_now`, `hawl_satisfied`, `label`, `_input_errors`)
 /// - A `new()` constructor
 /// - Standard setters: `debt()`, `hawl()`, `label()`
+/// - A `validate()` method that returns the first deferred input error
 /// - Implementation of `get_label()` for `CalculateZakat` trait
+///
+/// # Error Handling
+///
+/// Setters that require numeric conversion (like `debt()`) now collect errors
+/// instead of panicking. Call `validate()` or `calculate_zakat()` to surface errors.
 ///
 /// # Usage
 ///
@@ -51,6 +57,8 @@ macro_rules! zakat_asset {
             pub label: Option<String>,
             // Internal unique identifier
             _id: uuid::Uuid,
+            // Hidden field for deferred input validation errors
+            _input_errors: Vec<$crate::types::ZakatError>,
         }
 
         impl $name {
@@ -58,17 +66,23 @@ macro_rules! zakat_asset {
             pub fn new() -> Self {
                 Self {
                     _id: uuid::Uuid::new_v4(),
+                    _input_errors: Vec::new(),
                     ..Default::default()
                 }
             }
 
             /// Sets the deductible debt/liabilities due now.
             /// 
-            /// # Panics
-            /// Panics if the value cannot be converted to a valid decimal.
+            /// If the value cannot be converted to a valid decimal, the error is
+            /// collected and will be returned by `validate()` or `calculate_zakat()`.
             pub fn debt(mut self, val: impl $crate::inputs::IntoZakatDecimal) -> Self {
-                self.liabilities_due_now = val.into_zakat_decimal()
-                    .expect("Invalid numeric value for 'debt'");
+                match val.into_zakat_decimal() {
+                    Ok(v) => self.liabilities_due_now = v,
+                    Err(e) => {
+                        self._input_errors.push(e);
+                        // Keep default (ZERO)
+                    }
+                }
                 self
             }
 
@@ -84,6 +98,17 @@ macro_rules! zakat_asset {
                 self
             }
 
+            /// Validates the asset and returns the first input error, if any.
+            /// 
+            /// This method checks for any errors that were collected during
+            /// setter calls (e.g., invalid numeric conversions).
+            pub fn validate(&self) -> Result<(), $crate::types::ZakatError> {
+                if let Some(err) = self._input_errors.first() {
+                    return Err(err.clone());
+                }
+                Ok(())
+            }
+
             /// Returns the unique ID of the asset.
             pub fn get_id(&self) -> uuid::Uuid {
                 self._id
@@ -97,3 +122,4 @@ macro_rules! zakat_asset {
         }
     };
 }
+

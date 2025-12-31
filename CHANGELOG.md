@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.12.0] - 2025-12-31
+
+### Added
+- **Arabic Numeral Support**: Input parsing now handles Eastern Arabic numerals (`٠-٩`) and Perso-Arabic numerals (`۰-۹`).
+    - Example: `"١٢٣٤.٥٠"` → `1234.50`
+- **Enhanced Error Context**: All `ZakatError` variants now include an optional `asset_id: Option<uuid::Uuid>` field.
+    - Added `ZakatError::with_asset_id(uuid)` method for setting the asset ID.
+    - Updated `ZakatError::report()` to display the asset ID when present.
+- **Input Validation Method**: Added `validate()` method to asset structs using `zakat_asset!` macro.
+- **Livestock Optimization**: Early return when `count == 0` skips unnecessary calculations.
+
+### Changed
+- **Panic-Free Setters**: Fluent setters in `BusinessZakat`, `MiningAssets`, and macro-generated structs no longer panic on invalid input.
+    - Errors are collected and deferred until `validate()` or `calculate_zakat()` is called.
+    - *Breaking Change*: Users who relied on immediate panics must now check `validate()` or handle errors from `calculate_zakat()`.
+- **Config Partial Loading**: `ZakatConfig` optional fields now use `#[serde(default)]`, allowing partial JSON loading without errors on missing keys.
+    - Fields: `rice_price_per_kg`, `rice_price_per_liter`, `cash_nisab_standard`, `nisab_gold_grams`, `nisab_silver_grams`, `nisab_agriculture_kg`.
+
 ## [0.11.0] - 2025-12-31
 
 ### Added

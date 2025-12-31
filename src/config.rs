@@ -73,6 +73,7 @@ impl std::str::FromStr for ZakatConfig {
             .map_err(|e| ZakatError::ConfigurationError {
                 reason: format!("Failed to parse config JSON: {}", e),
                 source_label: None,
+                asset_id: None,
             })
     }
 }
@@ -112,12 +113,14 @@ impl ZakatConfig {
             return Err(ZakatError::ConfigurationError {
                 reason: "Gold price must be non-negative".to_string(),
                 source_label: None,
+                asset_id: None,
             });
         }
         if self.silver_price_per_gram < Decimal::ZERO {
             return Err(ZakatError::ConfigurationError {
                 reason: "Silver price must be non-negative".to_string(),
                 source_label: None,
+                asset_id: None,
             });
         }
 
@@ -136,6 +139,7 @@ impl ZakatConfig {
              return Err(ZakatError::ConfigurationError {
                  reason: "Gold price must be > 0 for Gold Nisab Standard".to_string(),
                  source_label: None,
+                asset_id: None,
              });
         }
 
@@ -143,6 +147,7 @@ impl ZakatConfig {
              return Err(ZakatError::ConfigurationError {
                  reason: "Silver price must be > 0 for Silver Nisab Standard".to_string(),
                  source_label: None,
+                asset_id: None,
              });
         }
 
@@ -151,12 +156,14 @@ impl ZakatConfig {
                 return Err(ZakatError::ConfigurationError {
                     reason: "Missing 'Gold Price'. Required because 'LowerOfTwo' standard is active.".to_string(),
                     source_label: Some("ZakatConfig validation".to_string()),
+                    asset_id: None,
                 });
             }
             if self.silver_price_per_gram <= Decimal::ZERO {
                 return Err(ZakatError::ConfigurationError {
                     reason: "Missing 'Silver Price'. Required because 'LowerOfTwo' standard is active.".to_string(),
                     source_label: Some("ZakatConfig validation".to_string()),
+                    asset_id: None,
                 });
             }
         }
@@ -170,22 +177,26 @@ impl ZakatConfig {
             .map_err(|_| ZakatError::ConfigurationError {
                 reason: "ZAKAT_GOLD_PRICE env var not set".to_string(),
                 source_label: None,
+                asset_id: None,
             })?;
         let silver_str = env::var("ZAKAT_SILVER_PRICE")
             .map_err(|_| ZakatError::ConfigurationError {
                  reason: "ZAKAT_SILVER_PRICE env var not set".to_string(),
                  source_label: None,
+                asset_id: None,
             })?;
 
         let gold_price = gold_str.parse::<Decimal>()
             .map_err(|e| ZakatError::ConfigurationError {
                 reason: format!("Invalid gold price format: {}", e),
                 source_label: None,
+                asset_id: None,
             })?;
         let silver_price = silver_str.parse::<Decimal>()
             .map_err(|e| ZakatError::ConfigurationError {
                 reason: format!("Invalid silver price format: {}", e),
                 source_label: None,
+                asset_id: None,
             })?;
 
         Ok(Self {
@@ -201,12 +212,14 @@ impl ZakatConfig {
             .map_err(|e| ZakatError::ConfigurationError {
                 reason: format!("Failed to read config file: {}", e),
                 source_label: None,
+                asset_id: None,
             })?;
         
         let config: ZakatConfig = serde_json::from_str(&content)
             .map_err(|e| ZakatError::ConfigurationError {
                 reason: format!("Failed to parse config JSON: {}", e),
                 source_label: None,
+                asset_id: None,
             })?;
             
         config.validate()?;

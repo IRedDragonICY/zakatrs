@@ -32,7 +32,8 @@ impl Prices {
                 field: "prices".to_string(),
                 value: "negative".to_string(),
                 reason: "Prices must be non-negative".to_string(),
-                source_label: None
+                source_label: None,
+                asset_id: None,
             });
         }
 

@@ -471,6 +471,7 @@ pub enum ZakatError {
     CalculationError {
         reason: String,
         source_label: Option<String>,
+        asset_id: Option<uuid::Uuid>,
     },
 
     #[error("Invalid input for asset '{source_label:?}': Field '{field}' (value: '{value}') - {reason}")]
@@ -479,51 +480,93 @@ pub enum ZakatError {
         value: String,
         reason: String,
         source_label: Option<String>,
+        asset_id: Option<uuid::Uuid>,
     },
 
     #[error("Configuration error for '{source_label:?}': {reason}")]
     ConfigurationError {
         reason: String,
         source_label: Option<String>,
+        asset_id: Option<uuid::Uuid>,
     },
     
     #[error("Calculation overflow in '{operation}' for '{source_label:?}'")]
     Overflow {
         operation: String,
         source_label: Option<String>,
+        asset_id: Option<uuid::Uuid>,
     },
 
     #[error("Missing configuration for '{source_label:?}': Field '{field}' is required")]
     MissingConfig {
         field: String,
         source_label: Option<String>,
+        asset_id: Option<uuid::Uuid>,
     },
 }
 
 impl ZakatError {
     pub fn with_source(self, source: String) -> Self {
         match self {
-            ZakatError::CalculationError { reason, .. } => ZakatError::CalculationError {
+            ZakatError::CalculationError { reason, asset_id, .. } => ZakatError::CalculationError {
                 reason,
                 source_label: Some(source),
+                asset_id,
             },
-            ZakatError::InvalidInput { field, value, reason, .. } => ZakatError::InvalidInput {
+            ZakatError::InvalidInput { field, value, reason, asset_id, .. } => ZakatError::InvalidInput {
                 field,
                 value,
                 reason,
                 source_label: Some(source),
+                asset_id,
             },
-            ZakatError::ConfigurationError { reason, .. } => ZakatError::ConfigurationError {
+            ZakatError::ConfigurationError { reason, asset_id, .. } => ZakatError::ConfigurationError {
                 reason,
                 source_label: Some(source),
+                asset_id,
             },
-            ZakatError::Overflow { operation, .. } => ZakatError::Overflow {
+            ZakatError::Overflow { operation, asset_id, .. } => ZakatError::Overflow {
                 operation,
                 source_label: Some(source),
+                asset_id,
             },
-            ZakatError::MissingConfig { field, .. } => ZakatError::MissingConfig {
+            ZakatError::MissingConfig { field, asset_id, .. } => ZakatError::MissingConfig {
                 field,
                 source_label: Some(source),
+                asset_id,
+            },
+        }
+    }
+
+    /// Sets the asset ID for debugging purposes.
+    pub fn with_asset_id(self, id: uuid::Uuid) -> Self {
+        match self {
+            ZakatError::CalculationError { reason, source_label, .. } => ZakatError::CalculationError {
+                reason,
+                source_label,
+                asset_id: Some(id),
+            },
+            ZakatError::InvalidInput { field, value, reason, source_label, .. } => ZakatError::InvalidInput {
+                field,
+                value,
+                reason,
+                source_label,
+                asset_id: Some(id),
+            },
+            ZakatError::ConfigurationError { reason, source_label, .. } => ZakatError::ConfigurationError {
+                reason,
+                source_label,
+                asset_id: Some(id),
+            },
+            ZakatError::Overflow { operation, source_label, .. } => ZakatError::Overflow {
+                operation,
+                source_label,
+                asset_id: Some(id),
+            },
+            ZakatError::MissingConfig { field, source_label, .. } => ZakatError::MissingConfig {
+                field,
+                source_label,
+                asset_id: Some(id),
             },
         }
     }
@@ -532,6 +575,7 @@ impl ZakatError {
     /// 
     /// Format includes:
     /// - The Asset Source (if available)
+    /// - The Asset ID (if available)
     /// - The Error Reason
     /// - A hinted remediation (if applicable)
     pub fn report(&self) -> String {
@@ -542,6 +586,14 @@ impl ZakatError {
             ZakatError::Overflow { source_label, .. } => source_label,
             ZakatError::MissingConfig { source_label, .. } => source_label,
         }.as_deref().unwrap_or("Unknown Source");
+
+        let asset_id = match self {
+            ZakatError::CalculationError { asset_id, .. } => asset_id,
+            ZakatError::InvalidInput { asset_id, .. } => asset_id,
+            ZakatError::ConfigurationError { asset_id, .. } => asset_id,
+            ZakatError::Overflow { asset_id, .. } => asset_id,
+            ZakatError::MissingConfig { asset_id, .. } => asset_id,
+        };
 
         let reason = match self {
             ZakatError::CalculationError { reason, .. } => reason.clone(),
@@ -570,9 +622,12 @@ impl ZakatError {
             _ => "Suggestion: Check input data accuracy."
         };
 
+        let id_str = asset_id.map(|id| format!("\n  Asset ID: {}", id)).unwrap_or_default();
+        
         format!(
-            "Diagnostic Report:\n  Asset: {}\n  Error: {}\n  Hint: {}",
-            label, reason, hint
+            "Diagnostic Report:\n  Asset: {}{}
+  Error: {}\n  Hint: {}",
+            label, id_str, reason, hint
         )
     }
 }

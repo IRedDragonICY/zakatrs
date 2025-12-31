@@ -152,7 +152,8 @@ impl CalculateZakat for PreciousMetals {
                 field: "metal_type".to_string(),
                 value: "None".to_string(),
                 reason: "Metal type must be specified (Gold or Silver)".to_string(), 
-                source_label: self.label.clone() 
+                source_label: self.label.clone(),
+                asset_id: None,
             }
         )?;
 
@@ -161,7 +162,8 @@ impl CalculateZakat for PreciousMetals {
                 field: "weight".to_string(),
                 value: "negative".to_string(),
                 reason: "Weight must be non-negative".to_string(), 
-                source_label: self.label.clone() 
+                source_label: self.label.clone(),
+                asset_id: None,
             });
         }
 
@@ -171,7 +173,8 @@ impl CalculateZakat for PreciousMetals {
                 field: "metal_type".to_string(),
                 value: format!("{:?}", metal_type),
                 reason: "Type must be Gold or Silver".to_string(), 
-                source_label: self.label.clone() 
+                source_label: self.label.clone(),
+                asset_id: None,
             }),
         };
 
@@ -191,15 +194,17 @@ impl CalculateZakat for PreciousMetals {
                 field: "metal_type".to_string(),
                 value: format!("{:?}", metal_type),
                 reason: "Type must be Gold or Silver".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             }),
         };
 
         if price_per_gram <= Decimal::ZERO {
              return Err(ZakatError::ConfigurationError { 
                 reason: "Price for metal not set".to_string(), 
-                source_label: self.label.clone() 
-             });
+                source_label: self.label.clone(),
+                asset_id: None,
+            });
         }
 
         let nisab_value = ZakatDecimal::new(nisab_threshold_grams)

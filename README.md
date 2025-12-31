@@ -31,7 +31,8 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Dynamic Portfolio (Add, Remove, Replace assets with stable UUIDs)
 - Asset Labeling (e.g., "Main Store", "Crypto Wallet")
 - Input Sanitization & Validation (Rejects negative values, ensures safe configuration)
-- Flexible Configuration (Env Vars, JSON, Fluent API)
+- Arabic Numeral Support (Eastern Arabic ٠-٩, Perso-Arabic ۰-۹)
+- Flexible Configuration (Env Vars, JSON, Fluent API, Partial Loading)
 - Fiqh Compliance (Jewelry exemptions, Madhab-specific rules, Hawl requirements)
 - Async Support (Optional integration with `tokio` and `async-trait`)
 - Live Pricing Interface (e.g. for API integration)
@@ -45,7 +46,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.11.0"
+zakat = "0.12.0"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] } # Required if using async features
 ```
@@ -53,7 +54,7 @@ tokio = { version = "1", features = ["full"] } # Required if using async feature
 Synchronous Only (Lighter weight):
 ```toml
 [dependencies]
-zakat = { version = "0.11.0", default-features = false }
+zakat = { version = "0.12.0", default-features = false }
 rust_decimal = "1.39"
 ```
 

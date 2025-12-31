@@ -111,7 +111,8 @@ impl CalculateZakat for AgricultureAssets {
                 field: "harvest_weight_price".to_string(),
                 value: "negative".to_string(),
                 reason: "Harvest weight and price must be non-negative".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             });
         }
 

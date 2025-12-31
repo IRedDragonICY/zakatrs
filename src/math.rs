@@ -18,6 +18,7 @@ impl ZakatDecimal {
             .ok_or_else(|| ZakatError::Overflow {
                 operation: "add".to_string(),
                 source_label: None,
+                asset_id: None,
             })
     }
 
@@ -28,6 +29,7 @@ impl ZakatDecimal {
             .ok_or_else(|| ZakatError::Overflow {
                 operation: "sub".to_string(),
                 source_label: None,
+                asset_id: None,
             })
     }
 
@@ -38,6 +40,7 @@ impl ZakatDecimal {
             .ok_or_else(|| ZakatError::Overflow {
                 operation: "mul".to_string(),
                 source_label: None,
+                asset_id: None,
             })
     }
 
@@ -47,6 +50,7 @@ impl ZakatDecimal {
              return Err(ZakatError::CalculationError {
                 reason: "Division by zero".to_string(),
                 source_label: None,
+                asset_id: None,
             });
         }
         self.0.checked_div(other_dec)
@@ -54,6 +58,7 @@ impl ZakatDecimal {
             .ok_or_else(|| ZakatError::Overflow {
                 operation: "div".to_string(),
                 source_label: None,
+                asset_id: None,
             })
     }
 

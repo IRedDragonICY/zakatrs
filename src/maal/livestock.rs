@@ -161,6 +161,12 @@ impl LivestockAssets {
 
 impl CalculateZakat for LivestockAssets {
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        // Early return optimization for zero count
+        if self.count == 0 {
+            return Ok(ZakatDetails::below_threshold(Decimal::ZERO, crate::types::WealthType::Livestock, "Count is zero")
+                .with_label(self.label.clone().unwrap_or_default()));
+        }
+        
         let config_cow = config.resolve_config();
         let _config = config_cow.as_ref();
 
@@ -169,7 +175,8 @@ impl CalculateZakat for LivestockAssets {
                 field: "animal_type".to_string(),
                 value: "None".to_string(),
                 reason: "Animal type must be specified".to_string(),
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             }
         )?;
 
@@ -188,7 +195,8 @@ impl CalculateZakat for LivestockAssets {
             };
             return Err(ZakatError::ConfigurationError {
                 reason: format!("Price for {} must be greater than zero", animal_str), 
-                source_label: self.label.clone()
+                source_label: self.label.clone(),
+                asset_id: None,
             });
         }
 

@@ -86,11 +86,13 @@ impl PortfolioResult {
             PortfolioStatus::Complete => Ok(self),
             PortfolioStatus::Partial => Err(ZakatError::CalculationError {
                 reason: format!("Portfolio calculation incomplete. {}/{} items failed.", self.items_failed, self.items_attempted), 
-                source_label: Some("Portfolio".to_string())
+                source_label: Some("Portfolio".to_string()),
+                asset_id: None,
             }),
             PortfolioStatus::Failed => Err(ZakatError::CalculationError {
                 reason: "Portfolio calculation failed completely.".to_string(), 
-                source_label: Some("Portfolio".to_string())
+                source_label: Some("Portfolio".to_string()),
+                asset_id: None,
             }),
         }
     }
@@ -201,7 +203,8 @@ impl ZakatPortfolio {
                 field: "asset_id".to_string(),
                 value: id.to_string(),
                 reason: "Asset with ID not found".to_string(),
-                source_label: None
+                source_label: None,
+                asset_id: None,
             })
         }
     }

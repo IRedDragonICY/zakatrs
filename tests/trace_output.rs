@@ -3,9 +3,9 @@ use zakat::types::{CalculationStep, CalculationTrace};
 #[test]
 fn test_trace_serialization() {
     let trace = CalculationTrace(vec![
-        CalculationStep::initial("Initial Step", 100),
-        CalculationStep::add("Added Value", 50),
-        CalculationStep::rate("Rate Applied", 0.025),
+        CalculationStep::initial("step-initial", "Initial Step", 100),
+        CalculationStep::add("step-added", "Added Value", 50),
+        CalculationStep::rate("step-rate", "Rate Applied", 0.025),
     ]);
 
     let json = serde_json::to_string(&trace).unwrap();

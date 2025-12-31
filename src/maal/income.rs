@@ -23,23 +23,50 @@ pub enum IncomeCalculationMethod {
     Net,
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IncomeZakatCalculator {
-    pub total_income: Decimal,
-    pub basic_expenses: Decimal,
+    pub income: Decimal,
+    pub expenses: Decimal,
+    pub debt: Decimal,
     pub method: IncomeCalculationMethod,
-    pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
     pub id: uuid::Uuid,
+    // Hidden field for deferred input validation errors
+    #[serde(skip)]
+    _input_errors: Vec<ZakatError>,
+}
+
+impl Default for IncomeZakatCalculator {
+    fn default() -> Self {
+        Self {
+            income: Decimal::ZERO,
+            expenses: Decimal::ZERO,
+            debt: Decimal::ZERO,
+            method: IncomeCalculationMethod::default(),
+            hawl_satisfied: false,
+            label: None,
+            id: uuid::Uuid::new_v4(),
+            _input_errors: Vec::new(),
+        }
+    }
 }
 
 impl IncomeZakatCalculator {
     pub fn new() -> Self {
-        Self {
-            id: uuid::Uuid::new_v4(),
-            ..Default::default()
-        }
+        Self::default()
+    }
+
+    pub fn from_amounts(
+        income: impl IntoZakatDecimal,
+        expenses: impl IntoZakatDecimal,
+        debt: impl IntoZakatDecimal,
+    ) -> Self {
+        let mut calc = Self::default();
+        calc = calc.income(income);
+        calc = calc.expenses(expenses);
+        calc = calc.debt(debt);
+        calc
     }
 
     /// Creates an Income Zakat calculator for a salary amount.
@@ -51,23 +78,35 @@ impl IncomeZakatCalculator {
             .hawl(true)
     }
 
+    pub fn validate(&self) -> Result<(), ZakatError> {
+        match self._input_errors.len() {
+            0 => Ok(()),
+            1 => Err(self._input_errors[0].clone()),
+            _ => Err(ZakatError::MultipleErrors(self._input_errors.clone())),
+        }
+    }
+
     /// Sets total income.
-    /// 
+    ///
     /// # Panics
     /// Panics if the value cannot be converted to a valid decimal.
     pub fn income(mut self, income: impl IntoZakatDecimal) -> Self {
-        self.total_income = income.into_zakat_decimal()
-            .expect("Invalid numeric value for 'income'");
+        match income.into_zakat_decimal() {
+            Ok(v) => self.income = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
     /// Sets basic living expenses.
-    /// 
+    ///
     /// # Panics
     /// Panics if the value cannot be converted to a valid decimal.
     pub fn expenses(mut self, expenses: impl IntoZakatDecimal) -> Self {
-        self.basic_expenses = expenses.into_zakat_decimal()
-            .expect("Invalid numeric value for 'expenses'");
+        match expenses.into_zakat_decimal() {
+            Ok(v) => self.expenses = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
@@ -77,12 +116,14 @@ impl IncomeZakatCalculator {
     }
 
     /// Sets deductible debt.
-    /// 
+    ///
     /// # Panics
     /// Panics if the value cannot be converted to a valid decimal.
     pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        self.liabilities_due_now = debt.into_zakat_decimal()
-            .expect("Invalid numeric value for 'debt'");
+        match debt.into_zakat_decimal() {
+            Ok(v) => self.debt = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
@@ -105,10 +146,11 @@ impl IncomeZakatCalculator {
 
 impl CalculateZakat for IncomeZakatCalculator {
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        self.validate()?;
         let config_cow = config.resolve_config();
         let config = config_cow.as_ref();
 
-        if self.total_income < Decimal::ZERO || self.basic_expenses < Decimal::ZERO {
+        if self.income < Decimal::ZERO || self.expenses < Decimal::ZERO {
             return Err(ZakatError::InvalidInput {
                 field: "income_expenses".to_string(),
                 value: "negative".to_string(),
@@ -150,32 +192,32 @@ impl CalculateZakat for IncomeZakatCalculator {
 
         // Dynamic rate from strategy (default 2.5%)
         let rate = config.strategy.get_rules().trade_goods_rate;
-        let external_debt = self.liabilities_due_now;
+        let external_debt = self.debt;
 
         let (total_assets, liabilities) = match self.method {
             IncomeCalculationMethod::Gross => {
                 // Gross Method: 2.5% of Total Income.
                 // Deducting debts is generally not standard in the Gross method (similar to agriculture),
                 // but we deduct external_debt if provided to support flexible user requirements.
-                (self.total_income, external_debt)
+                (self.income, external_debt)
             },
             IncomeCalculationMethod::Net => {
                 // Net means (Income - Basic Living Expenses).
                 // Then we also deduct any extra debts.
-                let combined_liabilities = ZakatDecimal::new(self.basic_expenses)
+                let combined_liabilities = ZakatDecimal::new(self.expenses)
                     .safe_add(external_debt)?
                     .with_source(self.label.clone());
-                (self.total_income, *combined_liabilities)
+                (self.income, *combined_liabilities)
             }
         };
 
         // Build calculation trace
         let mut trace = Vec::new();
-        trace.push(crate::types::CalculationStep::initial("step-total-income", "Total Income", self.total_income));
+        trace.push(crate::types::CalculationStep::initial("step-total-income", "Total Income", self.income));
         
         match self.method {
             IncomeCalculationMethod::Net => {
-                trace.push(crate::types::CalculationStep::subtract("step-basic-expenses", "Basic Living Expenses", self.basic_expenses));
+                trace.push(crate::types::CalculationStep::subtract("step-basic-expenses", "Basic Living Expenses", self.expenses));
             }
             IncomeCalculationMethod::Gross => {
                 trace.push(crate::types::CalculationStep::info("info-gross-method", "Gross Method used (Expenses not deducted)"));

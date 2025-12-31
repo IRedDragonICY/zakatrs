@@ -92,8 +92,10 @@ impl PreciousMetals {
     /// # Panics
     /// Panics if the value cannot be converted to a valid decimal.
     pub fn weight(mut self, weight: impl IntoZakatDecimal) -> Self {
-        self.weight_grams = weight.into_zakat_decimal()
-            .expect("Invalid numeric value for 'weight'");
+        match weight.into_zakat_decimal() {
+            Ok(v) => self.weight_grams = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
@@ -131,8 +133,10 @@ impl PreciousMetals {
     /// # Panics
     /// Panics if the value cannot be converted to a valid decimal.
     pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        self.liabilities_due_now = debt.into_zakat_decimal()
-            .expect("Invalid numeric value for 'debt'");
+        match debt.into_zakat_decimal() {
+            Ok(v) => self.liabilities_due_now = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 

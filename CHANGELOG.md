@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.17.0] - 2025-12-31
+
+### Added
+- **Panic-Free Setters (Complete)**: Extended deferred error handling to `PreciousMetals`, `InvestmentAssets`, and `IncomeZakatCalculator`.
+    - Setters like `weight()`, `debt()`, `income()`, `value()` no longer panic on invalid input.
+    - Errors are deferred and reported via `validate()` or `calculate_zakat()`.
+- **Validation**: Added `validate()` method to `InvestmentAssets` and `IncomeZakatCalculator`.
+
+### Fixed
+- **Trace Output**: Fixed deserialization of `CalculationStep` in tests.
+- **Explain Output**: Aligned `explain()` output format in tests.
+
 ## [0.16.0] - 2025-12-31
 
 ### Added

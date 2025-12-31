@@ -18,9 +18,9 @@ fn test_explain_output_format() {
 
     // Verify key elements
     // Note: Specific assets might use "Total Value" or "Weight" instead of generic "Total Assets"
-    assert!(explanation.contains("Explanation for 'My Gold' (Gold):"));
+    assert!(explanation.contains("My Gold (Gold)"));
     assert!(explanation.contains("Status: PAYABLE"));
-    assert!(explanation.contains("Amount Due: 250.00")); // 100 * 100 * 0.025 = 250
+    assert!(explanation.contains("Amount Due: $250.00")); // 100 * 100 * 0.025 = 250
     
     // Check for specific trace steps we know exist for Gold
     assert!(explanation.contains("Weight (grams)")); 

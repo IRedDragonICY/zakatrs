@@ -1,5 +1,5 @@
 use zakat::i18n::{ZakatLocale, CurrencyFormatter, TRANSLATOR};
-use zakat::types::{CalculationStep, ZakatDetails, WealthType, PaymentPayload};
+use zakat::types::{CalculationStep, ZakatDetails, WealthType};
 use rust_decimal_macros::dec;
 use rust_decimal::Decimal;
 

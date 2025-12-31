@@ -24,28 +24,43 @@ pub enum InvestmentType {
     MutualFund,
 }
 
-#[derive(Default, Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InvestmentAssets {
-    pub market_value: Decimal,
+    pub value: Decimal,
+    pub debt: Decimal,
+    // Hidden field for deferred input validation errors
+    #[serde(skip)]
+    _input_errors: Vec<ZakatError>,
+    // The following fields are retained from the original struct
     pub investment_type: InvestmentType,
-    pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub label: Option<String>,
     pub id: uuid::Uuid,
 }
 
+impl Default for InvestmentAssets {
+    fn default() -> Self {
+        Self {
+            value: Decimal::ZERO,
+            debt: Decimal::ZERO,
+            _input_errors: Vec::new(),
+            investment_type: InvestmentType::default(),
+            hawl_satisfied: false,
+            label: None,
+            id: uuid::Uuid::new_v4(), // Default ID generation
+        }
+    }
+}
+
 impl InvestmentAssets {
     pub fn new() -> Self {
-        Self {
-            id: uuid::Uuid::new_v4(),
-            ..Default::default()
-        }
+        Self::default()
     }
 
     /// Creates a Stock investment asset with the specified market value.
     /// Defaults to Hawl satisfied.
     pub fn stock(value: impl IntoZakatDecimal) -> Self {
-        Self::new()
+        Self::default()
             .value(value)
             .kind(InvestmentType::Stock)
             .hawl(true)
@@ -54,19 +69,28 @@ impl InvestmentAssets {
     /// Creates a Crypto investment asset with the specified market value.
     /// Defaults to Hawl satisfied.
     pub fn crypto(value: impl IntoZakatDecimal) -> Self {
-        Self::new()
+        Self::default()
             .value(value)
             .kind(InvestmentType::Crypto)
             .hawl(true)
     }
 
+
+
+    pub fn validate(&self) -> Result<(), ZakatError> {
+        match self._input_errors.len() {
+            0 => Ok(()),
+            1 => Err(self._input_errors[0].clone()),
+            _ => Err(ZakatError::MultipleErrors(self._input_errors.clone())),
+        }
+    }
+
     /// Sets the market value.
-    /// 
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
     pub fn value(mut self, value: impl IntoZakatDecimal) -> Self {
-        self.market_value = value.into_zakat_decimal()
-            .expect("Invalid numeric value for 'value'");
+        match value.into_zakat_decimal() {
+            Ok(v) => self.value = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
@@ -76,12 +100,11 @@ impl InvestmentAssets {
     }
 
     /// Sets deductible debt.
-    /// 
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
     pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        self.liabilities_due_now = debt.into_zakat_decimal()
-            .expect("Invalid numeric value for 'debt'");
+        match debt.into_zakat_decimal() {
+            Ok(v) => self.debt = v,
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 
@@ -104,10 +127,11 @@ impl InvestmentAssets {
 
 impl CalculateZakat for InvestmentAssets {
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        self.validate()?;
         let config_cow = config.resolve_config();
         let config = config_cow.as_ref();
 
-        if self.market_value < Decimal::ZERO {
+        if self.value < Decimal::ZERO {
             return Err(ZakatError::InvalidInput {
                 field: "market_value".to_string(),
                 value: "negative".to_string(),
@@ -148,8 +172,8 @@ impl CalculateZakat for InvestmentAssets {
         // Crypto: Treated as Trade Goods (2.5% if > Nisab).
         // Stocks: Market Value * 2.5% (Zakah on Principal + Profit).
         
-        let total_assets = self.market_value;
-        let liabilities = self.liabilities_due_now;
+        let total_assets = self.value;
+        let liabilities = self.debt;
         // Dynamic rate from strategy (default 2.5%)
         let rate = config.strategy.get_rules().trade_goods_rate;
 

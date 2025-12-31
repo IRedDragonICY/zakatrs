@@ -108,6 +108,14 @@ impl ZakatConfig {
             .with_gold_price(gold)
     }
 
+    /// Finalizes the configuration and runs validation.
+    /// 
+    /// This is the recommended way to finish a ZakatConfig builder chain.
+    pub fn build(self) -> Result<Self, ZakatError> {
+        self.validate()?;
+        Ok(self)
+    }
+
     /// Validates the configuration for logical consistency and safety.
     #[instrument(skip(self))]
     pub fn validate(&self) -> Result<(), ZakatError> {

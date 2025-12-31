@@ -5,7 +5,7 @@
 //! - **Benefit**: This ensures the poor receive their due from wealth that would otherwise be exempt if split (*Anfa' lil-fuqara*).
 
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
+
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -454,7 +454,7 @@ fn aggregate_and_summarize(mut results: Vec<PortfolioItemResult>, config: &crate
     let global_nisab = config.get_monetary_nisab_threshold();
     
     if monetary_net_assets >= global_nisab && monetary_net_assets > Decimal::ZERO {
-        let standard_rate = dec!(0.025);
+        let standard_rate = config.strategy.get_rules().trade_goods_rate;
 
         for i in monetary_indices {
             // We need to mutate the result.

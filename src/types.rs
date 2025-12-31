@@ -680,7 +680,19 @@ impl ZakatError {
             ZakatError::MultipleErrors(_) => unreachable!(), // Handled above
         };
 
-        let hint = match self {
+        let hint = self.get_hint();
+
+        let id_str = asset_id.map(|id| format!("\n  Asset ID: {}", id)).unwrap_or_default();
+        
+        format!(
+            "Diagnostic Report:\n  Asset: {}{}
+  Error: {}\n  Hint: {}",
+            label, id_str, reason, hint
+        )
+    }
+
+    fn get_hint(&self) -> &'static str {
+         match self {
             ZakatError::ConfigurationError { reason, .. } => {
                 if reason.contains("Gold price") || reason.contains("Silver price") {
                     "Suggestion: Set prices in ZakatConfig using .with_gold_price() / .with_silver_price()"
@@ -697,15 +709,53 @@ impl ZakatError {
             },
             ZakatError::InvalidInput { .. } => "Suggestion: Ensure all input values are non-negative and correct.",
             _ => "Suggestion: Check input data accuracy."
-        };
+        }
+    }
 
-        let id_str = asset_id.map(|id| format!("\n  Asset ID: {}", id)).unwrap_or_default();
-        
-        format!(
-            "Diagnostic Report:\n  Asset: {}{}
-  Error: {}\n  Hint: {}",
-            label, id_str, reason, hint
-        )
+    /// Returns a structured JSON context for the error.
+    /// Useful for WASM/Frontend consumers.
+    pub fn context(&self) -> serde_json::Value {
+        use serde_json::json;
+        match self {
+             ZakatError::InvalidInput { field, value, reason, source_label, .. } => json!({
+                 "code": "INVALID_INPUT",
+                 "message": reason,
+                 "field": field,
+                 "value": value,
+                 "source": source_label,
+                 "hint": self.get_hint()
+             }),
+             ZakatError::ConfigurationError { reason, source_label, .. } => json!({
+                 "code": "CONFIG_ERROR",
+                 "message": reason,
+                 "source": source_label,
+                 "hint": self.get_hint()
+             }),
+             ZakatError::MissingConfig { field, source_label, .. } => json!({
+                 "code": "MISSING_CONFIG",
+                 "message": format!("Missing required field: {}", field),
+                 "field": field,
+                 "source": source_label,
+                 "hint": self.get_hint()
+             }),
+             ZakatError::CalculationError { reason, source_label, .. } => json!({
+                 "code": "CALCULATION_ERROR",
+                 "message": reason,
+                 "source": source_label,
+                 "hint": self.get_hint()
+             }),
+             ZakatError::Overflow { operation, source_label, .. } => json!({
+                 "code": "OVERFLOW",
+                 "message": format!("Overflow in operation: {}", operation),
+                 "source": source_label,
+                 "hint": self.get_hint()
+             }),
+             ZakatError::MultipleErrors(errors) => json!({
+                 "code": "MULTIPLE_ERRORS",
+                 "message": "Multiple validation errors occurred",
+                 "errors": errors.iter().map(|e| e.context()).collect::<Vec<_>>()
+             })
+        }
     }
 }
 

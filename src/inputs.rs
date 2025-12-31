@@ -79,6 +79,24 @@ impl_into_zakat_decimal_float!(f32, f64);
 ///
 /// Negative numbers and decimal points are preserved.
 /// Negative numbers and decimal points are preserved.
+/// Sanitizes a numeric string by removing common formatting characters.
+/// 
+/// This function handles:
+/// - Arabic numerals: Eastern Arabic (`٠` through `٩`) and Perso-Arabic (`۰` through `۹`) normalized to ASCII
+/// - Currency symbols (`$`, `£`, `€`, `¥`) - removed
+/// - Underscores (`_`) - Rust-style numeric separators, removed
+/// - Commas (`,`) - intelligently handled:
+///   - If comma is the last separator AND followed by 1-2 digits, treated as decimal (European format)
+///   - Otherwise, treated as thousands separator (US/UK format)
+/// - Leading/trailing whitespace - trimmed
+///
+/// # Examples
+/// - `"$1,000.00"` → `"1000.00"` (US format)
+/// - `"€12,50"` → `"12.50"` (European format)
+/// - `"1.234,56"` → `"1234.56"` (European thousands + decimal)
+/// - `"١٢٣٤.٥٠"` → `"1234.50"` (Eastern Arabic numerals)
+///
+/// Negative numbers and decimal points are preserved.
 fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
     if s.len() > MAX_INPUT_LEN {
         return Err(ZakatError::InvalidInput {
@@ -90,42 +108,124 @@ fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
         });
     }
 
-    // First normalize Arabic numerals to ASCII
-    let normalized = normalize_arabic_numerals(s);
+    // Optimization: Pre-allocate buffer to avoid re-allocations
+    let mut buffer = String::with_capacity(s.len());
+    let mut last_comma_index = None;
+    let mut last_dot_index = None;
     
-    // Remove non-breaking spaces and control characters
-    let mut result = normalized.replace('\u{00A0}', "");
-    result.retain(|c| !c.is_control());
-    result = result.replace(' ', ""); // Remove regular spaces
-    result = result.trim().to_string();
+    // Single pass for cleaning and normalization
+    for c in s.trim().chars() {
+        match c {
+            // Arabic Numerals -> Normalize to ASCII
+            '\u{0660}'..='\u{0669}' => buffer.push(char::from_u32(c as u32 - 0x0660 + '0' as u32).unwrap_or(c)),
+            '\u{06F0}'..='\u{06F9}' => buffer.push(char::from_u32(c as u32 - 0x06F0 + '0' as u32).unwrap_or(c)),
+            
+            // Allowed characters
+            '0'..='9' | '-' | '.' => {
+                if c == '.' {
+                    last_dot_index = Some(buffer.len());
+                }
+                buffer.push(c);
+            },
+            
+            // Commas need tracking for heuristic
+            ',' => {
+                last_comma_index = Some(buffer.len());
+                buffer.push(c);
+            },
+
+            // Eastern Arabic Decimal Separator (٫) -> Convert to dot
+            '٫' => {
+                 last_dot_index = Some(buffer.len());
+                 buffer.push('.');
+            },
+            
+            // Ignored characters (Currency, Spaces, Controls, Underscores, Arabic Thousands Sep)
+            '$' | '£' | '€' | '¥' | '_' | ' ' | '\u{00A0}' | '٬' => {},
+            
+            // Skip control characters
+            c if c.is_control() => {},
+            
+            // Keep others? Or be strict? 
+            // Existing logic seemed to just effectively filter specific things and keep others via simple replace.
+            // But optimal is to whitelist or be specific. 
+            // For safety with existing tests that might pass weird chars, let's just ignore known "bad" ones.
+            // Actually, best practice for "sanitize numeric" is to mostly whitelist.
+            // But let's stick to the previous behavior of "remove specific junk, keep rest" essentially, 
+            // but implemented via match.
+            // The previous logic did: replace specific things, then trim.
+            // So if I had 'a', it would keep it. Leading to parse error later.
+            // Let's replicate that behavior for compatibility, OR improve it?
+            // "Others: Push to buffer" was in user instructions.
+            _ => buffer.push(c), 
+        }
+    }
+
+    // Heuristic for comma handling (Post-processing on the cleaned buffer)
+    // If comma is the last separator and followed by 1-2 digits at end...
+    // Note: Indices in `last_comma_index` refer to position in `buffer`.
     
-    // Remove currency symbols and underscores
-    result = result.replace(['$', '£', '€', '¥', '_'], "");
+    // We need to re-find indices because we might have skipped chars, 
+    // but we tracked them as we pushed! 
+    // Wait, if we pushed multiple commas, `last_comma_index` is the last one in `buffer`. Correct.
     
-    // Heuristic for comma handling:
-    // If comma is the last separator and followed by 1-2 digits at end,
-    // treat as decimal point (European format like "12,50" or "1.234,56")
-    if let Some(comma_pos) = result.rfind(',') {
-        let after_comma = &result[comma_pos + 1..];
-        let dot_pos = result.rfind('.');
+    if let Some(comma_pos) = last_comma_index {
+        let len = buffer.len();
+        let after_comma_len = len - 1 - comma_pos;
         
-        // European decimal: comma after any dot, or no dot and 1-2 digits after comma
-        let is_european_decimal = (dot_pos.is_none() || comma_pos > dot_pos.unwrap())
-            && after_comma.len() <= 2 
-            && !after_comma.is_empty()
-            && after_comma.chars().all(|c| c.is_ascii_digit());
+        // Check if it looks like a European decimal
+        // Conditions:
+        // 1. comma is after the last dot (if any)
+        // 2. 1 or 2 digits after comma
+        // 3. remaining chars are digits (already checked by flow mostly, but `buffer` might have trash)
         
+        let is_european_decimal = (last_dot_index.is_none() || comma_pos > last_dot_index.unwrap())
+            && after_comma_len > 0
+            && after_comma_len <= 2
+            && buffer[comma_pos+1..].chars().all(|c| c.is_ascii_digit());
+            
         if is_european_decimal {
-            // Replace this comma with dot, remove other commas and dots (thousands separators)
-            let before_comma = result[..comma_pos].replace([',', '.'], "");
-            result = format!("{}.{}", before_comma, after_comma);
+            // It's a decimal separator.
+            // 1. Remove all dots (thousands separators in EU)
+            // 2. Turn this comma into dot.
+            // 3. Remove other commas? (EU thousands could be dots)
+            // Wait, standard EU is 1.234,56. 
+            // If we have mixed 1,234.56 (US), `is_european_decimal` is false (dot is after comma or len > 2).
+            
+            // To do this efficiently in one go:
+            // Rebuild string? Or mutate?
+            // Since we produced `buffer` ourselves, we can process it.
+            
+            // Simpler approach compatible with previous logic:
+            // "Replace this comma with dot, remove other commas and dots"
+            
+            // Let's just do a second quick pass or string manipulation as it's cleaner than complex in-place.
+            // Allocating one more string here is acceptable for the "detected EU" case which is rarer than US,
+            // or we can manipulate `buffer`.
+            
+            let mut final_res = String::with_capacity(buffer.len());
+            for (i, c) in buffer.chars().enumerate() {
+                if i == comma_pos {
+                    final_res.push('.');
+                } else if c == '.' {
+                    // Skip (it was a thousands separator)
+                } else if c == ',' {
+                    // Skip (other commas? uncommon in valid EU but safe to remove)
+                } else {
+                    final_res.push(c);
+                }
+            }
+            return Ok(final_res);
         } else {
-            // Comma is thousands separator - remove all commas
-            result = result.replace(',', "");
+            // Comma is a thousands separator (US). Remove all commas.
+            // This is the common case: "1,000".
+            // We can do this in place if `buffer` was mutable more smartly, but replace is fine.
+            // `buffer.retain` is efficient.
+            buffer.retain(|c| c != ',');
         }
     }
     
-    Ok(result)
+    Ok(buffer)
 }
 
 /// Normalizes Arabic numerals to ASCII digits.
@@ -134,6 +234,8 @@ fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
 /// - Eastern Arabic numerals: ٠١٢٣٤٥٦٧٨٩ (U+0660..U+0669)
 /// - Perso-Arabic numerals: ۰۱۲۳۴۵۶۷۸۹ (U+06F0..U+06F9)
 fn normalize_arabic_numerals(s: &str) -> String {
+    // Kept for backward compatibility if used elsewhere, 
+    // but `sanitize_numeric_string` now handles this inline.
     s.chars().map(|c| {
         match c {
             // Eastern Arabic numerals (٠-٩)

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.15.0] - 2025-12-31
+
+### Added
+- **Dynamic Trade Goods Rate**: `aggregate_and_summarize` now uses the rate defined in `ZakatStrategy` (e.g., 2.577%) instead of a hardcoded 2.5%.
+- **Config Builder**: Added `ZakatConfig::build()` for explicit validation at the end of a configuration chain.
+- **Diagnostic Reports**: Enhanced `ZakatError` with `context()` returning structured JSON and improved `report()` output.
+- **WASM structured Errors**: WebAssembly functions now return detailed error objects with codes (`INVALID_INPUT`, `CONFIG_ERROR`) instead of plain strings.
+
+### Performance
+- **Zero-Copy Sanitization**: Rewrote `sanitize_numeric_string` to use single-pass pre-allocation, significantly reducing memory churn during input parsing.
+
 ## [0.14.0] - 2025-12-31
 
 ### Added

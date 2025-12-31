@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.11.0] - 2025-12-31
+
+### Added
+- **ID Restoration**: Added `with_id(uuid::Uuid)` method to all asset types for database/serialization restoration.
+- **Gold Purity Validation**: `PreciousMetals::purity()` now validates that purity is between 1-24 Karat.
+- **European Locale Support**: Input parsing now handles European decimal format (e.g., `€12,50` → `12.50`).
+
+### Changed
+- **Dynamic Trade Goods Rate**: All calculators now use `config.strategy.get_rules().trade_goods_rate` instead of hardcoded `2.5%`.
+    - Affected modules: `business`, `investments`, `income`, `mining`, `precious_metals`.
+- **Fail-Fast Setters**: Fluent setters now panic on invalid input instead of silently ignoring errors.
+    - *Breaking Change*: Invalid inputs will cause panics rather than defaulting to zero.
+    - Maintains DX-friendly fluent API (no `.unwrap()` required by users).
+
+### Fixed
+- **100x Financial Error**: Fixed locale-aware parsing bug where `€12,50` was incorrectly parsed as `1250`.
+- **400% Asset Inflation**: Fixed purity validation allowing `purity(100)` which inflated gold value by `100/24`.
+- **Strategy Pattern Disconnect**: Fixed `trade_goods_rate` from `ZakatStrategy` being ignored.
+
 ## [0.10.0] - 2025-12-31
 
 ### Added

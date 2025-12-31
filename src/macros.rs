@@ -63,10 +63,12 @@ macro_rules! zakat_asset {
             }
 
             /// Sets the deductible debt/liabilities due now.
+            /// 
+            /// # Panics
+            /// Panics if the value cannot be converted to a valid decimal.
             pub fn debt(mut self, val: impl $crate::inputs::IntoZakatDecimal) -> Self {
-                if let Ok(v) = val.into_zakat_decimal() {
-                    self.liabilities_due_now = v;
-                }
+                self.liabilities_due_now = val.into_zakat_decimal()
+                    .expect("Invalid numeric value for 'debt'");
                 self
             }
 
@@ -85,6 +87,12 @@ macro_rules! zakat_asset {
             /// Returns the unique ID of the asset.
             pub fn get_id(&self) -> uuid::Uuid {
                 self._id
+            }
+
+            /// Restores the asset ID (for database/serialization restoration).
+            pub fn with_id(mut self, id: uuid::Uuid) -> Self {
+                self._id = id;
+                self
             }
         }
     };

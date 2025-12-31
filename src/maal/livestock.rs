@@ -479,6 +479,7 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decima
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ZakatConfig;
 
     #[test]
     fn test_sheep() {

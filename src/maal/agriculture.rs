@@ -208,6 +208,7 @@ impl CalculateZakat for AgricultureAssets {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ZakatConfig;
 
     #[test]
     fn test_agriculture_rain() {

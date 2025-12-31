@@ -41,10 +41,13 @@ impl MiningAssets {
         }
     }
 
+    /// Sets the mining value.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn value(mut self, value: impl IntoZakatDecimal) -> Self {
-        if let Ok(v) = value.into_zakat_decimal() {
-            self.value = v;
-        }
+        self.value = value.into_zakat_decimal()
+            .expect("Invalid numeric value for 'value'");
         self
     }
 
@@ -53,10 +56,13 @@ impl MiningAssets {
         self
     }
 
+    /// Sets deductible debt.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        if let Ok(d) = debt.into_zakat_decimal() {
-            self.liabilities_due_now = d;
-        }
+        self.liabilities_due_now = debt.into_zakat_decimal()
+            .expect("Invalid numeric value for 'debt'");
         self
     }
 
@@ -67,6 +73,12 @@ impl MiningAssets {
 
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    /// Restores the asset ID (for database/serialization restoration).
+    pub fn with_id(mut self, id: uuid::Uuid) -> Self {
+        self.id = id;
         self
     }
 }
@@ -116,7 +128,8 @@ impl CalculateZakat for MiningAssets {
                      return Ok(ZakatDetails::below_threshold(*nisab_threshold, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met")
                         .with_label(self.label.clone().unwrap_or_default()));
                 }
-                let rate = dec!(0.025);
+                // Dynamic rate from strategy (default 2.5%)
+                let rate = config.strategy.get_rules().trade_goods_rate;
                 let liabilities = self.liabilities_due_now;
 
                 // Build trace for Mines
@@ -130,7 +143,7 @@ impl CalculateZakat for MiningAssets {
                 trace.push(crate::types::CalculationStep::compare("Nisab Threshold (85g Gold)", *nisab_threshold));
                 
                 if *net_val >= *nisab_threshold && *net_val > Decimal::ZERO {
-                    trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
+                    trace.push(crate::types::CalculationStep::rate("Applied Trade Goods Rate", rate));
                 } else {
                      trace.push(crate::types::CalculationStep::info("Net Value below Nisab - No Zakat Due"));
                 }
@@ -153,6 +166,7 @@ impl CalculateZakat for MiningAssets {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ZakatConfig;
 
     #[test]
     fn test_rikaz() {

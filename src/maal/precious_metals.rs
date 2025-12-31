@@ -15,7 +15,6 @@
 //! - Logic: `weight * (karat / 24)` extracts the zakatable 24K equivalent.
 
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError, WealthType};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 
@@ -84,10 +83,13 @@ impl PreciousMetals {
             .hawl(true)
     }
 
+    /// Sets the weight in grams.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn weight(mut self, weight: impl IntoZakatDecimal) -> Self {
-        if let Ok(w) = weight.into_zakat_decimal() {
-            self.weight_grams = w;
-        }
+        self.weight_grams = weight.into_zakat_decimal()
+            .expect("Invalid numeric value for 'weight'");
         self
     }
 
@@ -96,7 +98,14 @@ impl PreciousMetals {
         self
     }
 
+    /// Sets gold purity in Karat (1-24).
+    /// 
+    /// # Panics
+    /// Panics if purity is 0 or greater than 24.
     pub fn purity(mut self, purity: u32) -> Self {
+        if purity == 0 || purity > 24 {
+            panic!("Gold purity must be between 1 and 24 Karat (got {})", purity);
+        }
         self.purity = purity;
         self
     }
@@ -106,10 +115,13 @@ impl PreciousMetals {
         self
     }
 
+    /// Sets deductible debt.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        if let Ok(d) = debt.into_zakat_decimal() {
-            self.liabilities_due_now = d;
-        }
+        self.liabilities_due_now = debt.into_zakat_decimal()
+            .expect("Invalid numeric value for 'debt'");
         self
     }
 
@@ -120,6 +132,12 @@ impl PreciousMetals {
 
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    /// Restores the asset ID (for database/serialization restoration).
+    pub fn with_id(mut self, id: uuid::Uuid) -> Self {
+        self.id = id;
         self
     }
 }
@@ -208,7 +226,8 @@ impl CalculateZakat for PreciousMetals {
             .with_source(self.label.clone());
         let liabilities = self.liabilities_due_now;
 
-        let rate = dec!(0.025); // 2.5%
+        // Dynamic rate from strategy (default 2.5%)
+        let rate = config.strategy.get_rules().trade_goods_rate;
 
         // Build calculation trace
         let mut trace = Vec::new();
@@ -230,7 +249,7 @@ impl CalculateZakat for PreciousMetals {
         trace.push(crate::types::CalculationStep::compare("Nisab Threshold", *nisab_value));
 
         if *net_val >= *nisab_value && *net_val > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
+            trace.push(crate::types::CalculationStep::rate("Applied Trade Goods Rate", rate));
         } else {
              trace.push(crate::types::CalculationStep::info("Net Value below Nisab - No Zakat Due"));
         }
@@ -252,6 +271,8 @@ impl CalculateZakat for PreciousMetals {
 mod tests {
     use super::*;
     use crate::madhab::Madhab;
+    use crate::config::ZakatConfig;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_gold_below_nisab() {

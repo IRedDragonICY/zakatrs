@@ -59,16 +59,50 @@ impl_into_zakat_decimal_float!(f32, f64);
 
 /// Sanitizes a numeric string by removing common formatting characters.
 /// 
-/// This function removes:
-/// - Commas (`,`) - thousand separators
-/// - Underscores (`_`) - Rust-style numeric separators
-/// - Currency symbols (`$`, `£`, `€`, `¥`)
-/// - Leading/trailing whitespace
+/// This function handles:
+/// - Currency symbols (`$`, `£`, `€`, `¥`) - removed
+/// - Underscores (`_`) - Rust-style numeric separators, removed
+/// - Commas (`,`) - intelligently handled:
+///   - If comma is the last separator AND followed by 1-2 digits, treated as decimal (European format)
+///   - Otherwise, treated as thousands separator (US/UK format)
+/// - Leading/trailing whitespace - trimmed
+///
+/// # Examples
+/// - `"$1,000.00"` → `"1000.00"` (US format)
+/// - `"€12,50"` → `"12.50"` (European format)
+/// - `"1.234,56"` → `"1234.56"` (European thousands + decimal)
 ///
 /// Negative numbers and decimal points are preserved.
 fn sanitize_numeric_string(s: &str) -> String {
-    s.trim()
-        .replace([',', '_', '$', '£', '€', '¥'], "")
+    let mut result = s.trim().to_string();
+    
+    // Remove currency symbols and underscores
+    result = result.replace(['$', '£', '€', '¥', '_'], "");
+    
+    // Heuristic for comma handling:
+    // If comma is the last separator and followed by 1-2 digits at end,
+    // treat as decimal point (European format like "12,50" or "1.234,56")
+    if let Some(comma_pos) = result.rfind(',') {
+        let after_comma = &result[comma_pos + 1..];
+        let dot_pos = result.rfind('.');
+        
+        // European decimal: comma after any dot, or no dot and 1-2 digits after comma
+        let is_european_decimal = (dot_pos.is_none() || comma_pos > dot_pos.unwrap())
+            && after_comma.len() <= 2 
+            && !after_comma.is_empty()
+            && after_comma.chars().all(|c| c.is_ascii_digit());
+        
+        if is_european_decimal {
+            // Replace this comma with dot, remove other commas and dots (thousands separators)
+            let before_comma = result[..comma_pos].replace([',', '.'], "");
+            result = format!("{}.{}", before_comma, after_comma);
+        } else {
+            // Comma is thousands separator - remove all commas
+            result = result.replace(',', "");
+        }
+    }
+    
+    result
 }
 
 impl IntoZakatDecimal for &str {
@@ -146,6 +180,43 @@ mod tests {
         let input = String::from("$5,000.00");
         let result = input.into_zakat_decimal().unwrap();
         assert_eq!(result, Decimal::from_str("5000.00").unwrap());
+    }
+
+    // === European Locale Tests ===
+    
+    #[test]
+    fn test_european_decimal_format() {
+        // "€12,50" should become 12.50, not 1250
+        let result = "€12,50".into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("12.50").unwrap());
+    }
+
+    #[test]
+    fn test_european_decimal_single_digit() {
+        // "€12,5" should become 12.5
+        let result = "€12,5".into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("12.5").unwrap());
+    }
+
+    #[test]
+    fn test_european_thousands_with_decimal() {
+        // "1.234,56" (European thousands + decimal) should become 1234.56
+        let result = "1.234,56".into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("1234.56").unwrap());
+    }
+
+    #[test]
+    fn test_us_format_still_works() {
+        // "1,234.56" (US format) should still work
+        let result = "$1,234.56".into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("1234.56").unwrap());
+    }
+
+    #[test]
+    fn test_large_european_format() {
+        // "€1.234.567,89" should become 1234567.89
+        let result = "€1.234.567,89".into_zakat_decimal().unwrap();
+        assert_eq!(result, Decimal::from_str("1234567.89").unwrap());
     }
 }
 

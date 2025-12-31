@@ -9,7 +9,6 @@
 //! - **Net**: Deduct basic needs (*Hajah Asliyyah*) and debts before calculating surplus (Lenient).
 
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
@@ -52,17 +51,23 @@ impl IncomeZakatCalculator {
             .hawl(true)
     }
 
+    /// Sets total income.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn income(mut self, income: impl IntoZakatDecimal) -> Self {
-        if let Ok(i) = income.into_zakat_decimal() {
-            self.total_income = i;
-        }
+        self.total_income = income.into_zakat_decimal()
+            .expect("Invalid numeric value for 'income'");
         self
     }
 
+    /// Sets basic living expenses.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn expenses(mut self, expenses: impl IntoZakatDecimal) -> Self {
-        if let Ok(e) = expenses.into_zakat_decimal() {
-            self.basic_expenses = e;
-        }
+        self.basic_expenses = expenses.into_zakat_decimal()
+            .expect("Invalid numeric value for 'expenses'");
         self
     }
 
@@ -71,10 +76,13 @@ impl IncomeZakatCalculator {
         self
     }
 
+    /// Sets deductible debt.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        if let Ok(d) = debt.into_zakat_decimal() {
-            self.liabilities_due_now = d;
-        }
+        self.liabilities_due_now = debt.into_zakat_decimal()
+            .expect("Invalid numeric value for 'debt'");
         self
     }
 
@@ -85,6 +93,12 @@ impl IncomeZakatCalculator {
 
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    /// Restores the asset ID (for database/serialization restoration).
+    pub fn with_id(mut self, id: uuid::Uuid) -> Self {
+        self.id = id;
         self
     }
 }
@@ -131,7 +145,8 @@ impl CalculateZakat for IncomeZakatCalculator {
                 .with_label(self.label.clone().unwrap_or_default()));
         }
 
-        let rate = dec!(0.025);
+        // Dynamic rate from strategy (default 2.5%)
+        let rate = config.strategy.get_rules().trade_goods_rate;
         let external_debt = self.liabilities_due_now;
 
         let (total_assets, liabilities) = match self.method {
@@ -173,7 +188,7 @@ impl CalculateZakat for IncomeZakatCalculator {
         trace.push(crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value));
         
         if *net_income >= nisab_threshold_value && *net_income > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
+            trace.push(crate::types::CalculationStep::rate("Applied Trade Goods Rate", rate));
         } else {
             trace.push(crate::types::CalculationStep::info("Net Income below Nisab - No Zakat Due"));
         }
@@ -194,6 +209,8 @@ impl CalculateZakat for IncomeZakatCalculator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ZakatConfig;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_income_gross() {

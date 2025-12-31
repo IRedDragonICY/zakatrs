@@ -9,7 +9,6 @@
 //! - **Debts**: Deducting `liabilities_due_now` aligns with the principle of *Dayn al-Hal* (immediate debt) preventing Zakat, as supported by AAOIFI Standard 35.
 
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::math::ZakatDecimal;
 use serde::{Serialize, Deserialize};
@@ -64,34 +63,42 @@ impl BusinessZakat {
     }
 
     /// Sets cash on hand.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn cash(mut self, cash: impl IntoZakatDecimal) -> Self {
-        if let Ok(val) = cash.into_zakat_decimal() {
-             self.cash_on_hand = val;
-        }
+        self.cash_on_hand = cash.into_zakat_decimal()
+            .expect("Invalid numeric value for 'cash'");
         self
     }
 
     /// Sets inventory value.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn inventory(mut self, inventory: impl IntoZakatDecimal) -> Self {
-        if let Ok(val) = inventory.into_zakat_decimal() {
-            self.inventory_value = val;
-        }
+        self.inventory_value = inventory.into_zakat_decimal()
+            .expect("Invalid numeric value for 'inventory'");
         self
     }
 
     /// Sets receivables (money owed to the business).
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn receivables(mut self, receivables: impl IntoZakatDecimal) -> Self {
-        if let Ok(val) = receivables.into_zakat_decimal() {
-            self.receivables = val;
-        }
+        self.receivables = receivables.into_zakat_decimal()
+            .expect("Invalid numeric value for 'receivables'");
         self
     }
 
     /// Sets short-term business liabilities (deducted from gross assets).
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn liabilities(mut self, liabilities: impl IntoZakatDecimal) -> Self {
-        if let Ok(val) = liabilities.into_zakat_decimal() {
-            self.short_term_liabilities = val;
-        }
+        self.short_term_liabilities = liabilities.into_zakat_decimal()
+            .expect("Invalid numeric value for 'liabilities'");
         self
     }
 }
@@ -155,8 +162,8 @@ impl CalculateZakat for BusinessZakat {
             .safe_add(self.liabilities_due_now)?
             .with_source(self.label.clone());
 
-        // Zakat Rate is 2.5%
-        let rate = dec!(0.025);
+        // Dynamic Zakat Rate from strategy (default 2.5%)
+        let rate = config.strategy.get_rules().trade_goods_rate;
 
         // Build calculation trace
         // Note: gross_assets and total_liabilities are ZakatDecimal wrapper
@@ -175,7 +182,7 @@ impl CalculateZakat for BusinessZakat {
         // We rely on ZakatDetails::with_trace to calculate final amounts, 
         // but we add a trace step for rate/info.
         if net_assets_dec >= nisab_threshold_value && net_assets_dec > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
+            trace.push(crate::types::CalculationStep::rate("Applied Trade Goods Rate", rate));
         } else {
              trace.push(crate::types::CalculationStep::info("Net Assets below Nisab - No Zakat Due"));
         }
@@ -202,6 +209,8 @@ impl CalculateZakat for BusinessZakat {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ZakatConfig;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_business_zakat() {

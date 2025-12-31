@@ -9,7 +9,6 @@
 //! - **IIFA Resolutions**: Cryptocurrencies recognized as wealth (*Mal*) are subject to Zakat if they meet conditions of value and possession.
 
 use rust_decimal::Decimal;
-use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
@@ -61,10 +60,13 @@ impl InvestmentAssets {
             .hawl(true)
     }
 
+    /// Sets the market value.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn value(mut self, value: impl IntoZakatDecimal) -> Self {
-        if let Ok(v) = value.into_zakat_decimal() {
-            self.market_value = v;
-        }
+        self.market_value = value.into_zakat_decimal()
+            .expect("Invalid numeric value for 'value'");
         self
     }
 
@@ -73,10 +75,13 @@ impl InvestmentAssets {
         self
     }
 
+    /// Sets deductible debt.
+    /// 
+    /// # Panics
+    /// Panics if the value cannot be converted to a valid decimal.
     pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        if let Ok(d) = debt.into_zakat_decimal() {
-            self.liabilities_due_now = d;
-        }
+        self.liabilities_due_now = debt.into_zakat_decimal()
+            .expect("Invalid numeric value for 'debt'");
         self
     }
 
@@ -87,6 +92,12 @@ impl InvestmentAssets {
 
     pub fn label(mut self, label: impl Into<String>) -> Self {
         self.label = Some(label.into());
+        self
+    }
+
+    /// Restores the asset ID (for database/serialization restoration).
+    pub fn with_id(mut self, id: uuid::Uuid) -> Self {
+        self.id = id;
         self
     }
 }
@@ -136,7 +147,8 @@ impl CalculateZakat for InvestmentAssets {
         
         let total_assets = self.market_value;
         let liabilities = self.liabilities_due_now;
-        let rate = dec!(0.025);
+        // Dynamic rate from strategy (default 2.5%)
+        let rate = config.strategy.get_rules().trade_goods_rate;
 
         // Build calculation trace
         let type_desc = match self.investment_type {
@@ -156,7 +168,7 @@ impl CalculateZakat for InvestmentAssets {
         trace.push(crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value));
         
         if *net_assets >= nisab_threshold_value && *net_assets > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("Applied Rate (2.5%)", rate));
+            trace.push(crate::types::CalculationStep::rate("Applied Trade Goods Rate", rate));
         } else {
              trace.push(crate::types::CalculationStep::info("Net Assets below Nisab - No Zakat Due"));
         }
@@ -177,6 +189,8 @@ impl CalculateZakat for InvestmentAssets {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::ZakatConfig;
+    use rust_decimal_macros::dec;
 
     #[test]
     fn test_crypto_investment() {

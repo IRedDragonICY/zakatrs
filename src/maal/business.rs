@@ -185,22 +185,22 @@ impl CalculateZakat for BusinessZakat {
         // Note: gross_assets and total_liabilities are ZakatDecimal wrapper
         let net_assets_dec = gross_assets.safe_sub(*total_liabilities)?.0;
         let mut trace = vec![
-            crate::types::CalculationStep::initial("Cash on Hand", self.cash_on_hand),
-            crate::types::CalculationStep::add("Inventory Value", self.inventory_value),
-            crate::types::CalculationStep::add("Receivables", self.receivables),
-            crate::types::CalculationStep::result("Gross Assets", *gross_assets),
-            crate::types::CalculationStep::subtract("Short-term Liabilities", self.short_term_liabilities),
-            crate::types::CalculationStep::subtract("Debts Due Now", self.liabilities_due_now),
-            crate::types::CalculationStep::result("Net Business Assets", net_assets_dec),
-            crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value),
+            crate::types::CalculationStep::initial("step-cash-on-hand", "Cash on Hand", self.cash_on_hand),
+            crate::types::CalculationStep::add("step-inventory-value", "Inventory Value", self.inventory_value),
+            crate::types::CalculationStep::add("step-receivables", "Receivables", self.receivables),
+            crate::types::CalculationStep::result("step-gross-assets", "Gross Assets", *gross_assets),
+            crate::types::CalculationStep::subtract("step-short-term-liabilities", "Short-term Liabilities", self.short_term_liabilities),
+            crate::types::CalculationStep::subtract("step-debts-due-now", "Debts Due Now", self.liabilities_due_now),
+            crate::types::CalculationStep::result("step-net-business-assets", "Net Business Assets", net_assets_dec),
+            crate::types::CalculationStep::compare("step-nisab-check", "Nisab Threshold", nisab_threshold_value),
         ];
 
         // We rely on ZakatDetails::with_trace to calculate final amounts, 
         // but we add a trace step for rate/info.
         if net_assets_dec >= nisab_threshold_value && net_assets_dec > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("Applied Trade Goods Rate", rate));
+            trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Trade Goods Rate", rate));
         } else {
-             trace.push(crate::types::CalculationStep::info("Net Assets below Nisab - No Zakat Due"));
+             trace.push(crate::types::CalculationStep::info("status-exempt", "Net Assets below Nisab - No Zakat Due"));
         }
 
         Ok(ZakatDetails::with_trace(

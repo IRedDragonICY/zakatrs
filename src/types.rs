@@ -63,77 +63,102 @@ impl std::fmt::Display for Operation {
 /// enabling users to understand and verify each step of the calculation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct CalculationStep {
-    /// Human-readable description of what this step does.
+    /// The Fluent ID (e.g., "step-net-assets").
+    pub key: String,
+    /// Fallback English text.
     pub description: String,
     /// The value at this step (if applicable).
     pub amount: Option<Decimal>,
     /// The semantic operation type.
     pub operation: Operation,
+    /// Variables for fluent.
+    pub args: Option<std::collections::HashMap<String, String>>,
 }
 
 impl CalculationStep {
-    pub fn initial(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
+    pub fn initial(key: impl Into<String>, description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
         Self {
+            key: key.into(),
             description: description.into(),
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Initial,
+            args: None,
         }
     }
 
-    pub fn add(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
+    pub fn add(key: impl Into<String>, description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
         Self {
+            key: key.into(),
             description: description.into(),
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Add,
+            args: None,
         }
     }
 
-    pub fn subtract(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
+    pub fn subtract(key: impl Into<String>, description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
         Self {
+            key: key.into(),
             description: description.into(),
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Subtract,
+            args: None,
         }
     }
 
-    pub fn multiply(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
+    pub fn multiply(key: impl Into<String>, description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
          Self {
+            key: key.into(),
             description: description.into(),
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Multiply,
+            args: None,
         }
     }
 
-    pub fn compare(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
+    pub fn compare(key: impl Into<String>, description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
         Self {
+            key: key.into(),
             description: description.into(),
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Compare,
+            args: None,
         }
     }
 
-    pub fn rate(description: impl Into<String>, rate: impl crate::inputs::IntoZakatDecimal) -> Self {
+    pub fn rate(key: impl Into<String>, description: impl Into<String>, rate: impl crate::inputs::IntoZakatDecimal) -> Self {
         CalculationStep {
+            key: key.into(),
             description: description.into(),
             amount: rate.into_zakat_decimal().ok(),
             operation: Operation::Rate,
+            args: None,
         }
     }
 
-    pub fn result(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
+    pub fn result(key: impl Into<String>, description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Self {
         CalculationStep {
+            key: key.into(),
             description: description.into(),
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Result,
+            args: None,
         }
     }
 
-    pub fn info(description: impl Into<String>) -> Self {
+    pub fn info(key: impl Into<String>, description: impl Into<String>) -> Self {
         CalculationStep {
+            key: key.into(),
             description: description.into(),
             amount: None,
             operation: Operation::Info,
+            args: None,
         }
+    }
+
+    pub fn with_args(mut self, args: std::collections::HashMap<String, String>) -> Self {
+        self.args = Some(args);
+        self
     }
 }
 
@@ -329,22 +354,22 @@ impl ZakatDetails {
 
         // Build default calculation trace
         let mut trace = vec![
-            CalculationStep::initial("Total Assets", total_assets),
-            CalculationStep::subtract("Liabilities Due Now", liabilities_due_now),
+            CalculationStep::initial("step-total-assets", "Total Assets", total_assets),
+            CalculationStep::subtract("step-liabilities", "Liabilities Due Now", liabilities_due_now),
         ];
 
         if let Some(msg) = clamped_msg {
-            trace.push(CalculationStep::info(msg));
+            trace.push(CalculationStep::info("warn-negative-clamped", msg));
         }
 
-        trace.push(CalculationStep::result("Net Assets", net_assets));
-        trace.push(CalculationStep::compare("Nisab Threshold", nisab_threshold));
+        trace.push(CalculationStep::result("step-net-assets", "Net Assets", net_assets));
+        trace.push(CalculationStep::compare("step-nisab-check", "Nisab Threshold", nisab_threshold));
 
         if is_payable {
-            trace.push(CalculationStep::rate("Applied Rate", rate));
-            trace.push(CalculationStep::result("Zakat Due", zakat_due));
+            trace.push(CalculationStep::rate("step-rate-applied", "Applied Rate", rate));
+            trace.push(CalculationStep::result("status-due", "Zakat Due", zakat_due));
         } else {
-            trace.push(CalculationStep::info("Net Assets below Nisab - No Zakat Due"));
+            trace.push(CalculationStep::info("status-exempt", "Net Assets below Nisab - No Zakat Due"));
         }
 
         ZakatDetails {
@@ -379,7 +404,7 @@ impl ZakatDetails {
         if net_assets < Decimal::ZERO {
             warn!("Net assets were negative ({}), clamped to zero.", net_assets);
             net_assets = Decimal::ZERO;
-            trace.push(CalculationStep::info("Net Assets are negative, clamped to zero for Zakat purposes"));
+            trace.push(CalculationStep::info("warn-negative-clamped", "Net Assets are negative, clamped to zero for Zakat purposes"));
             warnings.push("Net assets were negative and clamped to zero.".to_string());
         }
 
@@ -410,7 +435,7 @@ impl ZakatDetails {
     /// Helper to create a non-payable ZakatDetail because it is below the threshold.
     pub fn below_threshold(nisab_threshold: Decimal, wealth_type: WealthType, reason: &str) -> Self {
         let trace = vec![
-            CalculationStep::info(reason.to_string()),
+            CalculationStep::info("status-exempt", reason.to_string()),
         ];
         
         ZakatDetails {
@@ -453,16 +478,45 @@ impl ZakatDetails {
     /// Format: "{Label}: {Payable/Exempt} - Due: {Amount}"
     /// Returns a concise status string.
     /// Format: "{Label}: {Payable/Exempt} - Due: {Amount}"
+    /// Returns a concise status string using the English locale.
+    /// Format: "{Label}: {Payable/Exempt} - Due: {Amount}"
     pub fn summary(&self) -> String {
-        let label_str = self.label.as_deref().unwrap_or("Asset");
-        let status = if self.is_payable { "Payable" } else { "Exempt" };
+        self.summary_in(crate::i18n::ZakatLocale::EnUS)
+    }
+
+    /// Returns a localized concise status string.
+    pub fn summary_in(&self, locale: crate::i18n::ZakatLocale) -> String {
+        use crate::i18n::{TRANSLATOR, CurrencyFormatter};
+
+
+            
+        // Determine the label string.
+        // If a custom label is provided, clone it.
+        // Otherwise, fetch the localized generic "Asset" label from the translator.
+        // We clone to ensure we have an owned String that lives long enough for this scope.
+        
+        let label_string = if let Some(l) = &self.label {
+            l.clone()
+        } else {
+            TRANSLATOR.translate(locale, "asset-generic", None)
+        };
+        let label_str = label_string.as_str();
+        let status = if self.is_payable {
+            TRANSLATOR.translate(locale, "status-payable", None)
+        } else {
+            TRANSLATOR.translate(locale, "status-exempt", None)
+        };
+        
+        let due_label = TRANSLATOR.translate(locale, "status-due", None);
+        let formatted_due = locale.format_currency(self.zakat_due);
+
         let reason = if let Some(r) = &self.status_reason {
              format!(" ({})", r)
         } else {
             String::new()
         };
         
-        format!("{}: {}{} - Due: {}", label_str, status, reason, self.format_amount())
+        format!("{}: {}{} - {}: {}", label_str, status, reason, due_label, formatted_due)
     }
 
     /// Converts this ZakatDetails into a structured `ZakatExplanation`.
@@ -496,8 +550,124 @@ impl ZakatDetails {
     /// If there are any warnings (e.g., negative values clamped), they are appended at the end.
     ///
     /// For structured data (e.g., for API consumers), use `to_explanation()` instead.
+    /// Generates a human-readable explanation of the Zakat calculation in English.
     pub fn explain(&self) -> String {
-        self.to_explanation().to_string()
+        self.explain_in(crate::i18n::ZakatLocale::EnUS)
+    }
+
+    /// Generates a localized human-readable explanation of the Zakat calculation.
+    pub fn explain_in(&self, locale: crate::i18n::ZakatLocale) -> String {
+         use crate::i18n::{TRANSLATOR, CurrencyFormatter};
+         use std::fmt::Write;
+
+         let mut out = String::new();
+         let label_string = if let Some(l) = &self.label {
+             l.clone()
+         } else {
+             TRANSLATOR.translate(locale, "asset-generic", None)
+         };
+         let label_str = label_string.as_str();
+         
+         let type_str = format!("{:?}", self.wealth_type); // TODO: Localize wealth type
+         
+         writeln!(out, "{} ({})", label_str, type_str).ok();
+         writeln!(out, "{:-<50}", "").ok();
+
+         // Calculate max description length for alignment
+         // We need to translate descriptions first to know length
+         let mut localized_steps = Vec::new();
+         for step in self.calculation_trace.iter() {
+             let args = if let Some(args_map) = &step.args {
+                 let mut f_args = fluent::FluentArgs::new();
+                 for (k, v) in args_map {
+                     f_args.set(k.as_str(), v.to_string());
+                 }
+                 Some(f_args)
+             } else {
+                 None
+             };
+             
+             // Try to translate using key, fallback to direct description
+             let desc = if !step.key.is_empty() {
+                 let translated = TRANSLATOR.translate(locale, &step.key, args.as_ref());
+                 if translated.starts_with("MISSING:") {
+                     step.description.clone()
+                 } else {
+                     translated
+                 }
+             } else {
+                 step.description.clone()
+             };
+             
+             localized_steps.push((desc, step));
+         }
+
+         let max_desc_len = localized_steps.iter()
+            .map(|(desc, _)| desc.chars().count())
+            .max()
+            .unwrap_or(20)
+            .max(20);
+
+         for (desc, step) in localized_steps {
+            let op_symbol = step.operation.to_string();
+
+            let amount_str = if let Some(amt) = step.amount {
+                if matches!(step.operation, Operation::Rate) {
+                     format!("{:.3}%", amt * rust_decimal_macros::dec!(100)) // Show rate as percentage? Or just raw
+                } else {
+                     locale.format_currency(amt)
+                }
+            } else {
+                String::new()
+            };
+
+            if matches!(step.operation, Operation::Info) {
+                 writeln!(out, "  INFO: {}", desc).ok();
+            } else if !amount_str.is_empty() {
+                 // Manual alignment
+                 let padding = " ".repeat(max_desc_len.saturating_sub(desc.chars().count()));
+                 writeln!(out, "  {}{} : {} {:>10} ({:?})", 
+                    desc, 
+                    padding,
+                    op_symbol, 
+                    amount_str, 
+                    step.operation
+                 ).ok();
+            } else {
+                 let padding = " ".repeat(max_desc_len.saturating_sub(desc.chars().count()));
+                 writeln!(out, "  {}{} : [No Amount] ({:?})", 
+                    desc, 
+                    padding,
+                    step.operation
+                 ).ok();
+            }
+         }
+         
+         writeln!(out, "{:-<50}", "").ok();
+         
+         let status_key = if self.is_payable { "status-payable" } else { "status-exempt" };
+         let status = TRANSLATOR.translate(locale, status_key, None);
+         
+         writeln!(out, "{}: {}", TRANSLATOR.translate(locale, "status-label", None), status).ok();
+         
+         if self.is_payable {
+             let due_label = TRANSLATOR.translate(locale, "status-due", None);
+             writeln!(out, "{}: {}", due_label, locale.format_currency(self.zakat_due)).ok();
+         }
+         
+         if let Some(r) = &self.status_reason {
+             writeln!(out, "Reason: {}", r).ok();
+         }
+
+         if !self.warnings.is_empty() {
+             writeln!(out).ok();
+             writeln!(out, "WARNINGS:").ok();
+             for warning in &self.warnings {
+                 writeln!(out, " - {}", warning).ok(); // TODO: Localize warnings
+             }
+         }
+
+         out
     }
 }
 

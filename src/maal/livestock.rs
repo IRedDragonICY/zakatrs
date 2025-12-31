@@ -250,14 +250,20 @@ impl CalculateZakat for LivestockAssets {
         };
         
         let mut trace = Vec::new();
-        trace.push(crate::types::CalculationStep::initial(format!("{} Count", animal_type_str), Decimal::from(self.count)));
-        trace.push(crate::types::CalculationStep::info(format!("Animal Type: {}", animal_type_str)));
-        trace.push(crate::types::CalculationStep::compare(format!("Nisab Count ({} head)", nisab_count), *nisab_threshold));
+        trace.push(crate::types::CalculationStep::initial("step-livestock-count", format!("{} Count", animal_type_str), Decimal::from(self.count))
+            .with_args(std::collections::HashMap::from([("type".to_string(), animal_type_str.to_string())])));
+        trace.push(crate::types::CalculationStep::info("info-animal-type", format!("Animal Type: {}", animal_type_str))
+             .with_args(std::collections::HashMap::from([("type".to_string(), animal_type_str.to_string())])));
+        
+        trace.push(crate::types::CalculationStep::compare("step-nisab-check-count", format!("Nisab Count ({} head)", nisab_count), *nisab_threshold)
+             .with_args(std::collections::HashMap::from([("count".to_string(), nisab_count.to_string())])));
+
         if is_payable {
-            trace.push(crate::types::CalculationStep::result("Herd Value", *total_value));
-            trace.push(crate::types::CalculationStep::result(format!("Zakat Due: {}", description), zakat_value));
+            trace.push(crate::types::CalculationStep::result("step-herd-value", "Herd Value", *total_value));
+            trace.push(crate::types::CalculationStep::result("step-zakat-due-desc", format!("Zakat Due: {}", description), zakat_value)
+                 .with_args(std::collections::HashMap::from([("description".to_string(), description.clone())])));
         } else {
-            trace.push(crate::types::CalculationStep::info("Count below Nisab - No Zakat Due"));
+            trace.push(crate::types::CalculationStep::info("status-exempt", "Count below Nisab - No Zakat Due"));
         }
 
         Ok(ZakatDetails {

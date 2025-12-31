@@ -470,9 +470,11 @@ fn aggregate_and_summarize(mut results: Vec<PortfolioItemResult>, config: &crate
                     
                     // Add trace step explaining aggregation
                     details.calculation_trace.push(crate::types::CalculationStep::info(
+                        "info-aggregation-payable",
                         "Aggregated Monetary Wealth > Nisab -> Payable (Dam' al-Amwal)"
                     ));
                     details.calculation_trace.push(crate::types::CalculationStep::result(
+                        "step-recalculated-zakat",
                         "Recalculated Zakat Due", details.zakat_due
                     ));
                 }

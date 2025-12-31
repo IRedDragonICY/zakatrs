@@ -161,19 +161,20 @@ impl CalculateZakat for InvestmentAssets {
         };
 
         let mut trace = Vec::new();
-        trace.push(crate::types::CalculationStep::initial(format!("Market Value ({})", type_desc), total_assets));
-        trace.push(crate::types::CalculationStep::subtract("Debts Due Now", liabilities));
+        trace.push(crate::types::CalculationStep::initial("step-market-value", format!("Market Value ({})", type_desc), total_assets)
+             .with_args(std::collections::HashMap::from([("type".to_string(), type_desc.to_string())])));
+        trace.push(crate::types::CalculationStep::subtract("step-debts-due-now", "Debts Due Now", liabilities));
         
         let net_assets = ZakatDecimal::new(total_assets)
             .safe_sub(liabilities)?
             .with_source(self.label.clone());
-        trace.push(crate::types::CalculationStep::result("Net Investment Assets", *net_assets));
-        trace.push(crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value));
+        trace.push(crate::types::CalculationStep::result("step-net-investment-assets", "Net Investment Assets", *net_assets));
+        trace.push(crate::types::CalculationStep::compare("step-nisab-check", "Nisab Threshold", nisab_threshold_value));
         
         if *net_assets >= nisab_threshold_value && *net_assets > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("Applied Trade Goods Rate", rate));
+            trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Trade Goods Rate", rate));
         } else {
-             trace.push(crate::types::CalculationStep::info("Net Assets below Nisab - No Zakat Due"));
+             trace.push(crate::types::CalculationStep::info("status-exempt", "Net Assets below Nisab - No Zakat Due"));
         }
 
         Ok(ZakatDetails::with_trace(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Investment, trace)

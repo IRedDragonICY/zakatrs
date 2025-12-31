@@ -135,9 +135,9 @@ impl CalculateZakat for MiningAssets {
                 
                 // Calculate Trace
                 let trace = vec![
-                    crate::types::CalculationStep::initial("Rikaz Found Value", self.value),
-                    crate::types::CalculationStep::info("Rikaz Rule: No Nisab, No Debt Deduction, 20% Rate"),
-                    crate::types::CalculationStep::rate("Applied Rate (20%)", rate),
+                    crate::types::CalculationStep::initial("step-rikaz-value", "Rikaz Found Value", self.value),
+                    crate::types::CalculationStep::info("info-rikaz-rule", "Rikaz Rule: No Nisab, No Debt Deduction, 20% Rate"),
+                    crate::types::CalculationStep::rate("step-rate-applied", "Applied Rate (20%)", rate),
                 ];
                 
                 Ok(ZakatDetails::with_trace(self.value, Decimal::ZERO, Decimal::ZERO, rate, crate::types::WealthType::Rikaz, trace)
@@ -159,18 +159,18 @@ impl CalculateZakat for MiningAssets {
 
                 // Build trace for Mines
                 let mut trace = Vec::new();
-                trace.push(crate::types::CalculationStep::initial("Extracted Value", self.value));
-                trace.push(crate::types::CalculationStep::subtract("Debts Due Now", liabilities));
+                trace.push(crate::types::CalculationStep::initial("step-extracted-value", "Extracted Value", self.value));
+                trace.push(crate::types::CalculationStep::subtract("step-debts-due-now", "Debts Due Now", liabilities));
                 let net_val = ZakatDecimal::new(self.value)
                     .safe_sub(liabilities)?
                     .with_source(self.label.clone());
-                trace.push(crate::types::CalculationStep::result("Net Mining Assets", *net_val));
-                trace.push(crate::types::CalculationStep::compare("Nisab Threshold (85g Gold)", *nisab_threshold));
+                trace.push(crate::types::CalculationStep::result("step-net-mining-assets", "Net Mining Assets", *net_val));
+                trace.push(crate::types::CalculationStep::compare("step-nisab-check-gold", "Nisab Threshold (85g Gold)", *nisab_threshold));
                 
                 if *net_val >= *nisab_threshold && *net_val > Decimal::ZERO {
-                    trace.push(crate::types::CalculationStep::rate("Applied Trade Goods Rate", rate));
+                    trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Trade Goods Rate", rate));
                 } else {
-                     trace.push(crate::types::CalculationStep::info("Net Value below Nisab - No Zakat Due"));
+                     trace.push(crate::types::CalculationStep::info("status-exempt", "Net Value below Nisab - No Zakat Due"));
                 }
                 
                 Ok(ZakatDetails::with_trace(self.value, liabilities, *nisab_threshold, rate, crate::types::WealthType::Mining, trace)

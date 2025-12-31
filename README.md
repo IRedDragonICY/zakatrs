@@ -9,14 +9,14 @@
   ███╔╝ ███████║█████╔╝ ███████║   ██║   
  ███╔╝  ██╔══██║██╔═██╗ ██╔══██║   ██║   
 ███████╗██║  ██║██║  ██╗██║  ██║   ██║   
-╚══════╝╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   
+╚══════╝╚═╝  ╚═╝╚╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝   
 ```
 
 # Zakat
 
 [![Crates.io](https://img.shields.io/crates/v/zakat.svg)](https://crates.io/crates/zakat)
-[![Docs.rs](https://docs.rs/zakat/badge.svg)](https://docs.rs/zakat)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Documentation](https://docs.rs/zakat/badge.svg)](https://docs.rs/zakat)
+![License](https://img.shields.io/crates/l/zakat.svg)
 
 Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 
@@ -43,12 +43,35 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Custom Strategies (Pluggable `ZakatStrategy` trait for custom rules)
 - Full Serialization (Save/Load Portfolios via `serde` & JSON)
 
-## Install
+## Internationalization (i18n)
+
+`zakat` now fully supports internationalization for calculation summaries and explanations.
+
+### Supported Locales
+- **English (US)**: `ZakatLocale::EnUS` (Default)
+- **Indonesian**: `ZakatLocale::IdID`
+- **Arabic (Saudi)**: `ZakatLocale::ArSA`
+
+### Usage
+```rust
+use zakat::i18n::ZakatLocale;
+
+let details = calculator.calculate_zakat(&config)?;
+
+// Get localized summary
+println!("{}", details.summary_in(ZakatLocale::IdID));
+// Output: "Aset: WAJIB ZAKAT - Jumlah Wajib: Rp25.000,00"
+
+// Get detailed localized explanation
+println!("{}", details.explain_in(ZakatLocale::ArSA));
+```
+
+## 📦 Installation
 
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.15.0"
+zakat = "0.16.0"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] } # Required if using async features
 ```
@@ -56,7 +79,7 @@ tokio = { version = "1", features = ["full"] } # Required if using async feature
 Synchronous Only (Lighter weight):
 ```toml
 [dependencies]
-zakat = { version = "0.15.0", default-features = false }
+zakat = { version = "0.16.0", default-features = false }
 rust_decimal = "1.39"
 ```
 

@@ -165,9 +165,8 @@ fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
     // If comma is the last separator and followed by 1-2 digits at end...
     // Note: Indices in `last_comma_index` refer to position in `buffer`.
     
-    // We need to re-find indices because we might have skipped chars, 
-    // but we tracked them as we pushed! 
-    // Wait, if we pushed multiple commas, `last_comma_index` is the last one in `buffer`. Correct.
+    // We need to re-find indices because the buffer indices might differ from the original string.
+    // Logic check: if multiple commas were retained, `last_comma_index` points to the last one added to `buffer`.
     
     if let Some(comma_pos) = last_comma_index {
         let len = buffer.len();
@@ -188,20 +187,15 @@ fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
             // It's a decimal separator.
             // 1. Remove all dots (thousands separators in EU)
             // 2. Turn this comma into dot.
-            // 3. Remove other commas? (EU thousands could be dots)
-            // Wait, standard EU is 1.234,56. 
-            // If we have mixed 1,234.56 (US), `is_european_decimal` is false (dot is after comma or len > 2).
+            // 3. Remove other commas (though uncommon in valid EU format, we clean them for safety).
             
-            // To do this efficiently in one go:
-            // Rebuild string? Or mutate?
-            // Since we produced `buffer` ourselves, we can process it.
+            // Note: Standard EU format is "1.234,56". 
+            // If we encounter mixed formatting like "1,234.56" (US), `is_european_decimal` evaluates to false 
+            // because the comma is not after the last dot.
             
-            // Simpler approach compatible with previous logic:
-            // "Replace this comma with dot, remove other commas and dots"
-            
-            // Let's just do a second quick pass or string manipulation as it's cleaner than complex in-place.
-            // Allocating one more string here is acceptable for the "detected EU" case which is rarer than US,
-            // or we can manipulate `buffer`.
+            // Proceed with a secondary pass to finalize the string.
+            // Allocating a new string here is acceptable as the EU format is less common in this context,
+            // and this approach simplifies the mutation logic.
             
             let mut final_res = String::with_capacity(buffer.len());
             for (i, c) in buffer.chars().enumerate() {

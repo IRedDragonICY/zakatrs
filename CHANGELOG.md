@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.16.0] - 2025-12-31
+
+### Added
+- **Internationalization (i18n) Support**: Added robust i18n support using Project Fluent.
+- **New Locales**: Added support for `en-US` (English), `id-ID` (Indonesian), and `ar-SA` (Arabic).
+- **Localized Output**: `ZakatDetails` now provides `explain_in(locale)` and `summary_in(locale)` for localized calculation traces.
+- **Currency Formatting**: Added `CurrencyFormatter` trait for locale-aware currency display (e.g., `Rp` for ID, `,` vs `.` separators).
+- **Localized Warnings**: Validation warnings are now structured for localization.
+
+### Changed
+- **CalculationStep API**: Refactored `CalculationStep` to use translation keys instead of hardcoded English strings.
+- **Inputs Input**: Refined `sanitize_numeric_string` for professional-grade heuristic parsing of international number formats.
+
 ## [0.15.0] - 2025-12-31
 
 ### Added

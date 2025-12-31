@@ -262,28 +262,30 @@ impl CalculateZakat for PreciousMetals {
         let rate = config.strategy.get_rules().trade_goods_rate;
 
         // Build calculation trace
+        // Build calculation trace
         let mut trace = Vec::new();
-        trace.push(crate::types::CalculationStep::initial("Weight (grams)", self.weight_grams));
-        trace.push(crate::types::CalculationStep::initial("Price per gram", price_per_gram));
+        trace.push(crate::types::CalculationStep::initial("step-weight", "Weight (grams)", self.weight_grams));
+        trace.push(crate::types::CalculationStep::initial("step-price-per-gram", "Price per gram", price_per_gram));
         
         if metal_type == crate::types::WealthType::Gold && self.purity < 24 {
-             trace.push(crate::types::CalculationStep::info(format!("Purity Adjustment ({}K / 24K)", self.purity)));
-             trace.push(crate::types::CalculationStep::result("Effective 24K Weight", *effective_weight));
+             trace.push(crate::types::CalculationStep::info("info-purity-adjustment", format!("Purity Adjustment ({}K / 24K)", self.purity))
+                .with_args(std::collections::HashMap::from([("purity".to_string(), self.purity.to_string())])));
+             trace.push(crate::types::CalculationStep::result("step-effective-weight", "Effective 24K Weight", *effective_weight));
         }
         
-        trace.push(crate::types::CalculationStep::result("Total Value", *total_value));
-        trace.push(crate::types::CalculationStep::subtract("Debts Due Now", liabilities));
+        trace.push(crate::types::CalculationStep::result("step-total-value", "Total Value", *total_value));
+        trace.push(crate::types::CalculationStep::subtract("step-debts-due-now", "Debts Due Now", liabilities));
         
         let net_val = total_value
             .safe_sub(liabilities)?
             .with_source(self.label.clone());
-        trace.push(crate::types::CalculationStep::result("Net Value", *net_val));
-        trace.push(crate::types::CalculationStep::compare("Nisab Threshold", *nisab_value));
+        trace.push(crate::types::CalculationStep::result("step-net-value", "Net Value", *net_val));
+        trace.push(crate::types::CalculationStep::compare("step-nisab-check", "Nisab Threshold", *nisab_value));
 
         if *net_val >= *nisab_value && *net_val > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("Applied Trade Goods Rate", rate));
+            trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Trade Goods Rate", rate));
         } else {
-             trace.push(crate::types::CalculationStep::info("Net Value below Nisab - No Zakat Due"));
+             trace.push(crate::types::CalculationStep::info("status-exempt", "Net Value below Nisab - No Zakat Due"));
         }
 
         Ok(ZakatDetails::with_trace(*total_value, liabilities, *nisab_value, rate, metal_type, trace)

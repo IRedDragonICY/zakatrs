@@ -162,19 +162,20 @@ impl CalculateZakat for AgricultureAssets {
         };
         
         let mut trace = vec![
-            crate::types::CalculationStep::initial("Harvest Weight (kg)", self.harvest_weight_kg),
-            crate::types::CalculationStep::initial("Price per kg", self.price_per_kg),
-            crate::types::CalculationStep::result("Total Harvest Value", *total_value),
-            crate::types::CalculationStep::subtract("Liabilities Due Now", liabilities),
-            crate::types::CalculationStep::result("Net Harvest Value", *net_value),
-            crate::types::CalculationStep::compare("Nisab Threshold (653kg value)", *nisab_value),
+            crate::types::CalculationStep::initial("step-harvest-weight", "Harvest Weight (kg)", self.harvest_weight_kg),
+            crate::types::CalculationStep::initial("step-price-per-kg", "Price per kg", self.price_per_kg),
+            crate::types::CalculationStep::result("step-total-harvest-value", "Total Harvest Value", *total_value),
+            crate::types::CalculationStep::subtract("step-debts-due-now", "Liabilities Due Now", liabilities),
+            crate::types::CalculationStep::result("step-net-harvest-value", "Net Harvest Value", *net_value),
+            crate::types::CalculationStep::compare("step-nisab-check-value", "Nisab Threshold (653kg value)", *nisab_value),
         ];
         if is_payable {
-            trace.push(crate::types::CalculationStep::info(format!("Irrigation Method: {}", irrigation_desc)));
-            trace.push(crate::types::CalculationStep::rate("Applied Rate", rate));
-            trace.push(crate::types::CalculationStep::result("Zakat Due", *zakat_due));
+            trace.push(crate::types::CalculationStep::info("info-irrigation-method", format!("Irrigation Method: {}", irrigation_desc))
+                 .with_args(std::collections::HashMap::from([("method".to_string(), irrigation_desc.to_string())])));
+            trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Rate", rate));
+            trace.push(crate::types::CalculationStep::result("step-zakat-due", "Zakat Due", *zakat_due));
         } else {
-            trace.push(crate::types::CalculationStep::info("Net Value below Nisab - No Zakat Due"));
+            trace.push(crate::types::CalculationStep::info("status-exempt", "Net Value below Nisab - No Zakat Due"));
         }
 
         Ok(ZakatDetails {

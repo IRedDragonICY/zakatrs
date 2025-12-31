@@ -78,11 +78,11 @@ impl CalculateZakat for FitrahCalculator {
 
         // Build calculation trace
         let trace = vec![
-            crate::types::CalculationStep::initial("Person Count", total_people_decimal),
-            crate::types::CalculationStep::initial("Amount per Person (kg)", self.unit_amount),
-            crate::types::CalculationStep::initial("Price per kg", self.price_per_unit),
-            crate::types::CalculationStep::info("Fitrah is obligatory - no Nisab threshold"),
-            crate::types::CalculationStep::result("Total Fitrah Due", total_value),
+            crate::types::CalculationStep::initial("step-person-count", "Person Count", total_people_decimal),
+            crate::types::CalculationStep::initial("step-amount-per-person", "Amount per Person (kg)", self.unit_amount),
+            crate::types::CalculationStep::initial("step-price-per-kg", "Price per kg", self.price_per_unit),
+            crate::types::CalculationStep::info("info-fitrah-obligatory", "Fitrah is obligatory - no Nisab threshold"),
+            crate::types::CalculationStep::result("step-total-fitrah-due", "Total Fitrah Due", total_value),
         ];
 
         Ok(ZakatDetails {

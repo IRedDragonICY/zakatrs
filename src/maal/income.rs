@@ -171,29 +171,29 @@ impl CalculateZakat for IncomeZakatCalculator {
 
         // Build calculation trace
         let mut trace = Vec::new();
-        trace.push(crate::types::CalculationStep::initial("Total Income", self.total_income));
+        trace.push(crate::types::CalculationStep::initial("step-total-income", "Total Income", self.total_income));
         
         match self.method {
             IncomeCalculationMethod::Net => {
-                trace.push(crate::types::CalculationStep::subtract("Basic Living Expenses", self.basic_expenses));
+                trace.push(crate::types::CalculationStep::subtract("step-basic-expenses", "Basic Living Expenses", self.basic_expenses));
             }
             IncomeCalculationMethod::Gross => {
-                trace.push(crate::types::CalculationStep::info("Gross Method used (Expenses not deducted)"));
+                trace.push(crate::types::CalculationStep::info("info-gross-method", "Gross Method used (Expenses not deducted)"));
             }
         }
 
-        trace.push(crate::types::CalculationStep::subtract("Debts Due Now", external_debt));
+        trace.push(crate::types::CalculationStep::subtract("step-debts-due-now", "Debts Due Now", external_debt));
         let net_income = ZakatDecimal::new(total_assets)
             .safe_sub(liabilities)?
             .with_source(self.label.clone());
-        trace.push(crate::types::CalculationStep::result("Net Zakatable Income", *net_income));
+        trace.push(crate::types::CalculationStep::result("step-net-income", "Net Zakatable Income", *net_income));
         
-        trace.push(crate::types::CalculationStep::compare("Nisab Threshold", nisab_threshold_value));
+        trace.push(crate::types::CalculationStep::compare("step-nisab-check", "Nisab Threshold", nisab_threshold_value));
         
         if *net_income >= nisab_threshold_value && *net_income > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("Applied Trade Goods Rate", rate));
+            trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Trade Goods Rate", rate));
         } else {
-            trace.push(crate::types::CalculationStep::info("Net Income below Nisab - No Zakat Due"));
+            trace.push(crate::types::CalculationStep::info("status-exempt", "Net Income below Nisab - No Zakat Due"));
         }
 
         Ok(ZakatDetails::with_trace(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Income, trace)

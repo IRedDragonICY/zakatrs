@@ -13,8 +13,8 @@ use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use crate::math::ZakatDecimal;
 use serde::{Serialize, Deserialize};
-use crate::traits::CalculateZakat;
-use crate::config::ZakatConfig;
+use crate::traits::{CalculateZakat, ZakatConfigArgument};
+
 use crate::inputs::IntoZakatDecimal;
 
 // Use the zakat_asset! macro to generate common fields and setters
@@ -97,7 +97,10 @@ impl BusinessZakat {
 }
 
 impl CalculateZakat for BusinessZakat {
-    fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        let config_cow = config.resolve_config();
+        let config = config_cow.as_ref();
+
         // Validation moved here
         if self.cash_on_hand < Decimal::ZERO || self.inventory_value < Decimal::ZERO || self.receivables < Decimal::ZERO {
             return Err(ZakatError::InvalidInput {

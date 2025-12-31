@@ -12,10 +12,10 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use serde::{Serialize, Deserialize};
-use crate::traits::CalculateZakat;
+use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
-use crate::config::ZakatConfig;
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum InvestmentType {
@@ -92,7 +92,10 @@ impl InvestmentAssets {
 }
 
 impl CalculateZakat for InvestmentAssets {
-    fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        let config_cow = config.resolve_config();
+        let config = config_cow.as_ref();
+
         if self.market_value < Decimal::ZERO {
             return Err(ZakatError::InvalidInput {
                 field: "market_value".to_string(),

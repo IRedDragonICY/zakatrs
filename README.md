@@ -45,7 +45,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.9.0"
+zakat = "0.10.0"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] } # Required if using async features
 ```
@@ -53,7 +53,7 @@ tokio = { version = "1", features = ["full"] } # Required if using async feature
 Synchronous Only (Lighter weight):
 ```toml
 [dependencies]
-zakat = { version = "0.9.0", default-features = false }
+zakat = { version = "0.10.0", default-features = false }
 rust_decimal = "1.39"
 ```
 
@@ -79,7 +79,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // .hawl(true) is default in cash_only(), so we can skip it if strictly satisfied
 
     // Validation & Calculation happens here
-    let result = store.calculate_zakat(&config)?;
+    // Flexible arguments: pass &config, Option<&config>, or () for defaults
+    let result = store.calculate_zakat(&config)?; 
+    // Or simply: store.calculate()?; 
 
     if result.is_payable {
         println!("Zakat for {}: ${}", result.label.unwrap_or_default(), result.zakat_due);

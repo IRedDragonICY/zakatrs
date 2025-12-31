@@ -13,8 +13,8 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use serde::{Serialize, Deserialize};
-use crate::traits::CalculateZakat;
-use crate::config::ZakatConfig;
+use crate::traits::{CalculateZakat, ZakatConfigArgument};
+
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 
@@ -102,7 +102,10 @@ impl AgricultureAssets {
 }
 
 impl CalculateZakat for AgricultureAssets {
-    fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        let config_cow = config.resolve_config();
+        let config = config_cow.as_ref();
+
         if self.harvest_weight_kg < Decimal::ZERO || self.price_per_kg < Decimal::ZERO {
             return Err(ZakatError::InvalidInput {
                 field: "harvest_weight_price".to_string(),

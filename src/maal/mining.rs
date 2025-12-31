@@ -9,8 +9,8 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use serde::{Serialize, Deserialize};
-use crate::traits::CalculateZakat;
-use crate::config::ZakatConfig;
+use crate::traits::{CalculateZakat, ZakatConfigArgument};
+
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 
@@ -72,7 +72,10 @@ impl MiningAssets {
 }
 
 impl CalculateZakat for MiningAssets {
-    fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        let config_cow = config.resolve_config();
+        let config = config_cow.as_ref();
+
         if self.value < Decimal::ZERO {
             return Err(ZakatError::InvalidInput {
                 field: "value".to_string(),

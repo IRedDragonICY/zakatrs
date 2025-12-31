@@ -10,7 +10,7 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use crate::types::{ZakatDetails, ZakatError};
 use serde::{Serialize, Deserialize};
-use crate::traits::CalculateZakat;
+use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 
@@ -157,10 +157,13 @@ impl LivestockAssets {
     }
 }
 
-use crate::config::ZakatConfig;
+
 
 impl CalculateZakat for LivestockAssets {
-    fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        let config_cow = config.resolve_config();
+        let _config = config_cow.as_ref();
+
         let animal_type = self.animal_type.as_ref().ok_or_else(|| 
             ZakatError::InvalidInput {
                 field: "animal_type".to_string(),

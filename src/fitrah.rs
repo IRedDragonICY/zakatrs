@@ -2,7 +2,7 @@ use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::{Serialize, Deserialize};
 use crate::types::{ZakatDetails, ZakatError};
-use crate::traits::CalculateZakat;
+use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
@@ -60,7 +60,10 @@ impl FitrahCalculator {
 }
 
 impl CalculateZakat for FitrahCalculator {
-    fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        let config_cow = config.resolve_config();
+        let _config = config_cow.as_ref();
+
         let total_people_decimal: Decimal = self.person_count.into();
         let total_value = total_people_decimal
             .checked_mul(self.unit_amount)

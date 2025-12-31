@@ -68,12 +68,7 @@ impl_into_zakat_decimal_float!(f32, f64);
 /// Negative numbers and decimal points are preserved.
 fn sanitize_numeric_string(s: &str) -> String {
     s.trim()
-        .replace(',', "")
-        .replace('_', "")
-        .replace('$', "")
-        .replace('£', "")
-        .replace('€', "")
-        .replace('¥', "")
+        .replace([',', '_', '$', '£', '€', '¥'], "")
 }
 
 impl IntoZakatDecimal for &str {

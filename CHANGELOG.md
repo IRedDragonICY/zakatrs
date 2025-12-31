@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.10.0] - 2025-12-31
+
+### Added
+- **Flexible Configuration Arguments**:
+    - The `calculate_zakat` method now accepts arguments implementing `ZakatConfigArgument`.
+    - Supported inputs: `&ZakatConfig` (standard), `Option<&ZakatConfig>` (uses default if None), `()` (uses default config).
+    - Example: `asset.calculate_zakat(())?` or `asset.calculate_zakat(None)?`.
+- **Convenience Method**: Added `.calculate()` method as a shortcut for `.calculate_zakat(())`.
+
+### Changed
+- **Trait Definition**: Refactored `CalculateZakat` trait to use a generic config argument `C: ZakatConfigArgument`.
+    - *Breaking Change*: Manual implementations of `CalculateZakat` must update their method signature.
+
 ## [0.9.0] - 2025-12-31
 
 ### Added

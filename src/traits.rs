@@ -1,35 +1,55 @@
-
 use crate::types::{ZakatDetails, ZakatError};
+use crate::config::ZakatConfig;
+use std::borrow::Cow;
+
+/// Helper trait to allow flexible config arguments.
+pub trait ZakatConfigArgument {
+    fn resolve_config(&self) -> Cow<'_, ZakatConfig>;
+}
+
+// 1. Support passing &ZakatConfig directly
+impl ZakatConfigArgument for &ZakatConfig {
+    fn resolve_config(&self) -> Cow<'_, ZakatConfig> {
+        Cow::Borrowed(self)
+    }
+}
+
+// 2. Support passing () for default config
+impl ZakatConfigArgument for () {
+    fn resolve_config(&self) -> Cow<'_, ZakatConfig> {
+        Cow::Owned(ZakatConfig::default())
+    }
+}
+
+// 3. Support passing Option<&ZakatConfig>
+impl ZakatConfigArgument for Option<&ZakatConfig> {
+    fn resolve_config(&self) -> Cow<'_, ZakatConfig> {
+        match self {
+            Some(c) => Cow::Borrowed(c),
+            None => Cow::Owned(ZakatConfig::default()),
+        }
+    }
+}
 
 /// Trait to be implemented by all Zakat calculators.
 pub trait CalculateZakat {
-    /// Calculate Zakat details.
-    ///
-    /// * `Result<ZakatDetails, ZakatError>`
-    fn calculate_zakat(&self, config: &crate::config::ZakatConfig) -> Result<ZakatDetails, ZakatError>;
+    /// Calculate Zakat details with flexible config argument.
+    fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError>;
     
-    /// Returns the label of the asset, if any.
-    fn get_label(&self) -> Option<String> {
-        None
+    /// Convenience method using default config.
+    fn calculate(&self) -> Result<ZakatDetails, ZakatError> {
+        self.calculate_zakat(())
     }
 
-    /// Returns the stable unique identifier for this asset.
+    fn get_label(&self) -> Option<String> { None }
     fn get_id(&self) -> uuid::Uuid;
 }
 
-/// Async version of the CalculateZakat trait.
-///
-/// This trait is automatically implemented for any type that implements `CalculateZakat + Send + Sync`.
 #[cfg(feature = "async")]
 #[async_trait::async_trait]
 pub trait AsyncCalculateZakat: Send + Sync {
-    /// Calculate Zakat details asynchronously.
-    async fn calculate_zakat_async(&self, config: &crate::config::ZakatConfig) -> Result<ZakatDetails, ZakatError>;
-    
-    /// Returns the label of the asset, if any.
+    async fn calculate_zakat_async<C: ZakatConfigArgument + Send + Sync>(&self, config: C) -> Result<ZakatDetails, ZakatError>;
     fn get_label(&self) -> Option<String> { None }
-
-    /// Returns the stable unique identifier for this asset.
     fn get_id(&self) -> uuid::Uuid;
 }
 
@@ -38,15 +58,9 @@ pub trait AsyncCalculateZakat: Send + Sync {
 impl<T> AsyncCalculateZakat for T 
 where T: CalculateZakat + Sync + Send 
 {
-    async fn calculate_zakat_async(&self, config: &crate::config::ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+    async fn calculate_zakat_async<C: ZakatConfigArgument + Send + Sync>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         self.calculate_zakat(config)
     }
-
-    fn get_label(&self) -> Option<String> {
-        self.get_label()
-    }
-
-    fn get_id(&self) -> uuid::Uuid {
-        self.get_id()
-    }
+    fn get_label(&self) -> Option<String> { self.get_label() }
+    fn get_id(&self) -> uuid::Uuid { self.get_id() }
 }

@@ -1,7 +1,7 @@
 use serde::{Serialize, Deserialize};
 use crate::types::{ZakatDetails, ZakatError};
-use crate::traits::CalculateZakat;
-use crate::config::ZakatConfig;
+use crate::traits::{CalculateZakat, ZakatConfigArgument};
+
 
 use crate::maal::business::BusinessZakat;
 use crate::maal::income::IncomeZakatCalculator;
@@ -51,7 +51,10 @@ impl CustomAsset {
 }
 
 impl CalculateZakat for CustomAsset {
-    fn calculate_zakat(&self, _config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        let config_cow = config.resolve_config();
+        let _config_ref = config_cow.as_ref();
+
         let wealth_type = crate::types::WealthType::Other(self.wealth_type_name.clone());
         
         if !self.hawl_satisfied {
@@ -105,7 +108,10 @@ pub enum PortfolioItem {
 }
 
 impl CalculateZakat for PortfolioItem {
-    fn calculate_zakat(&self, config: &ZakatConfig) -> Result<ZakatDetails, ZakatError> {
+    fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
+        let config_cow = config.resolve_config();
+        let config = config_cow.as_ref();
+
         match self {
             PortfolioItem::Business(asset) => asset.calculate_zakat(config),
             PortfolioItem::Income(asset) => asset.calculate_zakat(config),

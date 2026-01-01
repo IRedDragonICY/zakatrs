@@ -21,6 +21,10 @@ pub mod wasm;
 #[cfg(feature = "python")]
 pub mod python;
 
+pub mod kotlin;
+
+uniffi::setup_scaffolding!();
+
 pub use config::ZakatConfig;
 pub use traits::CalculateZakat;
 pub use types::{ZakatDetails, ZakatError, WealthType, ZakatExplanation};

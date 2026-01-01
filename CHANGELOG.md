@@ -1,6 +1,13 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+
+## [Unreleased]
+### Changed
+- **Zakat Dart Refactor**: Major architectural update to `zakat_dart` integration.
+    - **Workspace**: Moved `zakat_dart/rust` to root cargo workspace for better dependency management.
+    - **Type Safety**: Replaced unsafe `String`/`f64` passing with strict `Decimal` types across the FFI boundary using `FrbDecimal`.
+    - **Dart Extensions**: Implemented `Decimal <-> FrbDecimal` conversion extensions for seamless DX.
+
 
 ## [0.18.0] - 2026-01-01
 ### Added

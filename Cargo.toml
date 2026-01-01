@@ -62,3 +62,7 @@ codegen-units = 1    # Maximize optimization opportunities
 panic = "abort"      # Abort on panic (smaller binary)
 strip = true         # Strip symbols from binary
 
+[workspace]
+members = ["zakat_dart/rust"]
+
+

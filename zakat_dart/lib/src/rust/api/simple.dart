@@ -6,13 +6,15 @@
 import '../frb_generated.dart';
 import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
+// These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
+
 DartZakatResult calculateBusinessZakat({
-  required double cash,
-  required double inventory,
-  required double receivables,
-  required double liabilities,
-  required double goldPrice,
-  required double silverPrice,
+  required FrbDecimal cash,
+  required FrbDecimal inventory,
+  required FrbDecimal receivables,
+  required FrbDecimal liabilities,
+  required FrbDecimal goldPrice,
+  required FrbDecimal silverPrice,
 }) => RustLib.instance.api.crateApiSimpleCalculateBusinessZakat(
   cash: cash,
   inventory: inventory,
@@ -23,10 +25,10 @@ DartZakatResult calculateBusinessZakat({
 );
 
 DartZakatResult calculateSavingsZakat({
-  required double cashInHand,
-  required double bankBalance,
-  required double goldPrice,
-  required double silverPrice,
+  required FrbDecimal cashInHand,
+  required FrbDecimal bankBalance,
+  required FrbDecimal goldPrice,
+  required FrbDecimal silverPrice,
 }) => RustLib.instance.api.crateApiSimpleCalculateSavingsZakat(
   cashInHand: cashInHand,
   bankBalance: bankBalance,
@@ -34,45 +36,44 @@ DartZakatResult calculateSavingsZakat({
   silverPrice: silverPrice,
 );
 
-(double, double) getNisabThresholds({
-  required double goldPrice,
-  required double silverPrice,
+(FrbDecimal, FrbDecimal) getNisabThresholds({
+  required FrbDecimal goldPrice,
+  required FrbDecimal silverPrice,
 }) => RustLib.instance.api.crateApiSimpleGetNisabThresholds(
   goldPrice: goldPrice,
   silverPrice: silverPrice,
 );
 
-class DartZakatResult {
-  final double zakatDue;
-  final bool isPayable;
-  final double nisabThreshold;
-  final double wealthAmount;
-  final String limitName;
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<DartZakatResult>>
+abstract class DartZakatResult implements RustOpaqueInterface {
+  bool get isPayable;
 
-  const DartZakatResult({
-    required this.zakatDue,
-    required this.isPayable,
-    required this.nisabThreshold,
-    required this.wealthAmount,
-    required this.limitName,
-  });
+  String get limitName;
+
+  FrbDecimal get nisabThreshold;
+
+  FrbDecimal get wealthAmount;
+
+  FrbDecimal get zakatDue;
+
+  set isPayable(bool isPayable);
+
+  set limitName(String limitName);
+
+  set nisabThreshold(FrbDecimal nisabThreshold);
+
+  set wealthAmount(FrbDecimal wealthAmount);
+
+  set zakatDue(FrbDecimal zakatDue);
+}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FrbDecimal>>
+abstract class FrbDecimal implements RustOpaqueInterface {
+  static FrbDecimal fromString({required String s}) =>
+      RustLib.instance.api.crateApiSimpleFrbDecimalFromString(s: s);
+
+  double toF64();
 
   @override
-  int get hashCode =>
-      zakatDue.hashCode ^
-      isPayable.hashCode ^
-      nisabThreshold.hashCode ^
-      wealthAmount.hashCode ^
-      limitName.hashCode;
-
-  @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is DartZakatResult &&
-          runtimeType == other.runtimeType &&
-          zakatDue == other.zakatDue &&
-          isPayable == other.isPayable &&
-          nisabThreshold == other.nisabThreshold &&
-          wealthAmount == other.wealthAmount &&
-          limitName == other.limitName;
+  String toString();
 }

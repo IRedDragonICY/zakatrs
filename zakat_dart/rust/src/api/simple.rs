@@ -10,11 +10,35 @@ pub fn init_app() {
 
 // --- Data Types ---
 
+/// A wrapper around rust_decimal::Decimal to be used across the FFI boundary.
+/// This ensures type safety and prevents floating point errors.
+#[derive(Debug, Clone)]
+pub struct FrbDecimal(Decimal);
+
+impl FrbDecimal {
+    #[frb(sync)]
+    pub fn from_string(s: String) -> anyhow::Result<Self> {
+        let d = Decimal::from_str(&s).map_err(|e| anyhow::anyhow!("Invalid decimal: {}", e))?;
+        Ok(Self(d))
+    }
+
+    #[frb(sync)]
+    pub fn to_string(&self) -> String {
+        self.0.to_string()
+    }
+    
+    // Allow using as rudimentary types if needed, but prefer string for precision
+    #[frb(sync)]
+    pub fn to_f64(&self) -> f64 {
+        self.0.to_f64().unwrap_or(0.0)
+    }
+}
+
 pub struct DartZakatResult {
-    pub zakat_due: f64,
+    pub zakat_due: FrbDecimal,
     pub is_payable: bool,
-    pub nisab_threshold: f64,
-    pub wealth_amount: f64,
+    pub nisab_threshold: FrbDecimal,
+    pub wealth_amount: FrbDecimal,
     pub limit_name: String,
 }
 
@@ -22,23 +46,19 @@ pub struct DartZakatResult {
 
 #[frb(sync)]
 pub fn calculate_business_zakat(
-    cash: String,
-    inventory: String,
-    receivables: String,
-    liabilities: String,
-    gold_price: String,
-    silver_price: String,
-) -> Result<DartZakatResult, String> {
-    // Helper to parse decimal or return error
-    let parse = |s: &str, name: &str| -> Result<Decimal, String> {
-        Decimal::from_str(s).map_err(|e| format!("Invalid {}: {}", name, e))
-    };
-
-    let gold_price_dec = parse(&gold_price, "gold_price")?;
-    let silver_price_dec = parse(&silver_price, "silver_price")?;
+    cash: FrbDecimal,
+    inventory: FrbDecimal,
+    receivables: FrbDecimal,
+    liabilities: FrbDecimal,
+    gold_price: FrbDecimal,
+    silver_price: FrbDecimal,
+) -> anyhow::Result<DartZakatResult> {
+    
+    // Unwrap inner decimals
+    let gold_price_dec = gold_price.0;
+    let silver_price_dec = silver_price.0;
 
     // Setup Config
-    // Explicitly use Hanafi to ensure LowerOfTwo standard (Safer for the poor)
     let config = ZakatConfig::new()
         .with_madhab(Madhab::Hanafi) 
         .with_gold_price(gold_price_dec)
@@ -46,82 +66,77 @@ pub fn calculate_business_zakat(
 
     // Setup Business Assets
     let business = BusinessZakat::new()
-        .cash(parse(&cash, "cash")?)
-        .inventory(parse(&inventory, "inventory")?)
-        .receivables(parse(&receivables, "receivables")?)
-        .liabilities(parse(&liabilities, "liabilities")?)
-        .hawl(true); // Assuming full hawl for simple API
+        .cash(cash.0)
+        .inventory(inventory.0)
+        .receivables(receivables.0)
+        .liabilities(liabilities.0)
+        .hawl(true);
 
     // Calculate
     match business.calculate_zakat(&config) {
         Ok(res) => Ok(DartZakatResult {
-            zakat_due: res.zakat_due.to_f64().unwrap_or(0.0),
+            zakat_due: FrbDecimal(res.zakat_due),
             is_payable: res.is_payable,
-            nisab_threshold: res.nisab_threshold.to_f64().unwrap_or(0.0),
-            wealth_amount: res.wealth_amount.to_f64().unwrap_or(0.0),
-            limit_name: format!("{:?}", res.limit_name),
+            nisab_threshold: FrbDecimal(res.nisab_threshold),
+            wealth_amount: FrbDecimal(res.net_assets),
+            limit_name: format!("{:?}", res.wealth_type),
         }),
-        Err(e) => Err(format!("Calculation failed: {:?}", e)),
+        Err(e) => Err(anyhow::anyhow!("Calculation failed: {:?}", e)),
     }
 }
 
 #[frb(sync)]
 pub fn calculate_savings_zakat(
-    cash_in_hand: String,
-    bank_balance: String,
-    gold_price: String,
-    silver_price: String,
-) -> Result<DartZakatResult, String> {
-    let parse = |s: &str, name: &str| -> Result<Decimal, String> {
-        Decimal::from_str(s).map_err(|e| format!("Invalid {}: {}", name, e))
-    };
-
-    let gold_price_dec = parse(&gold_price, "gold_price")?;
-    let silver_price_dec = parse(&silver_price, "silver_price")?;
+    cash_in_hand: FrbDecimal,
+    bank_balance: FrbDecimal,
+    gold_price: FrbDecimal,
+    silver_price: FrbDecimal,
+) -> anyhow::Result<DartZakatResult> {
+    
+    let gold_price_dec = gold_price.0;
+    let silver_price_dec = silver_price.0;
 
     let config = ZakatConfig::new()
         .with_madhab(Madhab::Hanafi)
         .with_gold_price(gold_price_dec)
         .with_silver_price(silver_price_dec);
 
-    let cash_val = parse(&cash_in_hand, "cash_in_hand")?;
-    let bank_val = parse(&bank_balance, "bank_balance")?;
+    let cash_val = cash_in_hand.0;
+    let bank_val = bank_balance.0;
 
-    // Savings are effectively "Cash Only" business assets or just pure wealth
-    // We can use BusinessZakat::cash_only or manual calculation
-    // Using BusinessZakat for consistency with "Urud al-Tijarah" / Wealth
+    // Using BusinessZakat for consistency
     let wealth = BusinessZakat::new()
         .cash(cash_val + bank_val)
         .hawl(true);
 
     match wealth.calculate_zakat(&config) {
         Ok(res) => Ok(DartZakatResult {
-            zakat_due: res.zakat_due.to_f64().unwrap_or(0.0),
+            zakat_due: FrbDecimal(res.zakat_due),
             is_payable: res.is_payable,
-            nisab_threshold: res.nisab_threshold.to_f64().unwrap_or(0.0),
-            wealth_amount: res.wealth_amount.to_f64().unwrap_or(0.0),
-            limit_name: format!("{:?}", res.limit_name),
+            nisab_threshold: FrbDecimal(res.nisab_threshold),
+            wealth_amount: FrbDecimal(res.net_assets),
+            limit_name: format!("{:?}", res.wealth_type),
         }),
-        Err(e) => Err(format!("Calculation failed: {:?}", e)),
+        Err(e) => Err(anyhow::anyhow!("Calculation failed: {:?}", e)),
     }
 }
 
 #[frb(sync)]
-pub fn get_nisab_thresholds(gold_price: String, silver_price: String) -> Result<(f64, f64), String> {
-    let parse = |s: &str, name: &str| -> Result<Decimal, String> {
-        Decimal::from_str(s).map_err(|e| format!("Invalid {}: {}", name, e))
-    };
-
-    let gold_price_dec = parse(&gold_price, "gold_price")?;
-    let silver_price_dec = parse(&silver_price, "silver_price")?;
+pub fn get_nisab_thresholds(
+    gold_price: FrbDecimal, 
+    silver_price: FrbDecimal
+) -> anyhow::Result<(FrbDecimal, FrbDecimal)> {
+    
+    let gold_price_dec = gold_price.0;
+    let silver_price_dec = silver_price.0;
 
     let config = ZakatConfig::new()
         .with_madhab(Madhab::Hanafi)
         .with_gold_price(gold_price_dec)
         .with_silver_price(silver_price_dec);
     
-    let nisab_gold = config.get_nisab_threshold(WealthType::Gold).to_f64().unwrap_or(0.0);
-    let nisab_silver = config.get_nisab_threshold(WealthType::Silver).to_f64().unwrap_or(0.0);
+    let nisab_gold = config.gold_price_per_gram * config.get_nisab_gold_grams();
+    let nisab_silver = config.silver_price_per_gram * config.get_nisab_silver_grams();
     
-    Ok((nisab_gold, nisab_silver))
+    Ok((FrbDecimal(nisab_gold), FrbDecimal(nisab_silver)))
 }

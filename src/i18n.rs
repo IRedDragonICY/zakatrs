@@ -98,6 +98,12 @@ impl std::fmt::Debug for Translator {
     }
 }
 
+impl Default for Translator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Translator {
     pub fn new() -> Self {
         let mut bundles = HashMap::new();

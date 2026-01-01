@@ -225,6 +225,48 @@ impl ZakatPortfolio {
         self.items.iter_mut().find(|c| CalculateZakat::get_id(*c) == id)
     }
 
+    /// Gets a reference to an asset by its human-readable label.
+    ///
+    /// Returns the first asset with a matching label, or `None` if no match is found.
+    /// ```rust,ignore
+    /// portfolio.get_by_label("Gold Savings").map(|item| { /* use item */ });
+    /// ```
+    pub fn get_by_label(&self, label: &str) -> Option<&PortfolioItem> {
+        self.items.iter().find(|item| {
+            CalculateZakat::get_label(*item).as_deref() == Some(label)
+        })
+    }
+
+    /// Gets a mutable reference to an asset by its human-readable label.
+    ///
+    /// Returns the first asset with a matching label, or `None` if no match is found.
+    /// ```rust,ignore
+    /// portfolio.get_by_label_mut("Gold Savings").map(|item| { /* modify item */ });
+    /// ```
+    pub fn get_by_label_mut(&mut self, label: &str) -> Option<&mut PortfolioItem> {
+        self.items.iter_mut().find(|item| {
+            CalculateZakat::get_label(&**item).as_deref() == Some(label)
+        })
+    }
+
+    /// Removes an asset by its human-readable label.
+    ///
+    /// Returns the removed item if found, or `None` if no match exists.
+    /// ```rust,ignore
+    /// if let Some(removed) = portfolio.remove_by_label("Gold Savings") {
+    ///     println!("Removed: {:?}", removed);
+    /// }
+    /// ```
+    pub fn remove_by_label(&mut self, label: &str) -> Option<PortfolioItem> {
+        if let Some(pos) = self.items.iter().position(|item| {
+            CalculateZakat::get_label(item).as_deref() == Some(label)
+        }) {
+            Some(self.items.remove(pos))
+        } else {
+            None
+        }
+    }
+
     /// Returns a slice of all items in the portfolio.
     pub fn get_items(&self) -> &[PortfolioItem] {
         &self.items

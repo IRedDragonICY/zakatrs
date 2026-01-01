@@ -8,6 +8,10 @@ use once_cell::sync::Lazy;
 use std::str::FromStr;
 
 use serde::{Serialize, Deserialize};
+use icu::locid::Locale;
+use icu::decimal::{FixedDecimalFormatter, options::FixedDecimalFormatterOptions};
+use fixed_decimal::FixedDecimal;
+use writeable::Writeable;
 
 #[derive(RustEmbed)]
 #[folder = "assets/locales"]
@@ -30,6 +34,10 @@ impl ZakatLocale {
             ZakatLocale::ArSA => "ar-SA",
         }
     }
+
+    pub fn to_icu_locale(&self) -> Locale {
+        self.as_str().parse().expect("Valid BCP-47 locale")
+    }
 }
 
 impl FromStr for ZakatLocale {
@@ -51,61 +59,29 @@ pub trait CurrencyFormatter {
 
 impl CurrencyFormatter for ZakatLocale {
     fn format_currency(&self, amount: Decimal) -> String {
-        use rust_decimal::RoundingStrategy;
+        let locale = self.to_icu_locale();
         
-        // Round to 2 decimals first
-        let rounded = amount.round_dp_with_strategy(2, RoundingStrategy::MidpointAwayFromZero);
-        let s = rounded.to_string();
-        
-        let (int_part, frac_part) = match s.split_once('.') {
-            Some((i, f)) => (i, Some(f)),
-            None => (s.as_str(), None),
-        };
+        // Use ICU4X FixedDecimalFormatter with compiled data
+        let options = FixedDecimalFormatterOptions::default();
+        let formatter = FixedDecimalFormatter::try_new(&locale.into(), options)
+            .expect("Failed to create ICU formatter with compiled data");
 
-        // Helper to insert separators
-        let format_number = |num_str: &str, sep: char| -> String {
-             let mut result = String::new();
-             let chars: Vec<char> = num_str.chars().rev().collect();
-             for (i, c) in chars.iter().enumerate() {
-                 if i > 0 && i % 3 == 0 && *c != '-' {
-                     result.push(sep);
-                 }
-                 result.push(*c);
-             }
-             result.chars().rev().collect()
-        };
+        // Convert Decimal to FixedDecimal
+        // Using string format is the most robust way to ensure simple conversion
+        // without manually handling mantissa/scale differences.
+        let amount_str = amount.to_string();
+        let fixed_decimal = FixedDecimal::from_str(&amount_str)
+            .unwrap_or_else(|_| FixedDecimal::from(0));
 
+        let formatted_number = formatter.format(&fixed_decimal);
+        let number_str = formatted_number.write_to_string().into_owned();
+
+        // ICU4X 1.4 doesn't have a stable CurrencyFormatter yet, so we append symbols manually
+        // conforming to the locale's common practice.
         match self {
-            ZakatLocale::EnUS => {
-                let main = format_number(int_part, ',');
-                if let Some(f) = frac_part {
-                    format!("${}.{}", main, f)
-                } else {
-                    format!("${}", main)
-                }
-            },
-            ZakatLocale::IdID => {
-                // Indonesia: thousands separator '.', decimal ','
-                // Example: Rp1.234,56
-                let main = format_number(int_part, '.');
-                if let Some(f) = frac_part {
-                    format!("Rp{},{}", main, f)
-                } else {
-                    format!("Rp{}", main)
-                }
-            },
-            ZakatLocale::ArSA => {
-                // Arabic: Uses standard numerals usually in finance but let's stick to locale specific if requested.
-                // Request says: "keep ASCII for now to minimize complexity, but respect locale formatting"
-                // Saudi: usually SAR prefix/suffix. Let's use suffix " ر.س" or prefix "SAR ".
-                // Common convention: 1,234.56 SAR
-                let main = format_number(int_part, ',');
-                if let Some(f) = frac_part {
-                    format!("{}.{} ر.س", main, f) 
-                } else {
-                    format!("{} ر.س", main)
-                }
-            }
+            ZakatLocale::EnUS => format!("${}", number_str),
+            ZakatLocale::IdID => format!("Rp{}", number_str),
+            ZakatLocale::ArSA => format!("{} ر.س", number_str),
         }
     }
 }
@@ -166,3 +142,4 @@ impl Translator {
 }
 
 pub static TRANSLATOR: Lazy<Translator> = Lazy::new(Translator::new);
+

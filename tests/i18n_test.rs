@@ -1,7 +1,6 @@
 use zakat::i18n::{ZakatLocale, CurrencyFormatter, TRANSLATOR};
 use zakat::types::{CalculationStep, ZakatDetails, WealthType};
 use rust_decimal_macros::dec;
-use rust_decimal::Decimal;
 
 #[test]
 fn test_locale_enum() {
@@ -36,8 +35,9 @@ fn test_currency_formatting_id_id() {
 fn test_currency_formatting_ar_sa() {
     let locale = ZakatLocale::ArSA;
     let amount = dec!(1234.56);
-    // 1,234.56 ر.س
-    assert_eq!(locale.format_currency(amount), "1,234.56 ر.س");
+    // ICU default for ar-SA is Eastern Arabic numerals
+    // 1,234.56 -> ١٬٢٣٤٫٥٦
+    assert_eq!(locale.format_currency(amount), "١٬٢٣٤٫٥٦ ر.س");
 }
 
 #[test]

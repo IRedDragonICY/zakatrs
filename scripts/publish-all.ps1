@@ -15,12 +15,23 @@ if ($confirm -ne 'y') { Write-Host "Aborted."; exit }
 # 1. Rust (Crates.io)
 Write-Host "`n🦀 Publishing to Crates.io..." -ForegroundColor Yellow
 cargo publish
-if ($LASTEXITCODE -ne 0) { throw "Rust publish failed!" }
+if ($LASTEXITCODE -ne 0) { 
+    $cont = Read-Host "⚠️ Rust publish failed (maybe already published?). Continue? (y/n)"
+    if ($cont -ne 'y') { exit }
+}
 
 # 2. Python (PyPI)
 Write-Host "`n🐍 Publishing to PyPI..." -ForegroundColor Yellow
-maturin publish
-if ($LASTEXITCODE -ne 0) { throw "Python publish failed!" }
+if (Get-Command maturin -ErrorAction SilentlyContinue) {
+    maturin publish
+}
+else {
+    python -m maturin publish
+}
+if ($LASTEXITCODE -ne 0) {
+    $cont = Read-Host "⚠️ Python publish failed. Continue? (y/n)"
+    if ($cont -ne 'y') { exit }
+}
 
 # 3. NPM (JS)
 Write-Host "`nnpm Publishing to NPM..." -ForegroundColor Yellow
@@ -38,7 +49,10 @@ Set-Location ..
 Write-Host "`n💙 Publishing to Pub.dev..." -ForegroundColor Yellow
 Set-Location zakat_dart
 dart pub publish
-if ($LASTEXITCODE -ne 0) { throw "Dart publish failed!" }
+if ($LASTEXITCODE -ne 0) {
+    $cont = Read-Host "⚠️ Dart publish failed. Continue? (y/n)"
+    if ($cont -ne 'y') { exit }
+}
 Set-Location ..
 
 Write-Host "`n✅✅✅ GLOBAL PUBLISH COMPLETE! ✅✅✅" -ForegroundColor Green

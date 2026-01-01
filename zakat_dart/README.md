@@ -76,7 +76,7 @@ We support multiple platforms. Please refer to the specific documentation for yo
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.18.0"
+zakat = "0.19.0"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] }
 ```
@@ -84,7 +84,7 @@ tokio = { version = "1", features = ["full"] }
 Synchronous Only:
 ```toml
 [dependencies]
-zakat = { version = "0.18.0", default-features = false }
+zakat = { version = "0.19.0", default-features = false }
 rust_decimal = "1.39"
 ```
 
@@ -108,6 +108,21 @@ npx jsr add @islam/zakat
 ```bash
 dart pub add zakat
 ```
+
+## Build & Development
+
+The project includes a comprehensive set of cross-platform scripts (PowerShell for Windows, Bash for Linux/macOS) in the `scripts/` directory to automate common tasks.
+
+| Task | Script (Windows) | Script (Linux/Mac) | Description |
+| :--- | :--- | :--- | :--- |
+| **Build All** | `scripts/build-all.ps1` | `scripts/build-all.sh` | Builds Rust Core, WASM bindings, and Dart bindings. |
+| **Build Core** | `cargo build` | `cargo build` | Standard Rust build. |
+| **Build WASM** | `scripts/build-wasm.ps1` | `scripts/build-wasm.sh` | Compiles to WASM using `wasm-pack` and generates NPM package in `pkg/`. |
+| **Build Dart** | `scripts/build-dart.ps1` | `scripts/build-dart.sh` | Generates Flutter Rust Bridge bindings and compiles the Dart library. |
+| **Sync Versions** | `scripts/sync-versions.ps1` | `scripts/sync-versions.sh` | Synchronizes version numbers across `Cargo.toml`, `package.json`, and `pubspec.yaml` (coming soon). |
+| **Publish** | `scripts/publish-all.ps1` | `scripts/publish-all.sh` | Automates publishing to Crates.io, NPM, and JSR (requires auth tokens). |
+
+> **Note**: For Windows users, run scripts from PowerShell. For Linux/Mac, ensure scripts are executable (`chmod +x scripts/*.sh`).
 
 ## Modules
 

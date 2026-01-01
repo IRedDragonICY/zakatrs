@@ -15,6 +15,7 @@ use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 
 use crate::inputs::IntoZakatDecimal;
+use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
 
 // Use the zakat_asset! macro to generate common fields and setters
 crate::zakat_asset! {
@@ -141,7 +142,7 @@ impl CalculateZakat for BusinessZakat {
                 reason: "Liabilities must be non-negative".to_string(),
                 source_label: self.label.clone(),
                 asset_id: None,
-             });
+            });
         }
 
         // For LowerOfTwo or Silver standard, we need silver price too
@@ -168,53 +169,41 @@ impl CalculateZakat for BusinessZakat {
         // Dynamic Nisab threshold based on config (Gold, Silver, or LowerOfTwo)
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
 
-        if !self.hawl_satisfied {
-            return Ok(ZakatDetails::below_threshold(nisab_threshold_value, crate::types::WealthType::Business, "Hawl (1 lunar year) not met")
-                .with_label(self.label.clone().unwrap_or_default()));
-        }
+        // Dynamic Zakat Rate from strategy (default 2.5%)
+        let rate = config.strategy.get_rules().trade_goods_rate;
         
         let gross_assets = ZakatDecimal::new(self.cash_on_hand)
             .safe_add(self.inventory_value)?
             .safe_add(self.receivables)?
             .with_source(self.label.clone());
-            
-        let total_liabilities = ZakatDecimal::new(self.short_term_liabilities)
-            .safe_add(self.liabilities_due_now)?
+        
+        // Calculate intermediate business net (Gross - Short Term)
+        // This keeps logic consistent: short term is deducted before general liabilities
+        let business_net = gross_assets
+            .safe_sub(self.short_term_liabilities)?
             .with_source(self.label.clone());
 
-        // Dynamic Zakat Rate from strategy (default 2.5%)
-        let rate = config.strategy.get_rules().trade_goods_rate;
-
-        // Build calculation trace
-        // Note: gross_assets and total_liabilities are ZakatDecimal wrapper
-        let net_assets_dec = gross_assets.safe_sub(*total_liabilities)?.0;
-        let mut trace = vec![
+        let trace_steps = vec![
             crate::types::CalculationStep::initial("step-cash-on-hand", "Cash on Hand", self.cash_on_hand),
             crate::types::CalculationStep::add("step-inventory-value", "Inventory Value", self.inventory_value),
             crate::types::CalculationStep::add("step-receivables", "Receivables", self.receivables),
             crate::types::CalculationStep::result("step-gross-assets", "Gross Assets", *gross_assets),
             crate::types::CalculationStep::subtract("step-short-term-liabilities", "Short-term Liabilities", self.short_term_liabilities),
-            crate::types::CalculationStep::subtract("step-debts-due-now", "Debts Due Now", self.liabilities_due_now),
-            crate::types::CalculationStep::result("step-net-business-assets", "Net Business Assets", net_assets_dec),
-            crate::types::CalculationStep::compare("step-nisab-check", "Nisab Threshold", nisab_threshold_value),
+            crate::types::CalculationStep::result("step-business-net-intermediate", "Business Net Assets (Pre-Liabilities)", *business_net),
         ];
 
-        // We rely on ZakatDetails::with_trace to calculate final amounts, 
-        // but we add a trace step for rate/info.
-        if net_assets_dec >= nisab_threshold_value && net_assets_dec > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Trade Goods Rate", rate));
-        } else {
-             trace.push(crate::types::CalculationStep::info("status-exempt", "Net Assets below Nisab - No Zakat Due"));
-        }
+        let params = MonetaryCalcParams {
+            total_assets: *business_net,
+            liabilities: self.liabilities_due_now,
+            nisab_threshold: nisab_threshold_value,
+            rate,
+            wealth_type: crate::types::WealthType::Business,
+            label: self.label.clone(),
+            hawl_satisfied: self.hawl_satisfied,
+            trace_steps,
+        };
 
-        Ok(ZakatDetails::with_trace(
-            *gross_assets, 
-            *total_liabilities, 
-            nisab_threshold_value, 
-            rate, 
-            crate::types::WealthType::Business, 
-            trace
-        ).with_label(self.label.clone().unwrap_or_default()))
+        calculate_monetary_asset(params)
     }
 
     fn get_label(&self) -> Option<String> {

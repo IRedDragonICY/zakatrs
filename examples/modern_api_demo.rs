@@ -35,7 +35,7 @@ fn main() {
 
         println!("--- Asset Breakdown ---");
         for details in result.successes() {
-            println!("{}", details.summary());
+            println!("{}", details.summary(&zakat::i18n::default_translator()));
         }
     } else {
         println!("Calculation Failed!");

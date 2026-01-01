@@ -13,7 +13,7 @@ use crate::types::{ZakatDetails, ZakatError};
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
-use crate::math::ZakatDecimal;
+use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -144,6 +144,15 @@ impl CalculateZakat for InvestmentAssets {
                 asset_id: None,
             });
         }
+        if self.debt < Decimal::ZERO {
+             return Err(ZakatError::InvalidInput {
+                field: "debt".to_string(),
+                value: "negative".to_string(),
+                reason: "Debt must be non-negative".to_string(),
+                source_label: self.label.clone(),
+                asset_id: None,
+            });
+        }
 
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(
@@ -168,16 +177,10 @@ impl CalculateZakat for InvestmentAssets {
         
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
 
-        if !self.hawl_satisfied {
-            return Ok(ZakatDetails::below_threshold(nisab_threshold_value, crate::types::WealthType::Investment, "Hawl (1 lunar year) not met")
-                .with_label(self.label.clone().unwrap_or_default()));
-        }
         // Requirement: 
         // Crypto: Treated as Trade Goods (2.5% if > Nisab).
         // Stocks: Market Value * 2.5% (Zakah on Principal + Profit).
         
-        let total_assets = self.value;
-        let liabilities = self.debt;
         // Dynamic rate from strategy (default 2.5%)
         let rate = config.strategy.get_rules().trade_goods_rate;
 
@@ -188,25 +191,23 @@ impl CalculateZakat for InvestmentAssets {
             InvestmentType::MutualFund => "Mutual Fund",
         };
 
-        let mut trace = Vec::new();
-        trace.push(crate::types::CalculationStep::initial("step-market-value", format!("Market Value ({})", type_desc), total_assets)
-             .with_args(std::collections::HashMap::from([("type".to_string(), type_desc.to_string())])));
-        trace.push(crate::types::CalculationStep::subtract("step-debts-due-now", "Debts Due Now", liabilities));
-        
-        let net_assets = ZakatDecimal::new(total_assets)
-            .safe_sub(liabilities)?
-            .with_source(self.label.clone());
-        trace.push(crate::types::CalculationStep::result("step-net-investment-assets", "Net Investment Assets", *net_assets));
-        trace.push(crate::types::CalculationStep::compare("step-nisab-check", "Nisab Threshold", nisab_threshold_value));
-        
-        if *net_assets >= nisab_threshold_value && *net_assets > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Trade Goods Rate", rate));
-        } else {
-             trace.push(crate::types::CalculationStep::info("status-exempt", "Net Assets below Nisab - No Zakat Due"));
-        }
+        let trace_steps = vec![
+            crate::types::CalculationStep::initial("step-market-value", format!("Market Value ({})", type_desc), self.value)
+                 .with_args(std::collections::HashMap::from([("type".to_string(), type_desc.to_string())]))
+        ];
 
-        Ok(ZakatDetails::with_trace(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Investment, trace)
-            .with_label(self.label.clone().unwrap_or_default()))
+        let params = MonetaryCalcParams {
+            total_assets: self.value,
+            liabilities: self.debt,
+            nisab_threshold: nisab_threshold_value,
+            rate,
+            wealth_type: crate::types::WealthType::Investment,
+            label: self.label.clone(),
+            hawl_satisfied: self.hawl_satisfied,
+            trace_steps,
+        };
+
+        calculate_monetary_asset(params)
     }
 
     fn get_label(&self) -> Option<String> {

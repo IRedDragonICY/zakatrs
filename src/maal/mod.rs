@@ -1,4 +1,5 @@
 pub mod agriculture;
+pub mod calculator;
 pub mod business;
 pub mod income;
 pub mod investments;

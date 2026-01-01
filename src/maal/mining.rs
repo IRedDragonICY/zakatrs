@@ -13,6 +13,7 @@ use crate::traits::{CalculateZakat, ZakatConfigArgument};
 
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
+use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum MiningType {
@@ -156,32 +157,25 @@ impl CalculateZakat for MiningAssets {
                     .with_source(self.label.clone());
                 
                 // Rate: 2.5%. Nisab: 85g Gold.
-                if !self.hawl_satisfied {
-                     return Ok(ZakatDetails::below_threshold(*nisab_threshold, crate::types::WealthType::Mining, "Hawl (1 lunar year) not met")
-                        .with_label(self.label.clone().unwrap_or_default()));
-                }
                 // Dynamic rate from strategy (default 2.5%)
                 let rate = config.strategy.get_rules().trade_goods_rate;
-                let liabilities = self.liabilities_due_now;
 
-                // Build trace for Mines
-                let mut trace = Vec::new();
-                trace.push(crate::types::CalculationStep::initial("step-extracted-value", "Extracted Value", self.value));
-                trace.push(crate::types::CalculationStep::subtract("step-debts-due-now", "Debts Due Now", liabilities));
-                let net_val = ZakatDecimal::new(self.value)
-                    .safe_sub(liabilities)?
-                    .with_source(self.label.clone());
-                trace.push(crate::types::CalculationStep::result("step-net-mining-assets", "Net Mining Assets", *net_val));
-                trace.push(crate::types::CalculationStep::compare("step-nisab-check-gold", "Nisab Threshold (85g Gold)", *nisab_threshold));
-                
-                if *net_val >= *nisab_threshold && *net_val > Decimal::ZERO {
-                    trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Trade Goods Rate", rate));
-                } else {
-                     trace.push(crate::types::CalculationStep::info("status-exempt", "Net Value below Nisab - No Zakat Due"));
-                }
-                
-                Ok(ZakatDetails::with_trace(self.value, liabilities, *nisab_threshold, rate, crate::types::WealthType::Mining, trace)
-                    .with_label(self.label.clone().unwrap_or_default()))
+                let trace_steps = vec![
+                    crate::types::CalculationStep::initial("step-extracted-value", "Extracted Value", self.value),
+                ];
+
+                let params = MonetaryCalcParams {
+                    total_assets: self.value,
+                    liabilities: self.liabilities_due_now,
+                    nisab_threshold: *nisab_threshold,
+                    rate,
+                    wealth_type: crate::types::WealthType::Mining,
+                    label: self.label.clone(),
+                    hawl_satisfied: self.hawl_satisfied,
+                    trace_steps,
+                };
+
+                calculate_monetary_asset(params)
             }
         }
     }

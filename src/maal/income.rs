@@ -14,6 +14,7 @@ use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
+use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
@@ -187,17 +188,11 @@ impl CalculateZakat for IncomeZakatCalculator {
         
         let nisab_threshold_value = config.get_monetary_nisab_threshold();
 
-        // Income usually doesn't strictly require hawl if it's salary (paid upon receipt),
-        // but if the user explicitly sets hawl_satisfied = false, we should respect it.
-        if !self.hawl_satisfied {
-             return Ok(ZakatDetails::below_threshold(nisab_threshold_value, crate::types::WealthType::Income, "Hawl (1 lunar year) not met")
-                .with_label(self.label.clone().unwrap_or_default()));
-        }
-
         // Dynamic rate from strategy (default 2.5%)
         let rate = config.strategy.get_rules().trade_goods_rate;
         let external_debt = self.debt;
 
+        // Calculate total_assets and liabilities based on method
         let (total_assets, liabilities) = match self.method {
             IncomeCalculationMethod::Gross => {
                 // Gross Method: 2.5% of Total Income.
@@ -215,35 +210,32 @@ impl CalculateZakat for IncomeZakatCalculator {
             }
         };
 
-        // Build calculation trace
-        let mut trace = Vec::new();
-        trace.push(crate::types::CalculationStep::initial("step-total-income", "Total Income", self.income));
+        // Build trace steps based on method
+        let mut trace_steps = vec![
+            crate::types::CalculationStep::initial("step-total-income", "Total Income", self.income),
+        ];
         
         match self.method {
             IncomeCalculationMethod::Net => {
-                trace.push(crate::types::CalculationStep::subtract("step-basic-expenses", "Basic Living Expenses", self.expenses));
+                trace_steps.push(crate::types::CalculationStep::subtract("step-basic-expenses", "Basic Living Expenses", self.expenses));
             }
             IncomeCalculationMethod::Gross => {
-                trace.push(crate::types::CalculationStep::info("info-gross-method", "Gross Method used (Expenses not deducted)"));
+                trace_steps.push(crate::types::CalculationStep::info("info-gross-method", "Gross Method used (Expenses not deducted)"));
             }
         }
 
-        trace.push(crate::types::CalculationStep::subtract("step-debts-due-now", "Debts Due Now", external_debt));
-        let net_income = ZakatDecimal::new(total_assets)
-            .safe_sub(liabilities)?
-            .with_source(self.label.clone());
-        trace.push(crate::types::CalculationStep::result("step-net-income", "Net Zakatable Income", *net_income));
-        
-        trace.push(crate::types::CalculationStep::compare("step-nisab-check", "Nisab Threshold", nisab_threshold_value));
-        
-        if *net_income >= nisab_threshold_value && *net_income > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Trade Goods Rate", rate));
-        } else {
-            trace.push(crate::types::CalculationStep::info("status-exempt", "Net Income below Nisab - No Zakat Due"));
-        }
+        let params = MonetaryCalcParams {
+            total_assets,
+            liabilities,
+            nisab_threshold: nisab_threshold_value,
+            rate,
+            wealth_type: crate::types::WealthType::Income,
+            label: self.label.clone(),
+            hawl_satisfied: self.hawl_satisfied,
+            trace_steps,
+        };
 
-        Ok(ZakatDetails::with_trace(total_assets, liabilities, nisab_threshold_value, rate, crate::types::WealthType::Income, trace)
-            .with_label(self.label.clone().unwrap_or_default()))
+        calculate_monetary_asset(params)
     }
 
     fn get_label(&self) -> Option<String> {

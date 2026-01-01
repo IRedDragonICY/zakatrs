@@ -1484,7 +1484,7 @@ dependencies = [
 
 [[package]]
 name = "zakat"
-version = "0.17.2"
+version = "0.17.1"
 dependencies = [
  "async-trait",
  "console_error_panic_hook",

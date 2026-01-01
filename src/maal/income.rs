@@ -24,39 +24,34 @@ pub enum IncomeCalculationMethod {
     Net,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IncomeZakatCalculator {
-    pub income: Decimal,
-    pub expenses: Decimal,
-    pub debt: Decimal,
-    pub method: IncomeCalculationMethod,
-    pub hawl_satisfied: bool,
-    pub label: Option<String>,
-    pub id: uuid::Uuid,
-    // Hidden field for deferred input validation errors
-    #[serde(skip)]
-    _input_errors: Vec<ZakatError>,
+// MACRO USAGE
+crate::zakat_asset! {
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct IncomeZakatCalculator {
+        pub income: Decimal,
+        pub expenses: Decimal,
+        pub method: IncomeCalculationMethod,
+    }
 }
 
 impl Default for IncomeZakatCalculator {
     fn default() -> Self {
+        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors) = Self::default_common();
         Self {
             income: Decimal::ZERO,
             expenses: Decimal::ZERO,
-            debt: Decimal::ZERO,
             method: IncomeCalculationMethod::default(),
-            hawl_satisfied: false,
-            label: None,
-            id: uuid::Uuid::new_v4(),
-            _input_errors: Vec::new(),
+            liabilities_due_now,
+            hawl_satisfied,
+            label,
+            id,
+            _input_errors,
         }
     }
 }
 
 impl IncomeZakatCalculator {
-    pub fn new() -> Self {
-        Self::default()
-    }
+    // new() is provided by the macro
 
     pub fn from_amounts(
         income: impl IntoZakatDecimal,
@@ -66,7 +61,7 @@ impl IncomeZakatCalculator {
         let mut calc = Self::default();
         calc = calc.income(income);
         calc = calc.expenses(expenses);
-        calc = calc.debt(debt);
+        calc = calc.debt(debt); // Uses macro's debt() setter -> liabilities_due_now
         calc
     }
 
@@ -79,18 +74,7 @@ impl IncomeZakatCalculator {
             .hawl(true)
     }
 
-    pub fn validate(&self) -> Result<(), ZakatError> {
-        match self._input_errors.len() {
-            0 => Ok(()),
-            1 => Err(self._input_errors[0].clone()),
-            _ => Err(ZakatError::MultipleErrors(self._input_errors.clone())),
-        }
-    }
-
     /// Sets total income.
-    ///
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
     pub fn income(mut self, income: impl IntoZakatDecimal) -> Self {
         match income.into_zakat_decimal() {
             Ok(v) => self.income = v,
@@ -100,9 +84,6 @@ impl IncomeZakatCalculator {
     }
 
     /// Sets basic living expenses.
-    ///
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
     pub fn expenses(mut self, expenses: impl IntoZakatDecimal) -> Self {
         match expenses.into_zakat_decimal() {
             Ok(v) => self.expenses = v,
@@ -115,40 +96,12 @@ impl IncomeZakatCalculator {
         self.method = method;
         self
     }
-
-    /// Sets deductible debt.
-    ///
-    /// # Panics
-    /// Panics if the value cannot be converted to a valid decimal.
-    pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        match debt.into_zakat_decimal() {
-            Ok(v) => self.debt = v,
-            Err(e) => self._input_errors.push(e),
-        }
-        self
-    }
-
-    pub fn hawl(mut self, satisfied: bool) -> Self {
-        self.hawl_satisfied = satisfied;
-        self
-    }
-
-    pub fn label(mut self, label: impl Into<String>) -> Self {
-        self.label = Some(label.into());
-        self
-    }
-
-    /// Restores the asset ID (for database/serialization restoration).
-    pub fn with_id(mut self, id: uuid::Uuid) -> Self {
-        self.id = id;
-        self
-    }
 }
 
 impl CalculateZakat for IncomeZakatCalculator {
-    fn validate_input(&self) -> Result<(), ZakatError> {
-        self.validate()
-    }
+    fn validate_input(&self) -> Result<(), ZakatError> { self.validate() }
+    fn get_label(&self) -> Option<String> { self.label.clone() }
+    fn get_id(&self) -> uuid::Uuid { self.id }
 
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         self.validate()?;
@@ -190,7 +143,7 @@ impl CalculateZakat for IncomeZakatCalculator {
 
         // Dynamic rate from strategy (default 2.5%)
         let rate = config.strategy.get_rules().trade_goods_rate;
-        let external_debt = self.debt;
+        let external_debt = self.liabilities_due_now; // Uses macro field
 
         // Calculate total_assets and liabilities based on method
         let (total_assets, liabilities) = match self.method {
@@ -236,14 +189,6 @@ impl CalculateZakat for IncomeZakatCalculator {
         };
 
         calculate_monetary_asset(params)
-    }
-
-    fn get_label(&self) -> Option<String> {
-        self.label.clone()
-    }
-
-    fn get_id(&self) -> uuid::Uuid {
-        self.id
     }
 }
 

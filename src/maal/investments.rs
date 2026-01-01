@@ -24,68 +24,41 @@ pub enum InvestmentType {
     MutualFund,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct InvestmentAssets {
-    pub value: Decimal,
-    pub debt: Decimal,
-    // Hidden field for deferred input validation errors
-    #[serde(skip)]
-    _input_errors: Vec<ZakatError>,
-    // The following fields are retained from the original struct
-    pub investment_type: InvestmentType,
-    pub hawl_satisfied: bool,
-    pub label: Option<String>,
-    pub id: uuid::Uuid,
+// MACRO USAGE
+crate::zakat_asset! {
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct InvestmentAssets {
+        pub value: Decimal,
+        pub investment_type: InvestmentType,
+    }
 }
 
 impl Default for InvestmentAssets {
     fn default() -> Self {
+        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors) = Self::default_common();
         Self {
             value: Decimal::ZERO,
-            debt: Decimal::ZERO,
-            _input_errors: Vec::new(),
             investment_type: InvestmentType::default(),
-            hawl_satisfied: false,
-            label: None,
-            id: uuid::Uuid::new_v4(), // Default ID generation
+            liabilities_due_now,
+            hawl_satisfied,
+            label,
+            id,
+            _input_errors,
         }
     }
 }
 
 impl InvestmentAssets {
-    pub fn new() -> Self {
-        Self::default()
-    }
+    // new() is provided by the macro
 
-    /// Creates a Stock investment asset with the specified market value.
-    /// Defaults to Hawl satisfied.
     pub fn stock(value: impl IntoZakatDecimal) -> Self {
-        Self::default()
-            .value(value)
-            .kind(InvestmentType::Stock)
-            .hawl(true)
+        Self::default().value(value).kind(InvestmentType::Stock)
     }
 
-    /// Creates a Crypto investment asset with the specified market value.
-    /// Defaults to Hawl satisfied.
     pub fn crypto(value: impl IntoZakatDecimal) -> Self {
-        Self::default()
-            .value(value)
-            .kind(InvestmentType::Crypto)
-            .hawl(true)
+        Self::default().value(value).kind(InvestmentType::Crypto)
     }
 
-
-
-    pub fn validate(&self) -> Result<(), ZakatError> {
-        match self._input_errors.len() {
-            0 => Ok(()),
-            1 => Err(self._input_errors[0].clone()),
-            _ => Err(ZakatError::MultipleErrors(self._input_errors.clone())),
-        }
-    }
-
-    /// Sets the market value.
     pub fn value(mut self, value: impl IntoZakatDecimal) -> Self {
         match value.into_zakat_decimal() {
             Ok(v) => self.value = v,
@@ -98,45 +71,21 @@ impl InvestmentAssets {
         self.investment_type = kind;
         self
     }
-
-    /// Sets deductible debt.
-    pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        match debt.into_zakat_decimal() {
-            Ok(v) => self.debt = v,
-            Err(e) => self._input_errors.push(e),
-        }
-        self
-    }
-
-    pub fn hawl(mut self, satisfied: bool) -> Self {
-        self.hawl_satisfied = satisfied;
-        self
-    }
-
-    pub fn label(mut self, label: impl Into<String>) -> Self {
-        self.label = Some(label.into());
-        self
-    }
-
-    /// Restores the asset ID (for database/serialization restoration).
-    pub fn with_id(mut self, id: uuid::Uuid) -> Self {
-        self.id = id;
-        self
-    }
 }
 
 impl CalculateZakat for InvestmentAssets {
-    fn validate_input(&self) -> Result<(), ZakatError> {
-        self.validate()
-    }
+    fn validate_input(&self) -> Result<(), ZakatError> { self.validate() }
+    fn get_label(&self) -> Option<String> { self.label.clone() }
+    fn get_id(&self) -> uuid::Uuid { self.id }
 
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         self.validate()?;
         let config_cow = config.resolve_config();
         let config = config_cow.as_ref();
 
+        // Specific input validation
         if self.value < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput {
+             return Err(ZakatError::InvalidInput {
                 field: "market_value".to_string(),
                 value: "negative".to_string(),
                 reason: "Market value must be non-negative".to_string(),
@@ -144,7 +93,7 @@ impl CalculateZakat for InvestmentAssets {
                 asset_id: None,
             });
         }
-        if self.debt < Decimal::ZERO {
+        if self.liabilities_due_now < Decimal::ZERO {
              return Err(ZakatError::InvalidInput {
                 field: "debt".to_string(),
                 value: "negative".to_string(),
@@ -198,7 +147,7 @@ impl CalculateZakat for InvestmentAssets {
 
         let params = MonetaryCalcParams {
             total_assets: self.value,
-            liabilities: self.debt,
+            liabilities: self.liabilities_due_now, // Uses macro field
             nisab_threshold: nisab_threshold_value,
             rate,
             wealth_type: crate::types::WealthType::Investment,
@@ -208,14 +157,6 @@ impl CalculateZakat for InvestmentAssets {
         };
 
         calculate_monetary_asset(params)
-    }
-
-    fn get_label(&self) -> Option<String> {
-        self.label.clone()
-    }
-
-    fn get_id(&self) -> uuid::Uuid {
-        self.id
     }
 }
 

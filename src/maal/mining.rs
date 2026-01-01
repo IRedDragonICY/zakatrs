@@ -24,27 +24,32 @@ pub enum MiningType {
     Mines,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct MiningAssets {
-    pub value: Decimal,
-    pub mining_type: MiningType,
-    pub liabilities_due_now: Decimal,
-    pub hawl_satisfied: bool,
-    pub label: Option<String>,
-    pub id: uuid::Uuid,
-    // Hidden field for deferred input validation errors
-    #[serde(skip)]
-    _input_errors: Vec<ZakatError>,
+// MACRO USAGE
+crate::zakat_asset! {
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    pub struct MiningAssets {
+        pub value: Decimal,
+        pub mining_type: MiningType,
+    }
+}
+
+impl Default for MiningAssets {
+    fn default() -> Self {
+        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors) = Self::default_common();
+        Self {
+            value: Decimal::ZERO,
+            mining_type: MiningType::default(),
+            liabilities_due_now,
+            hawl_satisfied,
+            label,
+            id,
+            _input_errors,
+        }
+    }
 }
 
 impl MiningAssets {
-    pub fn new() -> Self {
-        Self {
-            id: uuid::Uuid::new_v4(),
-            _input_errors: Vec::new(),
-            ..Default::default()
-        }
-    }
+    // new() is provided by the macro
 
     /// Sets the mining value.
     /// 
@@ -62,56 +67,12 @@ impl MiningAssets {
         self.mining_type = kind;
         self
     }
-
-    /// Sets deductible debt.
-    /// 
-    /// If the value cannot be converted to a valid decimal, the error is
-    /// collected and will be returned by `validate()` or `calculate_zakat()`.
-    pub fn debt(mut self, debt: impl IntoZakatDecimal) -> Self {
-        match debt.into_zakat_decimal() {
-            Ok(v) => self.liabilities_due_now = v,
-            Err(e) => self._input_errors.push(e),
-        }
-        self
-    }
-
-    pub fn hawl(mut self, satisfied: bool) -> Self {
-        self.hawl_satisfied = satisfied;
-        self
-    }
-
-    pub fn label(mut self, label: impl Into<String>) -> Self {
-        self.label = Some(label.into());
-        self
-    }
-
-    /// Restores the asset ID (for database/serialization restoration).
-    pub fn with_id(mut self, id: uuid::Uuid) -> Self {
-        self.id = id;
-        self
-    }
-
-    /// Validates the asset and returns any input errors.
-    ///
-    /// - If no errors, returns `Ok(())`.
-    /// - If 1 error, returns `Err(that_error)`.
-    /// - If >1 errors, returns `Err(ZakatError::MultipleErrors(...))`.
-    pub fn validate(&self) -> Result<(), ZakatError> {
-        match self._input_errors.len() {
-            0 => Ok(()),
-            1 => Err(self._input_errors[0].clone()),
-            _ => Err(ZakatError::MultipleErrors(self._input_errors.clone())),
-        }
-    }
-
-
-
 }
 
 impl CalculateZakat for MiningAssets {
-    fn validate_input(&self) -> Result<(), ZakatError> {
-        self.validate()
-    }
+    fn validate_input(&self) -> Result<(), ZakatError> { self.validate() }
+    fn get_label(&self) -> Option<String> { self.label.clone() }
+    fn get_id(&self) -> uuid::Uuid { self.id }
 
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         // Validate deferred input errors first
@@ -166,7 +127,7 @@ impl CalculateZakat for MiningAssets {
 
                 let params = MonetaryCalcParams {
                     total_assets: self.value,
-                    liabilities: self.liabilities_due_now,
+                    liabilities: self.liabilities_due_now, // Uses macro field
                     nisab_threshold: *nisab_threshold,
                     rate,
                     wealth_type: crate::types::WealthType::Mining,
@@ -178,14 +139,6 @@ impl CalculateZakat for MiningAssets {
                 calculate_monetary_asset(params)
             }
         }
-    }
-
-    fn get_label(&self) -> Option<String> {
-        self.label.clone()
-    }
-
-    fn get_id(&self) -> uuid::Uuid {
-        self.id
     }
 }
 

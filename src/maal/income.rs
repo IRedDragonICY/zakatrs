@@ -36,7 +36,7 @@ crate::zakat_asset! {
 
 impl Default for IncomeZakatCalculator {
     fn default() -> Self {
-        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors) = Self::default_common();
+        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
         Self {
             income: Decimal::ZERO,
             expenses: Decimal::ZERO,
@@ -45,6 +45,7 @@ impl Default for IncomeZakatCalculator {
             hawl_satisfied,
             label,
             id,
+            acquisition_date,
             _input_errors,
         }
     }
@@ -177,6 +178,15 @@ impl CalculateZakat for IncomeZakatCalculator {
             }
         }
 
+        // Override hawl_satisfied if acquisition_date is present
+        let hawl_is_satisfied = if let Some(date) = self.acquisition_date {
+            let tracker = crate::hawl::HawlTracker::new(chrono::Local::now().date_naive())
+                .acquired_on(date);
+            tracker.is_satisfied()
+        } else {
+            self.hawl_satisfied
+        };
+
         let params = MonetaryCalcParams {
             total_assets,
             liabilities,
@@ -184,7 +194,7 @@ impl CalculateZakat for IncomeZakatCalculator {
             rate,
             wealth_type: crate::types::WealthType::Income,
             label: self.label.clone(),
-            hawl_satisfied: self.hawl_satisfied,
+            hawl_satisfied: hawl_is_satisfied,
             trace_steps,
         };
 

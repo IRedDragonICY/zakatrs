@@ -35,7 +35,7 @@ crate::zakat_asset! {
 
 impl Default for MiningAssets {
     fn default() -> Self {
-        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors) = Self::default_common();
+        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
         Self {
             value: Decimal::ZERO,
             mining_type: MiningType::default(),
@@ -43,6 +43,7 @@ impl Default for MiningAssets {
             hawl_satisfied,
             label,
             id,
+            acquisition_date,
             _input_errors,
         }
     }

@@ -14,6 +14,7 @@ pub mod utils;
 pub mod assets;
 pub mod math;
 pub mod i18n;
+pub mod hawl;
 
 #[cfg(any(target_arch = "wasm32", feature = "wasm"))]
 pub mod wasm;

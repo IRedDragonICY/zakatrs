@@ -43,7 +43,7 @@ crate::zakat_asset! {
 
 impl Default for PreciousMetals {
     fn default() -> Self {
-        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors) = Self::default_common();
+        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
         Self {
             weight_grams: Decimal::ZERO,
             metal_type: None,
@@ -53,6 +53,7 @@ impl Default for PreciousMetals {
             hawl_satisfied,
             label,
             id,
+            acquisition_date,
             _input_errors,
         }
     }
@@ -205,7 +206,17 @@ impl CalculateZakat for PreciousMetals {
         let nisab_value = ZakatDecimal::new(nisab_threshold_grams)
             .safe_mul(price_per_gram)?
             .with_source(self.label.clone());
-        if !self.hawl_satisfied {
+
+        // Override hawl_satisfied if acquisition_date is present
+        let hawl_is_satisfied = if let Some(date) = self.acquisition_date {
+            crate::hawl::HawlTracker::new(chrono::Local::now().date_naive())
+                .acquired_on(date)
+                .is_satisfied()
+        } else {
+            self.hawl_satisfied
+        };
+
+        if !hawl_is_satisfied {
             return Ok(ZakatDetails::below_threshold(*nisab_value, metal_type, "Hawl (1 lunar year) not met")
                 .with_label(self.label.clone().unwrap_or_default()));
         }

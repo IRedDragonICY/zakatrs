@@ -73,6 +73,8 @@ macro_rules! zakat_asset {
             pub label: Option<String>,
             /// Internal unique identifier.
             pub id: uuid::Uuid,
+            /// Date when the asset was acquired (for precise Hawl calculation).
+            pub acquisition_date: Option<chrono::NaiveDate>,
             /// Hidden field for deferred input validation errors.
             #[serde(skip)]
             _input_errors: Vec<$crate::types::ZakatError>,
@@ -103,15 +105,20 @@ macro_rules! zakat_asset {
                 self
             }
 
+            pub fn acquired_on(mut self, date: chrono::NaiveDate) -> Self {
+                self.acquisition_date = Some(date);
+                self
+            }
+
             pub fn with_id(mut self, id: uuid::Uuid) -> Self {
                 self.id = id;
                 self
             }
             
             /// Internal helper to init common fields.
-            /// Returns (liabilities_due_now, hawl_satisfied, label, id, _input_errors)
-            fn default_common() -> (rust_decimal::Decimal, bool, Option<String>, uuid::Uuid, Vec<$crate::types::ZakatError>) {
-                (rust_decimal::Decimal::ZERO, true, None, uuid::Uuid::new_v4(), Vec::new())
+            /// Returns (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date)
+            fn default_common() -> (rust_decimal::Decimal, bool, Option<String>, uuid::Uuid, Vec<$crate::types::ZakatError>, Option<chrono::NaiveDate>) {
+                (rust_decimal::Decimal::ZERO, true, None, uuid::Uuid::new_v4(), Vec::new(), None)
             }
             
             /// Validates the asset and returns any input errors.

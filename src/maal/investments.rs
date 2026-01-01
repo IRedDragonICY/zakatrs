@@ -13,6 +13,7 @@ use crate::types::{ZakatDetails, ZakatError};
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
+use crate::math::ZakatDecimal;
 use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
 
 
@@ -30,19 +31,23 @@ crate::zakat_asset! {
     pub struct InvestmentAssets {
         pub value: Decimal,
         pub investment_type: InvestmentType,
+        /// Purification rate (e.g., 0.05 for 5%) to cleanse non-halal income.
+        pub purification_rate: Option<Decimal>,
     }
 }
 
 impl Default for InvestmentAssets {
     fn default() -> Self {
-        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors) = Self::default_common();
+        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
         Self {
             value: Decimal::ZERO,
             investment_type: InvestmentType::default(),
+            purification_rate: None,
             liabilities_due_now,
             hawl_satisfied,
             label,
             id,
+            acquisition_date,
             _input_errors,
         }
     }
@@ -69,6 +74,16 @@ impl InvestmentAssets {
 
     pub fn kind(mut self, kind: InvestmentType) -> Self {
         self.investment_type = kind;
+        self
+    }
+
+    /// Sets the purification rate (Tathir) to cleanse non-halal income.
+    /// Example: `0.05` for 5% legacy income deduction.
+    pub fn purify(mut self, rate: impl IntoZakatDecimal) -> Self {
+        match rate.into_zakat_decimal() {
+            Ok(v) => self.purification_rate = Some(v),
+            Err(e) => self._input_errors.push(e),
+        }
         self
     }
 }
@@ -140,19 +155,47 @@ impl CalculateZakat for InvestmentAssets {
             InvestmentType::MutualFund => "Mutual Fund",
         };
 
-        let trace_steps = vec![
+        let mut trace_steps = vec![
             crate::types::CalculationStep::initial("step-market-value", format!("Market Value ({})", type_desc), self.value)
                  .with_args(std::collections::HashMap::from([("type".to_string(), type_desc.to_string())]))
         ];
 
+        // Apply Purification if set
+        let zakatable_gross = if let Some(purify_rate) = self.purification_rate {
+             let impure_amount = ZakatDecimal::new(self.value)
+                .safe_mul(purify_rate)?
+                .with_source(self.label.clone());
+             
+             trace_steps.push(crate::types::CalculationStep::rate("step-purification-rate", "Purification Rate (Tathir)", purify_rate));
+             trace_steps.push(crate::types::CalculationStep::subtract("step-purification-amount", "Impure Amount Deducted", *impure_amount));
+             
+             let puri_val = ZakatDecimal::new(self.value)
+                .safe_sub(*impure_amount)?
+                .with_source(self.label.clone());
+             
+             trace_steps.push(crate::types::CalculationStep::result("step-purified-value", "Purified Gross Value", *puri_val));
+             *puri_val
+        } else {
+            self.value
+        };
+
+        // Override hawl_satisfied if acquisition_date is present
+        let hawl_is_satisfied = if let Some(date) = self.acquisition_date {
+            let tracker = crate::hawl::HawlTracker::new(chrono::Local::now().date_naive())
+                .acquired_on(date);
+            tracker.is_satisfied()
+        } else {
+            self.hawl_satisfied
+        };  
+
         let params = MonetaryCalcParams {
-            total_assets: self.value,
+            total_assets: zakatable_gross,
             liabilities: self.liabilities_due_now, // Uses macro field
             nisab_threshold: nisab_threshold_value,
             rate,
             wealth_type: crate::types::WealthType::Investment,
             label: self.label.clone(),
-            hawl_satisfied: self.hawl_satisfied,
+            hawl_satisfied: hawl_is_satisfied,
             trace_steps,
         };
 

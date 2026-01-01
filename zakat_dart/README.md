@@ -42,7 +42,12 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Input Sanitization & Validation (Rejects negative values, ensures safe configuration)
 - Arabic Numeral Support (Eastern Arabic ٠-٩, Perso-Arabic ۰-۹)
 - Flexible Configuration (Env Vars, JSON, Fluent API, Partial Loading)
+- Input Sanitization & Validation (Rejects negative values, ensures safe configuration)
+- Arabic Numeral Support (Eastern Arabic ٠-٩, Perso-Arabic ۰-۹)
+- Flexible Configuration (Env Vars, JSON, Fluent API, Partial Loading)
 - Fiqh Compliance (Jewelry exemptions, Madhab-specific rules, Hawl requirements)
+- **Hawl (Lunar Year) Tracking** (Precise date-based eligibility)
+- **Stock Purification (Tathir)** (Deduct impure income before calculation)
 - Async Support (Optional integration with `tokio` and `async-trait`)
 - Live Pricing Interface (e.g. for API integration)
 - Detailed Reporting (Livestock in-kind details, calculation traces, metadata support)
@@ -189,6 +194,6 @@ Our camel Zakat calculator is meticulously coded to follow the exact age tiers (
 Crucially, we enforce the **Saimah** condition: Zakat is only due if your livestock grazes freely on open pastures for the majority of the year. Feed-lot animals are generally exempt from this specific category.
 
 ### 5. Modern Assets & Portfolio
-*   **Stocks & Crypto**: We treat these as Trade Goods (*Urud*), subjecting them to a 2.5% rate on their market value, consistent with **[AAOIFI Standard 35](https://aaoifi.com)**.
+*   **Stocks & Crypto**: We treat these as Trade Goods (*Urud*), subjecting them to a 2.5% rate on their market value, consistent with **[AAOIFI Standard 35](https://aaoifi.com)**. We also support **Purification (Tathir)**, allowing you to automatically deduct percentages of non-halal income (e.g., from interest) before the Zakat calculation.
 *   **Professional Income**: We support Dr. Al-Qaradawi's view on *Zakat al-Mustafad*, allowing you to calculate Zakat either on your Gross income (like a harvest) or Net income (after basic needs).
 *   **The "Dam' al-Amwal" Principle**: To ensure the computation is most beneficial for the poor (*Anfa' lil-fuqara*), we follow the **Hanafi** methodology of aggregating all your monetary assets (Gold, Silver, Cash, Stocks) into a single pot to check against the Nisab, rather than isolating them.

@@ -261,3 +261,40 @@ if result.is_payable {
     }
 }
 ```
+
+## Hawl & Purification
+
+New in v0.19.0: Strict Fiqh logic for lunar years and income purification.
+
+### Hawl (Lunar Year) Tracking
+Zakat is only due if an asset is held for 1 Lunar Year (approx 354 days). You can now track this precisely:
+
+```rust
+use chrono::NaiveDate;
+
+let acquired_date = NaiveDate::from_ymd_opt(2023, 1, 1).unwrap();
+
+let store = BusinessZakat::new()
+    .cash(10_000.0)
+    .acquired_on(acquired_date); // Sets exact start date
+
+// If calculated today (e.g. 2023-06-01), specific logic checks if 354 days passed.
+// .acquired_on() overrides manual .hawl(true)
+```
+
+### Stock Purification (Tathir)
+For investments in mixed companies (halal business but some interest income), you must purify the non-halal portion *before* Zakat.
+
+```rust
+let stock = InvestmentAssets::new()
+    .value(10_000.0)
+    .kind(InvestmentType::Stock)
+    .purify(0.05); // 5% of value is impure
+
+// Result:
+// Gross Value: 10,000
+// Impure (Deducted): 500
+// Net Zakatable: 9,500
+// Zakat Due (2.5%): 237.50
+```
+This purification step is clearly visible in `result.explain()`.

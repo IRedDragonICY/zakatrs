@@ -1,0 +1,3 @@
+[submodule "zakat_dart/cargokit"]
+	path = zakat_dart/cargokit
+	url = https://github.com/irondash/cargokit.git

@@ -1,7 +1,7 @@
 name: zakat
 description: "High-performance, Fiqh-compliant Islamic Zakat calculation library powered by Rust. Supports Gold, Silver, Business, Livestock, and more."
-repository: https://github.com/IRedDragonICY/zakatrs
-homepage: https://github.com/IRedDragonICY/zakatrs
+repository: https://github.com/IRedDragonICY/zakatrs/tree/main/zakat_dart
+homepage: https://github.com/IRedDragonICY/zakatrs/tree/main/zakat_dart
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 # publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -18,7 +18,7 @@ homepage: https://github.com/IRedDragonICY/zakatrs
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 0.17.0
+version: 0.17.1
 
 environment:
   sdk: ^3.8.1

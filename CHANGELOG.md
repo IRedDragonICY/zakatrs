@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.17.1] - 2025-01-01
+### Fixed
+- **Pub.dev Metadata**: Updated `repository` URL to correctly point to the `zakat_dart` subdirectory, fixing package verification scores.
+
 ## [0.17.0] - 2025-12-31
 
 ### Added

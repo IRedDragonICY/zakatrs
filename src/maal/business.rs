@@ -113,6 +113,10 @@ impl BusinessZakat {
 }
 
 impl CalculateZakat for BusinessZakat {
+    fn validate_input(&self) -> Result<(), ZakatError> {
+        self.validate()
+    }
+
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         // Validate deferred input errors first
         self.validate()?;

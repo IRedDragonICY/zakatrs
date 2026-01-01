@@ -38,4 +38,15 @@ step-inventory-value = قيمة المخزون
 step-receivables = المدينون
 
 # Warnings
-warn-negative-clamped = صافي الأصول كان سالباً وتم تعديله إلى الصفر.
+warn-negative-clamped = صافي الأصول كان سلبياً وتم اعتباره صفراً.
+
+# Livestock
+livestock-kind-sheep = غنم
+livestock-kind-cow = بقر
+livestock-kind-camel = إبل
+camel-age-bint-makhad = بنت مخاض
+camel-age-bint-labun = بنت لبون
+camel-age-hiqqah = حقة
+camel-age-jazaah = جذعة
+cow-age-tabi = تبيع
+cow-age-musinnah = مسنة

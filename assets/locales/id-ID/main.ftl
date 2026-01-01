@@ -39,3 +39,14 @@ step-receivables = Piutang
 
 # Warnings
 warn-negative-clamped = Aset bersih bernilai negatif dan dianggap nol.
+
+# Livestock
+livestock-kind-sheep = Domba
+livestock-kind-cow = Sapi
+livestock-kind-camel = Unta
+camel-age-bint-makhad = Bint Makhad
+camel-age-bint-labun = Bint Labun
+camel-age-hiqqah = Hiqqah
+camel-age-jazaah = Jaza'ah
+cow-age-tabi = Tabi'
+cow-age-musinnah = Musinnah

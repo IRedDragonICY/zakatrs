@@ -10,8 +10,7 @@
 ///   (`liabilities_due_now`, `hawl_satisfied`, `label`, `_input_errors`)
 /// - A `new()` constructor
 /// - Standard setters: `debt()`, `hawl()`, `label()`
-/// - A `validate()` method that returns the first deferred input error
-/// - Implementation of `get_label()` for `CalculateZakat` trait
+/// - A `validate()` method that returns the first deferred input            /// - Implementation of `get_label()`, `is_valid()` and `validate_input()` for `CalculateZakat` trait
 ///
 /// # Error Handling
 ///

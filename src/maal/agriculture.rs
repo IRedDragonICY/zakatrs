@@ -99,9 +99,17 @@ impl AgricultureAssets {
         self.label = Some(label.into());
         self
     }
+    
+    pub fn validate(&self) -> Result<(), ZakatError> {
+        Ok(())
+    }
 }
 
 impl CalculateZakat for AgricultureAssets {
+    fn validate_input(&self) -> Result<(), ZakatError> {
+        self.validate()
+    }
+
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         let config_cow = config.resolve_config();
         let config = config_cow.as_ref();

@@ -35,6 +35,10 @@ pub struct ZakatConfig {
     pub nisab_gold_grams: Option<Decimal>, // Default 85g
     pub nisab_silver_grams: Option<Decimal>, // Default 595g
     pub nisab_agriculture_kg: Option<Decimal>, // Default 653kg
+
+    /// Locale for output formatting and translation (default: en-US).
+    #[serde(default)]
+    pub locale: crate::i18n::ZakatLocale,
 }
 
 // Manual Debug impl since Arc<dyn Trait> doesn't auto-derive Debug
@@ -45,6 +49,7 @@ impl std::fmt::Debug for ZakatConfig {
             .field("gold_price_per_gram", &self.gold_price_per_gram)
             .field("silver_price_per_gram", &self.silver_price_per_gram)
             .field("cash_nisab_standard", &self.cash_nisab_standard)
+            .field("locale", &self.locale)
             .finish()
     }
 }
@@ -61,6 +66,7 @@ impl Default for ZakatConfig {
             nisab_gold_grams: None,
             nisab_silver_grams: None,
             nisab_agriculture_kg: None,
+            locale: crate::i18n::ZakatLocale::default(),
         }
     }
 }
@@ -344,6 +350,11 @@ impl ZakatConfig {
         if let Ok(p) = kg.into_zakat_decimal() {
             self.nisab_agriculture_kg = Some(p);
         }
+        self
+    }
+
+    pub fn with_locale(mut self, locale: crate::i18n::ZakatLocale) -> Self {
+        self.locale = locale;
         self
     }
 

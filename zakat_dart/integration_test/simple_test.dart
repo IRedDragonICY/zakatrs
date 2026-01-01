@@ -16,17 +16,16 @@ void main() {
     // 85g Gold = $8,500. Result should be payable.
     // 10,000 * 0.025 = 250.
     
-    // Note: Rust API uses f64.
+    // Note: Rust API uses String for precision.
     final result = await calculateBusinessZakat(
-      cash: 10000.0,
-      inventory: 0.0,
-      receivables: 0.0,
-      liabilities: 0.0,
-      goldPrice: 100.0,
-      silverPrice: 1.0,
+      cash: "10000.0",
+      inventory: "0.0",
+      receivables: "0.0",
+      liabilities: "0.0",
+      goldPrice: "100.0",
+      silverPrice: "1.0",
     );
     
-    print('Debug Business: IsPayable=${result.isPayable}, Due=${result.zakatDue}, Threshold=${result.nisabThreshold}');
     print('Debug Business: IsPayable=${result.isPayable}, Due=${result.zakatDue}, Threshold=${result.nisabThreshold}');
     // Check boolean only first
     expect(result.isPayable, true, reason: "Business should be payable");
@@ -46,10 +45,10 @@ void main() {
     // 5000 > 595 -> Payable.
     
     final result = await calculateSavingsZakat(
-      cashInHand: 5000.0,
-      bankBalance: 0.0,
-      goldPrice: 100.0,
-      silverPrice: 1.0,
+      cashInHand: "5000.0",
+      bankBalance: "0.0",
+      goldPrice: "100.0",
+      silverPrice: "1.0",
     );
     print('Debug Savings: IsPayable=${result.isPayable}, Due=${result.zakatDue}, Threshold=${result.nisabThreshold}, Wealth=${result.wealthAmount}');
 

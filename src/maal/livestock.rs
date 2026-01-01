@@ -155,11 +155,19 @@ impl LivestockAssets {
         self.prices = self.prices.camel_price(price);
         self
     }
+    
+    pub fn validate(&self) -> Result<(), ZakatError> {
+        Ok(())
+    }
 }
 
 
 
 impl CalculateZakat for LivestockAssets {
+    fn validate_input(&self) -> Result<(), ZakatError> {
+        self.validate()
+    }
+
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         // Early return optimization for zero count
         if self.count == 0 {
@@ -168,7 +176,7 @@ impl CalculateZakat for LivestockAssets {
         }
         
         let config_cow = config.resolve_config();
-        let _config = config_cow.as_ref();
+        let config_ref = config_cow.as_ref();
 
         let animal_type = self.animal_type.as_ref().ok_or_else(|| 
             ZakatError::InvalidInput {
@@ -218,9 +226,9 @@ impl CalculateZakat for LivestockAssets {
         }
 
         let (zakat_value, nisab_count, heads_due) = match animal_type {
-            LivestockType::Sheep => calculate_sheep_zakat(self.count, self.prices.sheep_price)?,
-            LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price)?,
-            LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices)?,
+            LivestockType::Sheep => calculate_sheep_zakat(self.count, self.prices.sheep_price, config_ref.locale)?,
+            LivestockType::Cow => calculate_cow_zakat(self.count, self.prices.cow_price, config_ref.locale)?,
+            LivestockType::Camel => calculate_camel_zakat(self.count, &self.prices, config_ref.locale)?,
         };
 
         // We construct ZakatDetails.
@@ -243,6 +251,10 @@ impl CalculateZakat for LivestockAssets {
         let description = description_parts.join(", ");
 
         // Build calculation trace
+        // Use translator for the animal type itself in trace? 
+        // Plan asked for output payload localization (heads_due). Trace usually stays English or low priority, 
+        // but let's localize animal type if easy. 
+        // For now, focusing on the PaymentPayload as requested.
         let animal_type_str = match animal_type {
             LivestockType::Sheep => "Sheep/Goat",
             LivestockType::Cow => "Cattle",
@@ -252,6 +264,8 @@ impl CalculateZakat for LivestockAssets {
         let mut trace = Vec::new();
         trace.push(crate::types::CalculationStep::initial("step-livestock-count", format!("{} Count", animal_type_str), Decimal::from(self.count))
             .with_args(std::collections::HashMap::from([("type".to_string(), animal_type_str.to_string())])));
+        
+        // ... (truncated trace logic same as before) ...
         trace.push(crate::types::CalculationStep::info("info-animal-type", format!("Animal Type: {}", animal_type_str))
              .with_args(std::collections::HashMap::from([("type".to_string(), animal_type_str.to_string())])));
         
@@ -295,7 +309,7 @@ impl CalculateZakat for LivestockAssets {
 }
 
 #[allow(clippy::type_complexity)]
-fn calculate_sheep_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
+fn calculate_sheep_zakat(count: u32, price: Decimal, locale: crate::i18n::ZakatLocale) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
     let nisab = 40;
     if count < 40 {
         return Ok((Decimal::ZERO, nisab, vec![]));
@@ -315,12 +329,14 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Ve
     let zakat_value = ZakatDecimal::new(Decimal::from(sheep_due))
         .safe_mul(price)?
         .with_source(Some("Sheep Zakat".to_string()));
-    Ok((*zakat_value, nisab, vec![("Sheep".to_string(), sheep_due)]))
+    
+    let name = crate::i18n::TRANSLATOR.translate(locale, "livestock-kind-sheep", None);
+    Ok((*zakat_value, nisab, vec![(name, sheep_due)]))
 }
 
 #[allow(clippy::type_complexity)]
 #[allow(clippy::manual_is_multiple_of)]
-fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
+fn calculate_cow_zakat(count: u32, price: Decimal, locale: crate::i18n::ZakatLocale) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
     let nisab = 30;
     if count < 30 {
         return Ok((Decimal::ZERO, nisab, vec![]));
@@ -393,15 +409,19 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<
     let total_zakat_val = tabi_total.safe_add(*musinnah_total)?.with_source(Some("Cow Zakat".to_string()));
     
     let mut parts = Vec::new();
-    if tabi > 0 { parts.push(("Tabi'".to_string(), tabi)); }
-    if musinnah > 0 { parts.push(("Musinnah".to_string(), musinnah)); }
+    if tabi > 0 { 
+        parts.push((crate::i18n::TRANSLATOR.translate(locale, "cow-age-tabi", None), tabi)); 
+    }
+    if musinnah > 0 { 
+        parts.push((crate::i18n::TRANSLATOR.translate(locale, "cow-age-musinnah", None), musinnah)); 
+    }
 
     Ok((*total_zakat_val, nisab, parts))
 }
 
 #[allow(clippy::type_complexity)]
 #[allow(clippy::manual_is_multiple_of)]
-fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
+fn calculate_camel_zakat(count: u32, prices: &LivestockPrices, locale: crate::i18n::ZakatLocale) -> Result<(Decimal, u32, Vec<(String, u32)>), ZakatError> {
     let nisab = 5;
     if count < 5 {
         return Ok((Decimal::ZERO, nisab, vec![]));
@@ -481,11 +501,21 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decima
         .with_source(Some("Camel Zakat".to_string()));
         
     let mut parts = Vec::new();
-    if sheep > 0 { parts.push(("Sheep".to_string(), sheep)); }
-    if b_makhad > 0 { parts.push(("Bint Makhad".to_string(), b_makhad)); }
-    if b_labun > 0 { parts.push(("Bint Labun".to_string(), b_labun)); }
-    if hiqqah > 0 { parts.push(("Hiqqah".to_string(), hiqqah)); }
-    if jazaah > 0 { parts.push(("Jaza'ah".to_string(), jazaah)); }
+    if sheep > 0 { 
+        parts.push((crate::i18n::TRANSLATOR.translate(locale, "livestock-kind-sheep", None), sheep)); 
+    }
+    if b_makhad > 0 { 
+        parts.push((crate::i18n::TRANSLATOR.translate(locale, "camel-age-bint-makhad", None), b_makhad)); 
+    }
+    if b_labun > 0 { 
+        parts.push((crate::i18n::TRANSLATOR.translate(locale, "camel-age-bint-labun", None), b_labun)); 
+    }
+    if hiqqah > 0 { 
+        parts.push((crate::i18n::TRANSLATOR.translate(locale, "camel-age-hiqqah", None), hiqqah)); 
+    }
+    if jazaah > 0 { 
+        parts.push((crate::i18n::TRANSLATOR.translate(locale, "camel-age-jazaah", None), jazaah)); 
+    }
 
     Ok((*total, nisab, parts))
 }

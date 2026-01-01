@@ -41,6 +41,18 @@ pub trait CalculateZakat {
         self.calculate_zakat(())
     }
 
+    /// Check if the asset has valid inputs.
+    fn is_valid(&self) -> bool {
+        self.validate_input().is_ok()
+    }
+
+    /// Return input validation errors if any.
+    /// This should check for things like negative values, invalid purity, etc.
+    /// that are caught during builder phase.
+    fn validate_input(&self) -> Result<(), ZakatError> {
+        Ok(())
+    }
+
     fn get_label(&self) -> Option<String> { None }
     fn get_id(&self) -> uuid::Uuid;
 }

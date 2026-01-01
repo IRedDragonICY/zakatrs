@@ -230,6 +230,14 @@ impl ZakatPortfolio {
         &self.items
     }
 
+    /// Merges another portfolio into this one.
+    ///
+    /// Consumes the `other` portfolio and moves all its items into `self`.
+    pub fn merge(mut self, other: ZakatPortfolio) -> Self {
+        self.items.extend(other.items);
+        self
+    }
+
     /// Calculates Zakat for all assets in the portfolio.
     #[instrument(skip(self, config), fields(items_count = self.items.len()))]
     pub fn calculate_total(&self, config: &crate::config::ZakatConfig) -> PortfolioResult {

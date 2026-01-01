@@ -39,3 +39,14 @@ step-receivables = Receivables
 
 # Warnings
 warn-negative-clamped = Net assets were negative and clamped to zero.
+
+# Livestock
+livestock-kind-sheep = Sheep
+livestock-kind-cow = Cow
+livestock-kind-camel = Camel
+camel-age-bint-makhad = Bint Makhad
+camel-age-bint-labun = Bint Labun
+camel-age-hiqqah = Hiqqah
+camel-age-jazaah = Jaza'ah
+cow-age-tabi = Tabi'
+cow-age-musinnah = Musinnah

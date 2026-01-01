@@ -102,9 +102,16 @@ impl MiningAssets {
             _ => Err(ZakatError::MultipleErrors(self._input_errors.clone())),
         }
     }
+
+
+
 }
 
 impl CalculateZakat for MiningAssets {
+    fn validate_input(&self) -> Result<(), ZakatError> {
+        self.validate()
+    }
+
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         // Validate deferred input errors first
         self.validate()?;

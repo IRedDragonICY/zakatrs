@@ -22,26 +22,34 @@ pub struct DartZakatResult {
 
 #[frb(sync)]
 pub fn calculate_business_zakat(
-    cash: f64,
-    inventory: f64,
-    receivables: f64,
-    liabilities: f64,
-    gold_price: f64,
-    silver_price: f64,
+    cash: String,
+    inventory: String,
+    receivables: String,
+    liabilities: String,
+    gold_price: String,
+    silver_price: String,
 ) -> Result<DartZakatResult, String> {
+    // Helper to parse decimal or return error
+    let parse = |s: &str, name: &str| -> Result<Decimal, String> {
+        Decimal::from_str(s).map_err(|e| format!("Invalid {}: {}", name, e))
+    };
+
+    let gold_price_dec = parse(&gold_price, "gold_price")?;
+    let silver_price_dec = parse(&silver_price, "silver_price")?;
+
     // Setup Config
     // Explicitly use Hanafi to ensure LowerOfTwo standard (Safer for the poor)
     let config = ZakatConfig::new()
         .with_madhab(Madhab::Hanafi) 
-        .with_gold_price(gold_price)
-        .with_silver_price(silver_price);
+        .with_gold_price(gold_price_dec)
+        .with_silver_price(silver_price_dec);
 
     // Setup Business Assets
     let business = BusinessZakat::new()
-        .cash(cash)
-        .inventory(inventory)
-        .receivables(receivables)
-        .liabilities(liabilities)
+        .cash(parse(&cash, "cash")?)
+        .inventory(parse(&inventory, "inventory")?)
+        .receivables(parse(&receivables, "receivables")?)
+        .liabilities(parse(&liabilities, "liabilities")?)
         .hawl(true); // Assuming full hawl for simple API
 
     // Calculate
@@ -59,21 +67,31 @@ pub fn calculate_business_zakat(
 
 #[frb(sync)]
 pub fn calculate_savings_zakat(
-    cash_in_hand: f64,
-    bank_balance: f64,
-    gold_price: f64,
-    silver_price: f64,
+    cash_in_hand: String,
+    bank_balance: String,
+    gold_price: String,
+    silver_price: String,
 ) -> Result<DartZakatResult, String> {
+    let parse = |s: &str, name: &str| -> Result<Decimal, String> {
+        Decimal::from_str(s).map_err(|e| format!("Invalid {}: {}", name, e))
+    };
+
+    let gold_price_dec = parse(&gold_price, "gold_price")?;
+    let silver_price_dec = parse(&silver_price, "silver_price")?;
+
     let config = ZakatConfig::new()
         .with_madhab(Madhab::Hanafi)
-        .with_gold_price(gold_price)
-        .with_silver_price(silver_price);
+        .with_gold_price(gold_price_dec)
+        .with_silver_price(silver_price_dec);
+
+    let cash_val = parse(&cash_in_hand, "cash_in_hand")?;
+    let bank_val = parse(&bank_balance, "bank_balance")?;
 
     // Savings are effectively "Cash Only" business assets or just pure wealth
     // We can use BusinessZakat::cash_only or manual calculation
     // Using BusinessZakat for consistency with "Urud al-Tijarah" / Wealth
     let wealth = BusinessZakat::new()
-        .cash(cash_in_hand + bank_balance)
+        .cash(cash_val + bank_val)
         .hawl(true);
 
     match wealth.calculate_zakat(&config) {
@@ -89,14 +107,21 @@ pub fn calculate_savings_zakat(
 }
 
 #[frb(sync)]
-pub fn get_nisab_thresholds(gold_price: f64, silver_price: f64) -> (f64, f64) {
+pub fn get_nisab_thresholds(gold_price: String, silver_price: String) -> Result<(f64, f64), String> {
+    let parse = |s: &str, name: &str| -> Result<Decimal, String> {
+        Decimal::from_str(s).map_err(|e| format!("Invalid {}: {}", name, e))
+    };
+
+    let gold_price_dec = parse(&gold_price, "gold_price")?;
+    let silver_price_dec = parse(&silver_price, "silver_price")?;
+
     let config = ZakatConfig::new()
         .with_madhab(Madhab::Hanafi)
-        .with_gold_price(gold_price)
-        .with_silver_price(silver_price);
+        .with_gold_price(gold_price_dec)
+        .with_silver_price(silver_price_dec);
     
     let nisab_gold = config.get_nisab_threshold(WealthType::Gold).to_f64().unwrap_or(0.0);
     let nisab_silver = config.get_nisab_threshold(WealthType::Silver).to_f64().unwrap_or(0.0);
     
-    (nisab_gold, nisab_silver)
+    Ok((nisab_gold, nisab_silver))
 }

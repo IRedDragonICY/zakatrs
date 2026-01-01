@@ -7,12 +7,14 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 use std::str::FromStr;
 
+use serde::{Serialize, Deserialize};
+
 #[derive(RustEmbed)]
 #[folder = "assets/locales"]
 struct Asset;
 
 /// Supported locales for the Zakat library.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Hash, Serialize, Deserialize)]
 pub enum ZakatLocale {
     #[default]
     EnUS,

@@ -126,6 +126,10 @@ impl InvestmentAssets {
 }
 
 impl CalculateZakat for InvestmentAssets {
+    fn validate_input(&self) -> Result<(), ZakatError> {
+        self.validate()
+    }
+
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         self.validate()?;
         let config_cow = config.resolve_config();

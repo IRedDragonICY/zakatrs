@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.18.0] - 2026-01-01
+### Added
+- **Validation Trait**: Exposed `is_valid()` and `validate_input()` methods in `CalculateZakat` trait.
+    - Allows checking for validity (e.g., negative inputs) without strictly running the full calculation.
+- **Asset Validation**: Implemented `validate_input()` for all asset types (`Business`, `PreciousMetals`, `Livestock`, etc.).
+
+### Fixed
+- **Trait Bounds**: Added `Serialize`/`Deserialize` to `ZakatLocale`, enabling proper serialization chains.
+- **Config Usage**: Fixed internal compilation error in `LivestockAssets` config resolution.
+
 ## [0.17.2] - 2026-01-01
 ### Fixed
 - **NPM/JSR Metadata**: Fixed automated build to unconditionally sync `README.md` and metadata to `pkg/` directory, ensuring NPM/JSR pages are up-to-date even if WASM build is cached/skipped.

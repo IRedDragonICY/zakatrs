@@ -1,1 +1,14 @@
 /target
+/dist
+/node_modules
+/pkg
+.env
+.DS_Store
+
+# Android/Gradle
+.gradle/
+build/
+app/build/
+*.iml
+.idea/
+local.properties

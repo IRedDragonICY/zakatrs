@@ -3,7 +3,7 @@
 
 // ignore_for_file: unused_import, unused_element, unnecessary_import, duplicate_ignore, invalid_use_of_internal_member, annotate_overrides, non_constant_identifier_names, curly_braces_in_flow_control_structures, prefer_const_literals_to_create_immutables, unused_field
 
-import 'api/simple.dart';
+import 'api/zakat.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'frb_generated.dart';
@@ -55,7 +55,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 
   @override
   Future<void> executeRustInitializers() async {
-    await api.crateApiSimpleInitApp();
+    await api.crateApiZakatInitApp();
   }
 
   @override
@@ -66,7 +66,7 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
   String get codegenVersion => '2.11.1';
 
   @override
-  int get rustContentHash => -1167628800;
+  int get rustContentHash => 903592481;
 
   static const kDefaultExternalLibraryLoaderConfig =
       ExternalLibraryLoaderConfig(
@@ -77,79 +77,82 @@ class RustLib extends BaseEntrypoint<RustLibApi, RustLibApiImpl, RustLibWire> {
 }
 
 abstract class RustLibApi extends BaseApi {
-  bool crateApiSimpleDartZakatResultAutoAccessorGetIsPayable({
+  bool crateApiZakatDartZakatResultAutoAccessorGetIsPayable({
     required DartZakatResult that,
   });
 
-  String crateApiSimpleDartZakatResultAutoAccessorGetLimitName({
+  String crateApiZakatDartZakatResultAutoAccessorGetLimitName({
     required DartZakatResult that,
   });
 
-  FrbDecimal crateApiSimpleDartZakatResultAutoAccessorGetNisabThreshold({
+  FrbDecimal crateApiZakatDartZakatResultAutoAccessorGetNisabThreshold({
     required DartZakatResult that,
   });
 
-  FrbDecimal crateApiSimpleDartZakatResultAutoAccessorGetWealthAmount({
+  FrbDecimal crateApiZakatDartZakatResultAutoAccessorGetWealthAmount({
     required DartZakatResult that,
   });
 
-  FrbDecimal crateApiSimpleDartZakatResultAutoAccessorGetZakatDue({
+  FrbDecimal crateApiZakatDartZakatResultAutoAccessorGetZakatDue({
     required DartZakatResult that,
   });
 
-  void crateApiSimpleDartZakatResultAutoAccessorSetIsPayable({
+  void crateApiZakatDartZakatResultAutoAccessorSetIsPayable({
     required DartZakatResult that,
     required bool isPayable,
   });
 
-  void crateApiSimpleDartZakatResultAutoAccessorSetLimitName({
+  void crateApiZakatDartZakatResultAutoAccessorSetLimitName({
     required DartZakatResult that,
     required String limitName,
   });
 
-  void crateApiSimpleDartZakatResultAutoAccessorSetNisabThreshold({
+  void crateApiZakatDartZakatResultAutoAccessorSetNisabThreshold({
     required DartZakatResult that,
     required FrbDecimal nisabThreshold,
   });
 
-  void crateApiSimpleDartZakatResultAutoAccessorSetWealthAmount({
+  void crateApiZakatDartZakatResultAutoAccessorSetWealthAmount({
     required DartZakatResult that,
     required FrbDecimal wealthAmount,
   });
 
-  void crateApiSimpleDartZakatResultAutoAccessorSetZakatDue({
+  void crateApiZakatDartZakatResultAutoAccessorSetZakatDue({
     required DartZakatResult that,
     required FrbDecimal zakatDue,
   });
 
-  FrbDecimal crateApiSimpleFrbDecimalFromString({required String s});
+  FrbDecimal crateApiZakatFrbDecimalFromString({required String s});
 
-  double crateApiSimpleFrbDecimalToF64({required FrbDecimal that});
+  double crateApiZakatFrbDecimalToF64({required FrbDecimal that});
 
-  String crateApiSimpleFrbDecimalToString({required FrbDecimal that});
+  String crateApiZakatFrbDecimalToString({required FrbDecimal that});
 
-  DartZakatResult crateApiSimpleCalculateBusinessZakat({
+  DartZakatResult crateApiZakatZakatManagerCalculateBusiness({
+    required ZakatManager that,
     required FrbDecimal cash,
     required FrbDecimal inventory,
     required FrbDecimal receivables,
     required FrbDecimal liabilities,
-    required FrbDecimal goldPrice,
-    required FrbDecimal silverPrice,
   });
 
-  DartZakatResult crateApiSimpleCalculateSavingsZakat({
+  DartZakatResult crateApiZakatZakatManagerCalculateSavings({
+    required ZakatManager that,
     required FrbDecimal cashInHand,
     required FrbDecimal bankBalance,
-    required FrbDecimal goldPrice,
-    required FrbDecimal silverPrice,
   });
 
-  (FrbDecimal, FrbDecimal) crateApiSimpleGetNisabThresholds({
-    required FrbDecimal goldPrice,
-    required FrbDecimal silverPrice,
+  (FrbDecimal, FrbDecimal) crateApiZakatZakatManagerGetNisabThresholds({
+    required ZakatManager that,
   });
 
-  Future<void> crateApiSimpleInitApp();
+  ZakatManager crateApiZakatZakatManagerNew({
+    required FrbDecimal goldPrice,
+    required FrbDecimal silverPrice,
+    required String madhab,
+  });
+
+  Future<void> crateApiZakatInitApp();
 
   RustArcIncrementStrongCountFnType
   get rust_arc_increment_strong_count_DartZakatResult;
@@ -167,6 +170,14 @@ abstract class RustLibApi extends BaseApi {
   get rust_arc_decrement_strong_count_FrbDecimal;
 
   CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_FrbDecimalPtr;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_ZakatManager;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_ZakatManager;
+
+  CrossPlatformFinalizerArg get rust_arc_decrement_strong_count_ZakatManagerPtr;
 }
 
 class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
@@ -178,7 +189,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   });
 
   @override
-  bool crateApiSimpleDartZakatResultAutoAccessorGetIsPayable({
+  bool crateApiZakatDartZakatResultAutoAccessorGetIsPayable({
     required DartZakatResult that,
   }) {
     return handler.executeSync(
@@ -196,7 +207,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta:
-            kCrateApiSimpleDartZakatResultAutoAccessorGetIsPayableConstMeta,
+            kCrateApiZakatDartZakatResultAutoAccessorGetIsPayableConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
@@ -204,14 +215,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta
-  get kCrateApiSimpleDartZakatResultAutoAccessorGetIsPayableConstMeta =>
+  get kCrateApiZakatDartZakatResultAutoAccessorGetIsPayableConstMeta =>
       const TaskConstMeta(
         debugName: "DartZakatResult_auto_accessor_get_is_payable",
         argNames: ["that"],
       );
 
   @override
-  String crateApiSimpleDartZakatResultAutoAccessorGetLimitName({
+  String crateApiZakatDartZakatResultAutoAccessorGetLimitName({
     required DartZakatResult that,
   }) {
     return handler.executeSync(
@@ -229,7 +240,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta:
-            kCrateApiSimpleDartZakatResultAutoAccessorGetLimitNameConstMeta,
+            kCrateApiZakatDartZakatResultAutoAccessorGetLimitNameConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
@@ -237,14 +248,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta
-  get kCrateApiSimpleDartZakatResultAutoAccessorGetLimitNameConstMeta =>
+  get kCrateApiZakatDartZakatResultAutoAccessorGetLimitNameConstMeta =>
       const TaskConstMeta(
         debugName: "DartZakatResult_auto_accessor_get_limit_name",
         argNames: ["that"],
       );
 
   @override
-  FrbDecimal crateApiSimpleDartZakatResultAutoAccessorGetNisabThreshold({
+  FrbDecimal crateApiZakatDartZakatResultAutoAccessorGetNisabThreshold({
     required DartZakatResult that,
   }) {
     return handler.executeSync(
@@ -263,7 +274,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta:
-            kCrateApiSimpleDartZakatResultAutoAccessorGetNisabThresholdConstMeta,
+            kCrateApiZakatDartZakatResultAutoAccessorGetNisabThresholdConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
@@ -271,14 +282,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta
-  get kCrateApiSimpleDartZakatResultAutoAccessorGetNisabThresholdConstMeta =>
+  get kCrateApiZakatDartZakatResultAutoAccessorGetNisabThresholdConstMeta =>
       const TaskConstMeta(
         debugName: "DartZakatResult_auto_accessor_get_nisab_threshold",
         argNames: ["that"],
       );
 
   @override
-  FrbDecimal crateApiSimpleDartZakatResultAutoAccessorGetWealthAmount({
+  FrbDecimal crateApiZakatDartZakatResultAutoAccessorGetWealthAmount({
     required DartZakatResult that,
   }) {
     return handler.executeSync(
@@ -297,7 +308,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta:
-            kCrateApiSimpleDartZakatResultAutoAccessorGetWealthAmountConstMeta,
+            kCrateApiZakatDartZakatResultAutoAccessorGetWealthAmountConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
@@ -305,14 +316,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta
-  get kCrateApiSimpleDartZakatResultAutoAccessorGetWealthAmountConstMeta =>
+  get kCrateApiZakatDartZakatResultAutoAccessorGetWealthAmountConstMeta =>
       const TaskConstMeta(
         debugName: "DartZakatResult_auto_accessor_get_wealth_amount",
         argNames: ["that"],
       );
 
   @override
-  FrbDecimal crateApiSimpleDartZakatResultAutoAccessorGetZakatDue({
+  FrbDecimal crateApiZakatDartZakatResultAutoAccessorGetZakatDue({
     required DartZakatResult that,
   }) {
     return handler.executeSync(
@@ -331,7 +342,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta:
-            kCrateApiSimpleDartZakatResultAutoAccessorGetZakatDueConstMeta,
+            kCrateApiZakatDartZakatResultAutoAccessorGetZakatDueConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
@@ -339,14 +350,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta
-  get kCrateApiSimpleDartZakatResultAutoAccessorGetZakatDueConstMeta =>
+  get kCrateApiZakatDartZakatResultAutoAccessorGetZakatDueConstMeta =>
       const TaskConstMeta(
         debugName: "DartZakatResult_auto_accessor_get_zakat_due",
         argNames: ["that"],
       );
 
   @override
-  void crateApiSimpleDartZakatResultAutoAccessorSetIsPayable({
+  void crateApiZakatDartZakatResultAutoAccessorSetIsPayable({
     required DartZakatResult that,
     required bool isPayable,
   }) {
@@ -366,7 +377,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta:
-            kCrateApiSimpleDartZakatResultAutoAccessorSetIsPayableConstMeta,
+            kCrateApiZakatDartZakatResultAutoAccessorSetIsPayableConstMeta,
         argValues: [that, isPayable],
         apiImpl: this,
       ),
@@ -374,14 +385,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta
-  get kCrateApiSimpleDartZakatResultAutoAccessorSetIsPayableConstMeta =>
+  get kCrateApiZakatDartZakatResultAutoAccessorSetIsPayableConstMeta =>
       const TaskConstMeta(
         debugName: "DartZakatResult_auto_accessor_set_is_payable",
         argNames: ["that", "isPayable"],
       );
 
   @override
-  void crateApiSimpleDartZakatResultAutoAccessorSetLimitName({
+  void crateApiZakatDartZakatResultAutoAccessorSetLimitName({
     required DartZakatResult that,
     required String limitName,
   }) {
@@ -401,7 +412,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta:
-            kCrateApiSimpleDartZakatResultAutoAccessorSetLimitNameConstMeta,
+            kCrateApiZakatDartZakatResultAutoAccessorSetLimitNameConstMeta,
         argValues: [that, limitName],
         apiImpl: this,
       ),
@@ -409,14 +420,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta
-  get kCrateApiSimpleDartZakatResultAutoAccessorSetLimitNameConstMeta =>
+  get kCrateApiZakatDartZakatResultAutoAccessorSetLimitNameConstMeta =>
       const TaskConstMeta(
         debugName: "DartZakatResult_auto_accessor_set_limit_name",
         argNames: ["that", "limitName"],
       );
 
   @override
-  void crateApiSimpleDartZakatResultAutoAccessorSetNisabThreshold({
+  void crateApiZakatDartZakatResultAutoAccessorSetNisabThreshold({
     required DartZakatResult that,
     required FrbDecimal nisabThreshold,
   }) {
@@ -439,7 +450,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta:
-            kCrateApiSimpleDartZakatResultAutoAccessorSetNisabThresholdConstMeta,
+            kCrateApiZakatDartZakatResultAutoAccessorSetNisabThresholdConstMeta,
         argValues: [that, nisabThreshold],
         apiImpl: this,
       ),
@@ -447,14 +458,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta
-  get kCrateApiSimpleDartZakatResultAutoAccessorSetNisabThresholdConstMeta =>
+  get kCrateApiZakatDartZakatResultAutoAccessorSetNisabThresholdConstMeta =>
       const TaskConstMeta(
         debugName: "DartZakatResult_auto_accessor_set_nisab_threshold",
         argNames: ["that", "nisabThreshold"],
       );
 
   @override
-  void crateApiSimpleDartZakatResultAutoAccessorSetWealthAmount({
+  void crateApiZakatDartZakatResultAutoAccessorSetWealthAmount({
     required DartZakatResult that,
     required FrbDecimal wealthAmount,
   }) {
@@ -477,7 +488,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta:
-            kCrateApiSimpleDartZakatResultAutoAccessorSetWealthAmountConstMeta,
+            kCrateApiZakatDartZakatResultAutoAccessorSetWealthAmountConstMeta,
         argValues: [that, wealthAmount],
         apiImpl: this,
       ),
@@ -485,14 +496,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta
-  get kCrateApiSimpleDartZakatResultAutoAccessorSetWealthAmountConstMeta =>
+  get kCrateApiZakatDartZakatResultAutoAccessorSetWealthAmountConstMeta =>
       const TaskConstMeta(
         debugName: "DartZakatResult_auto_accessor_set_wealth_amount",
         argNames: ["that", "wealthAmount"],
       );
 
   @override
-  void crateApiSimpleDartZakatResultAutoAccessorSetZakatDue({
+  void crateApiZakatDartZakatResultAutoAccessorSetZakatDue({
     required DartZakatResult that,
     required FrbDecimal zakatDue,
   }) {
@@ -515,7 +526,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeErrorData: null,
         ),
         constMeta:
-            kCrateApiSimpleDartZakatResultAutoAccessorSetZakatDueConstMeta,
+            kCrateApiZakatDartZakatResultAutoAccessorSetZakatDueConstMeta,
         argValues: [that, zakatDue],
         apiImpl: this,
       ),
@@ -523,14 +534,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   TaskConstMeta
-  get kCrateApiSimpleDartZakatResultAutoAccessorSetZakatDueConstMeta =>
+  get kCrateApiZakatDartZakatResultAutoAccessorSetZakatDueConstMeta =>
       const TaskConstMeta(
         debugName: "DartZakatResult_auto_accessor_set_zakat_due",
         argNames: ["that", "zakatDue"],
       );
 
   @override
-  FrbDecimal crateApiSimpleFrbDecimalFromString({required String s}) {
+  FrbDecimal crateApiZakatFrbDecimalFromString({required String s}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -543,18 +554,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
               sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFrbDecimal,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiSimpleFrbDecimalFromStringConstMeta,
+        constMeta: kCrateApiZakatFrbDecimalFromStringConstMeta,
         argValues: [s],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiSimpleFrbDecimalFromStringConstMeta =>
+  TaskConstMeta get kCrateApiZakatFrbDecimalFromStringConstMeta =>
       const TaskConstMeta(debugName: "FrbDecimal_from_string", argNames: ["s"]);
 
   @override
-  double crateApiSimpleFrbDecimalToF64({required FrbDecimal that}) {
+  double crateApiZakatFrbDecimalToF64({required FrbDecimal that}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -569,18 +580,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_f_64,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiSimpleFrbDecimalToF64ConstMeta,
+        constMeta: kCrateApiZakatFrbDecimalToF64ConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiSimpleFrbDecimalToF64ConstMeta =>
+  TaskConstMeta get kCrateApiZakatFrbDecimalToF64ConstMeta =>
       const TaskConstMeta(debugName: "FrbDecimal_to_f64", argNames: ["that"]);
 
   @override
-  String crateApiSimpleFrbDecimalToString({required FrbDecimal that}) {
+  String crateApiZakatFrbDecimalToString({required FrbDecimal that}) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
@@ -595,32 +606,35 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_String,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiSimpleFrbDecimalToStringConstMeta,
+        constMeta: kCrateApiZakatFrbDecimalToStringConstMeta,
         argValues: [that],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiSimpleFrbDecimalToStringConstMeta =>
+  TaskConstMeta get kCrateApiZakatFrbDecimalToStringConstMeta =>
       const TaskConstMeta(
         debugName: "FrbDecimal_to_string",
         argNames: ["that"],
       );
 
   @override
-  DartZakatResult crateApiSimpleCalculateBusinessZakat({
+  DartZakatResult crateApiZakatZakatManagerCalculateBusiness({
+    required ZakatManager that,
     required FrbDecimal cash,
     required FrbDecimal inventory,
     required FrbDecimal receivables,
     required FrbDecimal liabilities,
-    required FrbDecimal goldPrice,
-    required FrbDecimal silverPrice,
   }) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+            that,
+            serializer,
+          );
           sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFrbDecimal(
             cash,
             serializer,
@@ -637,14 +651,6 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             liabilities,
             serializer,
           );
-          sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFrbDecimal(
-            goldPrice,
-            serializer,
-          );
-          sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFrbDecimal(
-            silverPrice,
-            serializer,
-          );
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 14)!;
         },
         codec: SseCodec(
@@ -652,58 +658,39 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
               sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDartZakatResult,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiSimpleCalculateBusinessZakatConstMeta,
-        argValues: [
-          cash,
-          inventory,
-          receivables,
-          liabilities,
-          goldPrice,
-          silverPrice,
-        ],
+        constMeta: kCrateApiZakatZakatManagerCalculateBusinessConstMeta,
+        argValues: [that, cash, inventory, receivables, liabilities],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiSimpleCalculateBusinessZakatConstMeta =>
+  TaskConstMeta get kCrateApiZakatZakatManagerCalculateBusinessConstMeta =>
       const TaskConstMeta(
-        debugName: "calculate_business_zakat",
-        argNames: [
-          "cash",
-          "inventory",
-          "receivables",
-          "liabilities",
-          "goldPrice",
-          "silverPrice",
-        ],
+        debugName: "ZakatManager_calculate_business",
+        argNames: ["that", "cash", "inventory", "receivables", "liabilities"],
       );
 
   @override
-  DartZakatResult crateApiSimpleCalculateSavingsZakat({
+  DartZakatResult crateApiZakatZakatManagerCalculateSavings({
+    required ZakatManager that,
     required FrbDecimal cashInHand,
     required FrbDecimal bankBalance,
-    required FrbDecimal goldPrice,
-    required FrbDecimal silverPrice,
   }) {
     return handler.executeSync(
       SyncTask(
         callFfi: () {
           final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+            that,
+            serializer,
+          );
           sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFrbDecimal(
             cashInHand,
             serializer,
           );
           sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFrbDecimal(
             bankBalance,
-            serializer,
-          );
-          sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFrbDecimal(
-            goldPrice,
-            serializer,
-          );
-          sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFrbDecimal(
-            silverPrice,
             serializer,
           );
           return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 15)!;
@@ -713,23 +700,56 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
               sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDartZakatResult,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiSimpleCalculateSavingsZakatConstMeta,
-        argValues: [cashInHand, bankBalance, goldPrice, silverPrice],
+        constMeta: kCrateApiZakatZakatManagerCalculateSavingsConstMeta,
+        argValues: [that, cashInHand, bankBalance],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiSimpleCalculateSavingsZakatConstMeta =>
+  TaskConstMeta get kCrateApiZakatZakatManagerCalculateSavingsConstMeta =>
       const TaskConstMeta(
-        debugName: "calculate_savings_zakat",
-        argNames: ["cashInHand", "bankBalance", "goldPrice", "silverPrice"],
+        debugName: "ZakatManager_calculate_savings",
+        argNames: ["that", "cashInHand", "bankBalance"],
       );
 
   @override
-  (FrbDecimal, FrbDecimal) crateApiSimpleGetNisabThresholds({
+  (FrbDecimal, FrbDecimal) crateApiZakatZakatManagerGetNisabThresholds({
+    required ZakatManager that,
+  }) {
+    return handler.executeSync(
+      SyncTask(
+        callFfi: () {
+          final serializer = SseSerializer(generalizedFrbRustBinding);
+          sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+            that,
+            serializer,
+          );
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+        },
+        codec: SseCodec(
+          decodeSuccessData:
+              sse_decode_record_auto_owned_rust_opaque_flutter_rust_bridgefor_generated_rust_auto_opaque_inner_frb_decimal_auto_owned_rust_opaque_flutter_rust_bridgefor_generated_rust_auto_opaque_inner_frb_decimal,
+          decodeErrorData: sse_decode_AnyhowException,
+        ),
+        constMeta: kCrateApiZakatZakatManagerGetNisabThresholdsConstMeta,
+        argValues: [that],
+        apiImpl: this,
+      ),
+    );
+  }
+
+  TaskConstMeta get kCrateApiZakatZakatManagerGetNisabThresholdsConstMeta =>
+      const TaskConstMeta(
+        debugName: "ZakatManager_get_nisab_thresholds",
+        argNames: ["that"],
+      );
+
+  @override
+  ZakatManager crateApiZakatZakatManagerNew({
     required FrbDecimal goldPrice,
     required FrbDecimal silverPrice,
+    required String madhab,
   }) {
     return handler.executeSync(
       SyncTask(
@@ -743,28 +763,29 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
             silverPrice,
             serializer,
           );
-          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 16)!;
+          sse_encode_String(madhab, serializer);
+          return pdeCallFfi(generalizedFrbRustBinding, serializer, funcId: 17)!;
         },
         codec: SseCodec(
           decodeSuccessData:
-              sse_decode_record_auto_owned_rust_opaque_flutter_rust_bridgefor_generated_rust_auto_opaque_inner_frb_decimal_auto_owned_rust_opaque_flutter_rust_bridgefor_generated_rust_auto_opaque_inner_frb_decimal,
+              sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager,
           decodeErrorData: sse_decode_AnyhowException,
         ),
-        constMeta: kCrateApiSimpleGetNisabThresholdsConstMeta,
-        argValues: [goldPrice, silverPrice],
+        constMeta: kCrateApiZakatZakatManagerNewConstMeta,
+        argValues: [goldPrice, silverPrice, madhab],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiSimpleGetNisabThresholdsConstMeta =>
+  TaskConstMeta get kCrateApiZakatZakatManagerNewConstMeta =>
       const TaskConstMeta(
-        debugName: "get_nisab_thresholds",
-        argNames: ["goldPrice", "silverPrice"],
+        debugName: "ZakatManager_new",
+        argNames: ["goldPrice", "silverPrice", "madhab"],
       );
 
   @override
-  Future<void> crateApiSimpleInitApp() {
+  Future<void> crateApiZakatInitApp() {
     return handler.executeNormal(
       NormalTask(
         callFfi: (port_) {
@@ -772,7 +793,7 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           pdeCallFfi(
             generalizedFrbRustBinding,
             serializer,
-            funcId: 17,
+            funcId: 18,
             port: port_,
           );
         },
@@ -780,14 +801,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
           decodeSuccessData: sse_decode_unit,
           decodeErrorData: null,
         ),
-        constMeta: kCrateApiSimpleInitAppConstMeta,
+        constMeta: kCrateApiZakatInitAppConstMeta,
         argValues: [],
         apiImpl: this,
       ),
     );
   }
 
-  TaskConstMeta get kCrateApiSimpleInitAppConstMeta =>
+  TaskConstMeta get kCrateApiZakatInitAppConstMeta =>
       const TaskConstMeta(debugName: "init_app", argNames: []);
 
   RustArcIncrementStrongCountFnType
@@ -805,6 +826,14 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   RustArcDecrementStrongCountFnType
   get rust_arc_decrement_strong_count_FrbDecimal => wire
       .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerFrbDecimal;
+
+  RustArcIncrementStrongCountFnType
+  get rust_arc_increment_strong_count_ZakatManager => wire
+      .rust_arc_increment_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager;
+
+  RustArcDecrementStrongCountFnType
+  get rust_arc_decrement_strong_count_ZakatManager => wire
+      .rust_arc_decrement_strong_count_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager;
 
   @protected
   AnyhowException dco_decode_AnyhowException(dynamic raw) {
@@ -828,6 +857,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return FrbDecimalImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  ZakatManager
+  dco_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ZakatManagerImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -858,6 +896,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ZakatManager
+  dco_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ZakatManagerImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
   DartZakatResult
   dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDartZakatResult(
     dynamic raw,
@@ -873,6 +920,15 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Dco (DartCObject based), see doc to use other codecs
     return FrbDecimalImpl.frbInternalDcoDecode(raw as List<dynamic>);
+  }
+
+  @protected
+  ZakatManager
+  dco_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+    dynamic raw,
+  ) {
+    // Codec=Dco (DartCObject based), see doc to use other codecs
+    return ZakatManagerImpl.frbInternalDcoDecode(raw as List<dynamic>);
   }
 
   @protected
@@ -969,6 +1025,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ZakatManager
+  sse_decode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return ZakatManagerImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   DartZakatResult
   sse_decode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDartZakatResult(
     SseDeserializer deserializer,
@@ -1005,6 +1073,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   }
 
   @protected
+  ZakatManager
+  sse_decode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return ZakatManagerImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
   DartZakatResult
   sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDartZakatResult(
     SseDeserializer deserializer,
@@ -1023,6 +1103,18 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
   ) {
     // Codec=Sse (Serialization based), see doc to use other codecs
     return FrbDecimalImpl.frbInternalSseDecode(
+      sse_decode_usize(deserializer),
+      sse_decode_i_32(deserializer),
+    );
+  }
+
+  @protected
+  ZakatManager
+  sse_decode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+    SseDeserializer deserializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    return ZakatManagerImpl.frbInternalSseDecode(
       sse_decode_usize(deserializer),
       sse_decode_i_32(deserializer),
     );
@@ -1131,6 +1223,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_Auto_Owned_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+    ZakatManager self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as ZakatManagerImpl).frbInternalSseEncode(move: true),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_Auto_RefMut_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDartZakatResult(
     DartZakatResult self,
     SseSerializer serializer,
@@ -1170,6 +1275,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
 
   @protected
   void
+  sse_encode_Auto_Ref_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+    ZakatManager self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as ZakatManagerImpl).frbInternalSseEncode(move: false),
+      serializer,
+    );
+  }
+
+  @protected
+  void
   sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerDartZakatResult(
     DartZakatResult self,
     SseSerializer serializer,
@@ -1190,6 +1308,19 @@ class RustLibApiImpl extends RustLibApiImplPlatform implements RustLibApi {
     // Codec=Sse (Serialization based), see doc to use other codecs
     sse_encode_usize(
       (self as FrbDecimalImpl).frbInternalSseEncode(move: null),
+      serializer,
+    );
+  }
+
+  @protected
+  void
+  sse_encode_RustOpaque_flutter_rust_bridgefor_generatedRustAutoOpaqueInnerZakatManager(
+    ZakatManager self,
+    SseSerializer serializer,
+  ) {
+    // Codec=Sse (Serialization based), see doc to use other codecs
+    sse_encode_usize(
+      (self as ZakatManagerImpl).frbInternalSseEncode(move: null),
       serializer,
     );
   }
@@ -1283,46 +1414,46 @@ class DartZakatResultImpl extends RustOpaque implements DartZakatResult {
   );
 
   bool get isPayable => RustLib.instance.api
-      .crateApiSimpleDartZakatResultAutoAccessorGetIsPayable(that: this);
+      .crateApiZakatDartZakatResultAutoAccessorGetIsPayable(that: this);
 
   String get limitName => RustLib.instance.api
-      .crateApiSimpleDartZakatResultAutoAccessorGetLimitName(that: this);
+      .crateApiZakatDartZakatResultAutoAccessorGetLimitName(that: this);
 
   FrbDecimal get nisabThreshold => RustLib.instance.api
-      .crateApiSimpleDartZakatResultAutoAccessorGetNisabThreshold(that: this);
+      .crateApiZakatDartZakatResultAutoAccessorGetNisabThreshold(that: this);
 
   FrbDecimal get wealthAmount => RustLib.instance.api
-      .crateApiSimpleDartZakatResultAutoAccessorGetWealthAmount(that: this);
+      .crateApiZakatDartZakatResultAutoAccessorGetWealthAmount(that: this);
 
   FrbDecimal get zakatDue => RustLib.instance.api
-      .crateApiSimpleDartZakatResultAutoAccessorGetZakatDue(that: this);
+      .crateApiZakatDartZakatResultAutoAccessorGetZakatDue(that: this);
 
-  set isPayable(bool isPayable) => RustLib.instance.api
-      .crateApiSimpleDartZakatResultAutoAccessorSetIsPayable(
+  set isPayable(bool isPayable) =>
+      RustLib.instance.api.crateApiZakatDartZakatResultAutoAccessorSetIsPayable(
         that: this,
         isPayable: isPayable,
       );
 
-  set limitName(String limitName) => RustLib.instance.api
-      .crateApiSimpleDartZakatResultAutoAccessorSetLimitName(
+  set limitName(String limitName) =>
+      RustLib.instance.api.crateApiZakatDartZakatResultAutoAccessorSetLimitName(
         that: this,
         limitName: limitName,
       );
 
   set nisabThreshold(FrbDecimal nisabThreshold) => RustLib.instance.api
-      .crateApiSimpleDartZakatResultAutoAccessorSetNisabThreshold(
+      .crateApiZakatDartZakatResultAutoAccessorSetNisabThreshold(
         that: this,
         nisabThreshold: nisabThreshold,
       );
 
   set wealthAmount(FrbDecimal wealthAmount) => RustLib.instance.api
-      .crateApiSimpleDartZakatResultAutoAccessorSetWealthAmount(
+      .crateApiZakatDartZakatResultAutoAccessorSetWealthAmount(
         that: this,
         wealthAmount: wealthAmount,
       );
 
   set zakatDue(FrbDecimal zakatDue) =>
-      RustLib.instance.api.crateApiSimpleDartZakatResultAutoAccessorSetZakatDue(
+      RustLib.instance.api.crateApiZakatDartZakatResultAutoAccessorSetZakatDue(
         that: this,
         zakatDue: zakatDue,
       );
@@ -1348,8 +1479,53 @@ class FrbDecimalImpl extends RustOpaque implements FrbDecimal {
   );
 
   double toF64() =>
-      RustLib.instance.api.crateApiSimpleFrbDecimalToF64(that: this);
+      RustLib.instance.api.crateApiZakatFrbDecimalToF64(that: this);
 
   String toString() =>
-      RustLib.instance.api.crateApiSimpleFrbDecimalToString(that: this);
+      RustLib.instance.api.crateApiZakatFrbDecimalToString(that: this);
+}
+
+@sealed
+class ZakatManagerImpl extends RustOpaque implements ZakatManager {
+  // Not to be used by end users
+  ZakatManagerImpl.frbInternalDcoDecode(List<dynamic> wire)
+    : super.frbInternalDcoDecode(wire, _kStaticData);
+
+  // Not to be used by end users
+  ZakatManagerImpl.frbInternalSseDecode(BigInt ptr, int externalSizeOnNative)
+    : super.frbInternalSseDecode(ptr, externalSizeOnNative, _kStaticData);
+
+  static final _kStaticData = RustArcStaticData(
+    rustArcIncrementStrongCount:
+        RustLib.instance.api.rust_arc_increment_strong_count_ZakatManager,
+    rustArcDecrementStrongCount:
+        RustLib.instance.api.rust_arc_decrement_strong_count_ZakatManager,
+    rustArcDecrementStrongCountPtr:
+        RustLib.instance.api.rust_arc_decrement_strong_count_ZakatManagerPtr,
+  );
+
+  DartZakatResult calculateBusiness({
+    required FrbDecimal cash,
+    required FrbDecimal inventory,
+    required FrbDecimal receivables,
+    required FrbDecimal liabilities,
+  }) => RustLib.instance.api.crateApiZakatZakatManagerCalculateBusiness(
+    that: this,
+    cash: cash,
+    inventory: inventory,
+    receivables: receivables,
+    liabilities: liabilities,
+  );
+
+  DartZakatResult calculateSavings({
+    required FrbDecimal cashInHand,
+    required FrbDecimal bankBalance,
+  }) => RustLib.instance.api.crateApiZakatZakatManagerCalculateSavings(
+    that: this,
+    cashInHand: cashInHand,
+    bankBalance: bankBalance,
+  );
+
+  (FrbDecimal, FrbDecimal) getNisabThresholds() => RustLib.instance.api
+      .crateApiZakatZakatManagerGetNisabThresholds(that: this);
 }

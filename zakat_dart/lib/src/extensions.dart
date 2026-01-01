@@ -1,5 +1,5 @@
 import 'package:decimal/decimal.dart';
-import 'rust/api/simple.dart';
+import 'rust/api/zakat.dart';
 
 extension FrbDecimalConversion on FrbDecimal {
   Decimal toDecimal() => Decimal.parse(toString());

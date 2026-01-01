@@ -8,42 +8,6 @@ import 'package:flutter_rust_bridge/flutter_rust_bridge_for_generated.dart';
 
 // These function are ignored because they are on traits that is not defined in current crate (put an empty `#[frb]` on it to unignore): `clone`, `fmt`
 
-DartZakatResult calculateBusinessZakat({
-  required FrbDecimal cash,
-  required FrbDecimal inventory,
-  required FrbDecimal receivables,
-  required FrbDecimal liabilities,
-  required FrbDecimal goldPrice,
-  required FrbDecimal silverPrice,
-}) => RustLib.instance.api.crateApiSimpleCalculateBusinessZakat(
-  cash: cash,
-  inventory: inventory,
-  receivables: receivables,
-  liabilities: liabilities,
-  goldPrice: goldPrice,
-  silverPrice: silverPrice,
-);
-
-DartZakatResult calculateSavingsZakat({
-  required FrbDecimal cashInHand,
-  required FrbDecimal bankBalance,
-  required FrbDecimal goldPrice,
-  required FrbDecimal silverPrice,
-}) => RustLib.instance.api.crateApiSimpleCalculateSavingsZakat(
-  cashInHand: cashInHand,
-  bankBalance: bankBalance,
-  goldPrice: goldPrice,
-  silverPrice: silverPrice,
-);
-
-(FrbDecimal, FrbDecimal) getNisabThresholds({
-  required FrbDecimal goldPrice,
-  required FrbDecimal silverPrice,
-}) => RustLib.instance.api.crateApiSimpleGetNisabThresholds(
-  goldPrice: goldPrice,
-  silverPrice: silverPrice,
-);
-
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<DartZakatResult>>
 abstract class DartZakatResult implements RustOpaqueInterface {
   bool get isPayable;
@@ -70,10 +34,37 @@ abstract class DartZakatResult implements RustOpaqueInterface {
 // Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<FrbDecimal>>
 abstract class FrbDecimal implements RustOpaqueInterface {
   static FrbDecimal fromString({required String s}) =>
-      RustLib.instance.api.crateApiSimpleFrbDecimalFromString(s: s);
+      RustLib.instance.api.crateApiZakatFrbDecimalFromString(s: s);
 
   double toF64();
 
   @override
   String toString();
+}
+
+// Rust type: RustOpaqueMoi<flutter_rust_bridge::for_generated::RustAutoOpaqueInner<ZakatManager>>
+abstract class ZakatManager implements RustOpaqueInterface {
+  DartZakatResult calculateBusiness({
+    required FrbDecimal cash,
+    required FrbDecimal inventory,
+    required FrbDecimal receivables,
+    required FrbDecimal liabilities,
+  });
+
+  DartZakatResult calculateSavings({
+    required FrbDecimal cashInHand,
+    required FrbDecimal bankBalance,
+  });
+
+  (FrbDecimal, FrbDecimal) getNisabThresholds();
+
+  factory ZakatManager({
+    required FrbDecimal goldPrice,
+    required FrbDecimal silverPrice,
+    required String madhab,
+  }) => RustLib.instance.api.crateApiZakatZakatManagerNew(
+    goldPrice: goldPrice,
+    silverPrice: silverPrice,
+    madhab: madhab,
+  );
 }

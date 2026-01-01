@@ -36,6 +36,9 @@ else {
     Write-Host "⚠️ 'wasm-pack' not found! Skipping WASM build." -ForegroundColor Red
 }
 
+# Always sync WASM/JS metadata (README, JSR config) even if build skipped
+.\scripts\sync-pkg-metadata.ps1
+
 # 4. Dart/Flutter Prep
 Write-Host "`n💙 Preparing Dart/Flutter Package..." -ForegroundColor Yellow
 .\scripts\build-dart.ps1

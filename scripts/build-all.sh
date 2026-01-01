@@ -22,7 +22,14 @@ fi
 
 # 3. WASM & JSR Build
 echo -e "\n\033[1;33m🕸️  Building WASM & JSR Package...\033[0m"
-./scripts/build-wasm.sh
+if command -v wasm-pack &> /dev/null; then
+    ./scripts/build-wasm.sh
+else
+    echo "⚠️ 'wasm-pack' not found! Skipping WASM build."
+fi
+
+# Always sync WASM/JS metadata
+./scripts/sync-pkg-metadata.sh
 
 # 4. Dart/Flutter Prep
 echo -e "\n\033[1;33m💙 Preparing Dart/Flutter Package...\033[0m"

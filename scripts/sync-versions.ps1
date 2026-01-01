@@ -54,4 +54,17 @@ $YamlReplace = 'version: ' + $Version
 
 Update-Manifest "zakat_dart/pubspec.yaml" $YamlPattern $YamlReplace
 
+Update-Manifest "zakat_dart/pubspec.yaml" $YamlPattern $YamlReplace
+
+# 4. Update README.md (Dependency Examples)
+# Pattern 1: zakat = "x.y.z"
+$ReadmePattern1 = 'zakat\s*=\s*"(.*?)"'
+$ReadmeReplace1 = 'zakat = "' + $Version + '"'
+Update-Manifest "README.md" $ReadmePattern1 $ReadmeReplace1
+
+# Pattern 2: zakat = { version = "x.y.z"
+$ReadmePattern2 = 'zakat\s*=\s*\{\s*version\s*=\s*"(.*?)"'
+$ReadmeReplace2 = 'zakat = { version = "' + $Version + '"'
+Update-Manifest "README.md" $ReadmePattern2 $ReadmeReplace2
+
 Write-Host "🔄 Version synchronization complete."

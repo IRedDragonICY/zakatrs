@@ -33,4 +33,11 @@ update_manifest "pkg/package.json" "\"version\": \".*\"" "\"version\": \"$VERSIO
 # 3. Update Dart Pubspec (version: x.y.z)
 update_manifest "zakat_dart/pubspec.yaml" "^version: .*" "version: $VERSION"
 
+# 4. Update README.md (Dependency Examples)
+# Pattern 1: zakat = "x.y.z"
+update_manifest "README.md" "zakat = \".*\"" "zakat = \"$VERSION\""
+
+# Pattern 2: zakat = { version = "x.y.z"
+update_manifest "README.md" "zakat = { version = \".*\"" "zakat = { version = \"$VERSION\""
+
 echo "🔄 Version synchronization complete."

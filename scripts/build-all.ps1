@@ -5,6 +5,10 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "🚀 Starting ZakatRS Master Build..." -ForegroundColor Cyan
 
+# 0. Sync Versions
+Write-Host "`n🔄 Synchronizing Versions..." -ForegroundColor Yellow
+.\scripts\sync-versions.ps1
+
 # 1. Native Rust Build
 Write-Host "`n🦀 Building Native Rust (Release)..." -ForegroundColor Yellow
 cargo build --release

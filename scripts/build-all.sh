@@ -3,6 +3,10 @@ set -e
 
 echo -e "\033[0;36m🚀 Starting ZakatRS Master Build...\033[0m"
 
+# 0. Sync Versions
+echo -e "\n\033[1;33m🔄 Synchronizing Versions...\033[0m"
+./scripts/sync-versions.sh
+
 # 1. Native Rust Build
 echo -e "\n\033[1;33m🦀 Building Native Rust (Release)...\033[0m"
 cargo build --release

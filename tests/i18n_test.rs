@@ -1,4 +1,4 @@
-use zakat::i18n::{ZakatLocale, CurrencyFormatter, TRANSLATOR};
+use zakat::i18n::{ZakatLocale, CurrencyFormatter};
 use zakat::types::{CalculationStep, ZakatDetails, WealthType};
 use rust_decimal_macros::dec;
 
@@ -42,18 +42,20 @@ fn test_currency_formatting_ar_sa() {
 
 #[test]
 fn test_translator_basic() {
-    let text = TRANSLATOR.translate(ZakatLocale::EnUS, "status-payable", None);
+    let translator = zakat::i18n::default_translator();
+    let text = translator.translate(ZakatLocale::EnUS, "status-payable", None);
     assert_eq!(text, "PAYABLE");
     
-    let text_id = TRANSLATOR.translate(ZakatLocale::IdID, "status-payable", None);
+    let text_id = translator.translate(ZakatLocale::IdID, "status-payable", None);
     assert_eq!(text_id, "WAJIB ZAKAT");
     
-    let text_missing = TRANSLATOR.translate(ZakatLocale::EnUS, "non-existent-key", None);
+    let text_missing = translator.translate(ZakatLocale::EnUS, "non-existent-key", None);
     assert!(text_missing.starts_with("MISSING:"));
 }
 
 #[test]
 fn test_details_summary_in() {
+    let translator = zakat::i18n::default_translator();
     let details = ZakatDetails::new(
         dec!(1000), // Total
         dec!(0),    // Liabilities
@@ -63,13 +65,13 @@ fn test_details_summary_in() {
     );
     // Total > Nisab -> Payable
     
-    let summary_en = details.summary_in(ZakatLocale::EnUS);
+    let summary_en = details.summary_in(ZakatLocale::EnUS, &translator);
     println!("Summary EN: '{}'", summary_en);
     // Asset: Payable - Due: $25.00
     assert!(summary_en.contains("PAYABLE"));
     assert!(summary_en.contains("Due: $25.00"));
     
-    let summary_id = details.summary_in(ZakatLocale::IdID);
+    let summary_id = details.summary_in(ZakatLocale::IdID, &translator);
     println!("Summary ID: '{}'", summary_id);
     // Aset: Wajib Zakat - Zakat: Rp25,00
     // Note: status-due for ID is "Zakat", status-label is "Aset" (if translated? fallback is "Asset" if not translated)
@@ -81,6 +83,7 @@ fn test_details_summary_in() {
 
 #[test]
 fn test_details_explain_in() {
+     let translator = zakat::i18n::default_translator();
      let mut trace = Vec::new();
      trace.push(CalculationStep::initial("step-weight", "Weight", dec!(100)));
      // Test with args
@@ -91,7 +94,7 @@ fn test_details_explain_in() {
         dec!(1000), dec!(0), dec!(85), dec!(0.025), WealthType::Gold, trace
      );
 
-     let explain_en = details.explain_in(ZakatLocale::EnUS);
+     let explain_en = details.explain_in(ZakatLocale::EnUS, &translator);
      // Should contain "Weight" and "Purity Adjustment (21K / 24K)" if key exists and args work
      println!("Explain EN:\n{}", explain_en);
      assert!(explain_en.contains("Weight"));

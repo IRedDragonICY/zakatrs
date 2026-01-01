@@ -476,38 +476,31 @@ impl ZakatDetails {
 
     /// Returns a concise status string.
     /// Format: "{Label}: {Payable/Exempt} - Due: {Amount}"
-    /// Returns a concise status string.
-    /// Format: "{Label}: {Payable/Exempt} - Due: {Amount}"
-    /// Returns a concise status string using the English locale.
-    /// Format: "{Label}: {Payable/Exempt} - Due: {Amount}"
-    pub fn summary(&self) -> String {
-        self.summary_in(crate::i18n::ZakatLocale::EnUS)
+    pub fn summary(&self, translator: &crate::i18n::Translator) -> String {
+        self.summary_in(crate::i18n::ZakatLocale::EnUS, translator)
     }
 
     /// Returns a localized concise status string.
-    pub fn summary_in(&self, locale: crate::i18n::ZakatLocale) -> String {
-        use crate::i18n::{TRANSLATOR, CurrencyFormatter};
-
-
+    pub fn summary_in(&self, locale: crate::i18n::ZakatLocale, translator: &crate::i18n::Translator) -> String {
+        use crate::i18n::CurrencyFormatter;
             
         // Determine the label string.
         // If a custom label is provided, clone it.
         // Otherwise, fetch the localized generic "Asset" label from the translator.
-        // We clone to ensure we have an owned String that lives long enough for this scope.
         
         let label_string = if let Some(l) = &self.label {
             l.clone()
         } else {
-            TRANSLATOR.translate(locale, "asset-generic", None)
+            translator.translate(locale, "asset-generic", None)
         };
         let label_str = label_string.as_str();
         let status = if self.is_payable {
-            TRANSLATOR.translate(locale, "status-payable", None)
+            translator.translate(locale, "status-payable", None)
         } else {
-            TRANSLATOR.translate(locale, "status-exempt", None)
+            translator.translate(locale, "status-exempt", None)
         };
         
-        let due_label = TRANSLATOR.translate(locale, "status-due", None);
+        let due_label = translator.translate(locale, "status-due", None);
         let formatted_due = locale.format_currency(self.zakat_due);
 
         let reason = if let Some(r) = &self.status_reason {
@@ -550,21 +543,20 @@ impl ZakatDetails {
     /// If there are any warnings (e.g., negative values clamped), they are appended at the end.
     ///
     /// For structured data (e.g., for API consumers), use `to_explanation()` instead.
-    /// Generates a human-readable explanation of the Zakat calculation in English.
-    pub fn explain(&self) -> String {
-        self.explain_in(crate::i18n::ZakatLocale::EnUS)
+    pub fn explain(&self, translator: &crate::i18n::Translator) -> String {
+        self.explain_in(crate::i18n::ZakatLocale::EnUS, translator)
     }
 
     /// Generates a localized human-readable explanation of the Zakat calculation.
-    pub fn explain_in(&self, locale: crate::i18n::ZakatLocale) -> String {
-         use crate::i18n::{TRANSLATOR, CurrencyFormatter};
+    pub fn explain_in(&self, locale: crate::i18n::ZakatLocale, translator: &crate::i18n::Translator) -> String {
+         use crate::i18n::CurrencyFormatter;
          use std::fmt::Write;
 
          let mut out = String::new();
          let label_string = if let Some(l) = &self.label {
              l.clone()
          } else {
-             TRANSLATOR.translate(locale, "asset-generic", None)
+             translator.translate(locale, "asset-generic", None)
          };
          let label_str = label_string.as_str();
          
@@ -589,7 +581,7 @@ impl ZakatDetails {
              
              // Try to translate using key, fallback to direct description
              let desc = if !step.key.is_empty() {
-                 let translated = TRANSLATOR.translate(locale, &step.key, args.as_ref());
+                 let translated = translator.translate(locale, &step.key, args.as_ref());
                  if translated.starts_with("MISSING:") {
                      step.description.clone()
                  } else {
@@ -646,12 +638,12 @@ impl ZakatDetails {
          writeln!(out, "{:-<50}", "").ok();
          
          let status_key = if self.is_payable { "status-payable" } else { "status-exempt" };
-         let status = TRANSLATOR.translate(locale, status_key, None);
+         let status = translator.translate(locale, status_key, None);
          
-         writeln!(out, "{}: {}", TRANSLATOR.translate(locale, "status-label", None), status).ok();
+         writeln!(out, "{}: {}", translator.translate(locale, "status-label", None), status).ok();
          
          if self.is_payable {
-             let due_label = TRANSLATOR.translate(locale, "status-due", None);
+             let due_label = translator.translate(locale, "status-due", None);
              writeln!(out, "{}: {}", due_label, locale.format_currency(self.zakat_due)).ok();
          }
          

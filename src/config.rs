@@ -39,6 +39,9 @@ pub struct ZakatConfig {
     /// Locale for output formatting and translation (default: en-US).
     #[serde(default)]
     pub locale: crate::i18n::ZakatLocale,
+
+    #[serde(skip, default = "crate::i18n::default_translator")]
+    pub translator: crate::i18n::Translator,
 }
 
 // Manual Debug impl since Arc<dyn Trait> doesn't auto-derive Debug
@@ -50,6 +53,7 @@ impl std::fmt::Debug for ZakatConfig {
             .field("silver_price_per_gram", &self.silver_price_per_gram)
             .field("cash_nisab_standard", &self.cash_nisab_standard)
             .field("locale", &self.locale)
+            .field("translator", &self.translator)
             .finish()
     }
 }
@@ -66,7 +70,9 @@ impl Default for ZakatConfig {
             nisab_gold_grams: None,
             nisab_silver_grams: None,
             nisab_agriculture_kg: None,
+
             locale: crate::i18n::ZakatLocale::default(),
+            translator: crate::i18n::default_translator(),
         }
     }
 }
@@ -398,6 +404,16 @@ impl ZakatConfig {
     pub fn with_nisab_standard(mut self, standard: NisabStandard) -> Self {
         self.cash_nisab_standard = standard;
         self
+    }
+
+    pub fn with_translator(mut self, translator: crate::i18n::Translator) -> Self {
+        self.translator = translator;
+        self
+    }
+    
+    /// Explain the details using the config's internal translator and locale.
+    pub fn explain(&self, details: &crate::types::ZakatDetails) -> String {
+        details.explain_in(self.locale, &self.translator)
     }
 
     // Getters

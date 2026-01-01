@@ -4,7 +4,6 @@ use fluent_bundle::{FluentResource, FluentArgs};
 use fluent_bundle::bundle::FluentBundle;
 use unic_langid::LanguageIdentifier;
 use std::collections::HashMap;
-use once_cell::sync::Lazy;
 use std::str::FromStr;
 
 use serde::{Serialize, Deserialize};
@@ -86,12 +85,21 @@ impl CurrencyFormatter for ZakatLocale {
     }
 }
 
+#[derive(Clone)]
 pub struct Translator {
-    bundles: HashMap<ZakatLocale, FluentBundle<FluentResource, intl_memoizer::concurrent::IntlLangMemoizer>>,
+    bundles: std::sync::Arc<HashMap<ZakatLocale, FluentBundle<FluentResource, intl_memoizer::concurrent::IntlLangMemoizer>>>,
+}
+
+impl std::fmt::Debug for Translator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Translator")
+         .field("locales", &self.bundles.keys())
+         .finish()
+    }
 }
 
 impl Translator {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let mut bundles = HashMap::new();
         
         let locales = [
@@ -118,7 +126,7 @@ impl Translator {
             bundles.insert(enum_val, bundle);
         }
 
-        Translator { bundles }
+        Translator { bundles: std::sync::Arc::new(bundles) }
     }
 
     #[allow(clippy::collapsible_if)]
@@ -141,5 +149,7 @@ impl Translator {
     }
 }
 
-pub static TRANSLATOR: Lazy<Translator> = Lazy::new(Translator::new);
+pub fn default_translator() -> Translator {
+    Translator::new()
+}
 

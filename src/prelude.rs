@@ -21,6 +21,7 @@ pub use crate::traits::CalculateZakat;
 pub use crate::traits::AsyncCalculateZakat;
 pub use crate::types::{WealthType, ZakatDetails, ZakatError};
 pub use crate::inputs::IntoZakatDecimal;
+pub use crate::i18n::Translator;
 
 // Re-export specific calculators and types
 // Note: Builders have been removed in favor of fluent structs.

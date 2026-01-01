@@ -12,7 +12,7 @@ fn test_explain_output_format() {
         .label("My Gold");
 
     let result = gold.calculate_zakat(&config).unwrap();
-    let explanation = result.explain();
+    let explanation = result.explain(&config.translator);
 
     println!("{}", explanation);
 

@@ -1,8 +1,14 @@
 # Changelog
 
 
-## [Unreleased]
+## [0.19.0] - 2026-01-01
+
 ### Changed
+- **Global Translation State Refactor**: Significant architectural overhaul to remove global static state.
+    - **Removed**: Global `TRANSLATOR` static from `src/i18n.rs`.
+    - **Added**: `translator` field to `ZakatConfig`, making it the owner of translation state.
+    - **Updated**: `ZakatDetails::explain()` and related methods now require `&Translator` to be passed explicitly.
+    - **API**: Added `default_translator()` helper and `config.explain()` convenience method.
 - **Zakat Dart Refactor**: Major architectural update to `zakat_dart` integration.
     - **Workspace**: Moved `zakat_dart/rust` to root cargo workspace for better dependency management.
     - **Type Safety**: Replaced unsafe `String`/`f64` passing with strict `Decimal` types across the FFI boundary using `FrbDecimal`.

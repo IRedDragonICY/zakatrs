@@ -1,6 +1,4 @@
-use zakat::prelude::*;
 use zakat::inputs::IntoZakatDecimal;
-use zakat::types::ZakatError;
 
 #[test]
 fn test_dos_long_input() {

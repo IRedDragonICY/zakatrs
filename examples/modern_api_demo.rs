@@ -50,6 +50,6 @@ fn main() {
     let error_result = bad_asset.calculate_zakat(&config);
 
     if let Err(e) = error_result {
-        println!("{}", e.report());
+        println!("{}", e.report(&zakat::i18n::default_translator()));
     }
 }

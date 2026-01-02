@@ -39,7 +39,8 @@ fn test_dynamic_portfolio_operations() {
     let _new_asset = BusinessZakat::new().cash(20000).label("Shop 2 Updated");
     
     // Check total
-    let config = ZakatConfig::new().with_gold_price(100);
+    let config = ZakatConfig::new().with_gold_price(100).with_silver_price(10);
     let result = portfolio.calculate_total(&config);
+    assert!(!result.successes().is_empty(), "No successes! Failures: {:?}", result.failures());
     assert_eq!(result.successes()[0].net_assets, dec!(20000));
 }

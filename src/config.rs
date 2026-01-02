@@ -506,8 +506,8 @@ mod tests {
         assert!(res.is_err(), "Validation should fail for zero/default prices");
         
         match res {
-            Err(ZakatError::ConfigurationError { reason_key, .. }) => {
-                assert!(reason_key.contains("error-config-gold-positive"), "Error should match key. Got: {}", reason_key);
+            Err(ZakatError::ConfigurationError(details)) => {
+                assert!(details.reason_key.contains("error-config-gold-positive"), "Error should match key. Got: {}", details.reason_key);
             }
             _ => panic!("Expected ConfigurationError"),
         }

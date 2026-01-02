@@ -39,7 +39,10 @@ fn test_portfolio_partial_failure() {
     
     if let PortfolioItemResult::Failure { error, .. } = failures[0] {
         // Expect "Metal type must be specified" error
-        assert!(error.to_string().contains("Metal type must be specified"));
+        let report_str = error.report(&zakat::i18n::default_translator());
+        println!("Error Report: {}", report_str);
+        assert!(report_str.contains("Type must be specified"));
+        assert!(report_str.contains("metal_type"));
     } else {
         panic!("Expected failure variant");
     }

@@ -61,8 +61,8 @@ fn test_error_context_labels() {
     let err = res.err().unwrap();
     
     // Check if the error string contains the label
-    let err_str = err.to_string();
+    let err_str = err.report(&zakat::i18n::default_translator());
     println!("Error String: {}", err_str);
     assert!(err_str.contains("Grandma's Broken Necklace"), "Error message should contain asset label");
-    assert!(err_str.contains("Weight must be non-negative"));
+    assert!(err_str.contains("Value must be non-negative"));
 }

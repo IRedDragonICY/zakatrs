@@ -28,9 +28,9 @@ fn test_safe_setters_no_panic() {
              // Expecting errors for weight and debt
              assert!(errors.len() >= 1);
         },
-        zakat::types::ZakatError::InvalidInput { field, .. } => {
+        zakat::types::ZakatError::InvalidInput(details) => {
             // If only one was caught/returned (first failure)
-            println!("Single input error on field: {}", field);
+            println!("Single input error on field: {}", details.field);
         }
         _ => panic!("Unexpected error type: {:?}", err),
     }

@@ -724,6 +724,9 @@ pub enum ZakatError {
 
     #[error("Multiple validation errors occurred")]
     MultipleErrors(Vec<ZakatError>),
+
+    #[error("Network error: {0}")]
+    NetworkError(String),
 }
 
 impl ZakatError {
@@ -759,6 +762,7 @@ impl ZakatError {
             ZakatError::MultipleErrors(errors) => ZakatError::MultipleErrors(
                 errors.into_iter().map(|e| e.with_source(source.clone())).collect()
             ),
+            ZakatError::NetworkError(msg) => ZakatError::NetworkError(msg),
         }
     }
 
@@ -795,6 +799,7 @@ impl ZakatError {
             ZakatError::MultipleErrors(errors) => ZakatError::MultipleErrors(
                 errors.into_iter().map(|e| e.with_asset_id(id)).collect()
             ),
+            ZakatError::NetworkError(msg) => ZakatError::NetworkError(msg),
         }
     }
 
@@ -816,20 +821,22 @@ impl ZakatError {
         }
 
         let label = match self {
-            ZakatError::CalculationError { source_label, .. } => source_label,
-            ZakatError::InvalidInput { source_label, .. } => source_label,
-            ZakatError::ConfigurationError { source_label, .. } => source_label,
-            ZakatError::Overflow { source_label, .. } => source_label,
-            ZakatError::MissingConfig { source_label, .. } => source_label,
+            ZakatError::CalculationError { source_label, .. } => source_label.as_deref(),
+            ZakatError::InvalidInput { source_label, .. } => source_label.as_deref(),
+            ZakatError::ConfigurationError { source_label, .. } => source_label.as_deref(),
+            ZakatError::Overflow { source_label, .. } => source_label.as_deref(),
+            ZakatError::MissingConfig { source_label, .. } => source_label.as_deref(),
+            ZakatError::NetworkError(_) => Some("Network"),
             ZakatError::MultipleErrors(_) => unreachable!(), // Handled above
-        }.as_deref().unwrap_or("Unknown Source");
+        }.unwrap_or("Unknown Source");
 
         let asset_id = match self {
-            ZakatError::CalculationError { asset_id, .. } => asset_id,
-            ZakatError::InvalidInput { asset_id, .. } => asset_id,
-            ZakatError::ConfigurationError { asset_id, .. } => asset_id,
-            ZakatError::Overflow { asset_id, .. } => asset_id,
-            ZakatError::MissingConfig { asset_id, .. } => asset_id,
+            ZakatError::CalculationError { asset_id, .. } => asset_id.as_ref(),
+            ZakatError::InvalidInput { asset_id, .. } => asset_id.as_ref(),
+            ZakatError::ConfigurationError { asset_id, .. } => asset_id.as_ref(),
+            ZakatError::Overflow { asset_id, .. } => asset_id.as_ref(),
+            ZakatError::MissingConfig { asset_id, .. } => asset_id.as_ref(),
+            ZakatError::NetworkError(_) => None,
             ZakatError::MultipleErrors(_) => unreachable!(), // Handled above
         };
 
@@ -839,6 +846,7 @@ impl ZakatError {
             ZakatError::ConfigurationError { reason, .. } => reason.clone(),
             ZakatError::Overflow { operation, .. } => format!("Overflow occurred during '{}'", operation),
             ZakatError::MissingConfig { field, .. } => format!("Missing required configuration field '{}'", field),
+            ZakatError::NetworkError(msg) => msg.clone(),
             ZakatError::MultipleErrors(_) => unreachable!(), // Handled above
         };
 
@@ -869,7 +877,9 @@ impl ZakatError {
                      "Suggestion: Ensure all required configuration fields are set."
                 }
             },
+
             ZakatError::InvalidInput { .. } => "Suggestion: Ensure all input values are non-negative and correct.",
+            ZakatError::NetworkError(_) => "Suggestion: Check internet connection or API availability.",
             _ => "Suggestion: Check input data accuracy."
         }
     }
@@ -916,6 +926,11 @@ impl ZakatError {
                  "code": "MULTIPLE_ERRORS",
                  "message": "Multiple validation errors occurred",
                  "errors": errors.iter().map(|e| e.context()).collect::<Vec<_>>()
+             }),
+             ZakatError::NetworkError(msg) => json!({
+                 "code": "NETWORK_ERROR",
+                 "message": msg,
+                 "hint": self.get_hint()
              })
         }
     }

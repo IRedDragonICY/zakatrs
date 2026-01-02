@@ -1,7 +1,6 @@
 use zakat::prelude::*;
-use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use chrono::{NaiveDate, Duration, Local};
+use chrono::{Duration, Local};
 
 #[test]
 fn test_hawl_tracking_logic() {

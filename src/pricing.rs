@@ -128,3 +128,103 @@ mod tests {
         assert_eq!(provider.prices.gold_per_gram, dec!(100));
     }
 }
+
+#[cfg(feature = "live-pricing")]
+#[derive(serde::Deserialize)]
+struct BinanceTicker {
+    #[allow(dead_code)]
+    symbol: String,
+    price: String,
+}
+
+/// A price provider that fetches live gold prices from Binance Public API.
+///
+/// Use this for testing "live" data without needing an API key.
+/// Note: This provider does not support Silver prices (returns 0.0).
+#[cfg(feature = "live-pricing")]
+pub struct BinancePriceProvider {
+    client: reqwest::Client,
+}
+
+#[cfg(feature = "live-pricing")]
+impl BinancePriceProvider {
+    /// Creates a new provider with automatic DNS bypass ("Internet Baik" proof).
+    ///
+    /// This uses a known Cloudfront IP (18.64.23.181) for `api.binance.com` to bypass
+    /// local DNS poisoning/blocking commonly found in Indonesia and other regions.
+    pub fn new() -> Self {
+        // Known Cloudfront IP for api.binance.com (Verified 2026-01-02 via Google DoH)
+        // This maps api.binance.com directly to 18.64.23.181, bypassing local DNS.
+        let bypass_ip = std::net::SocketAddr::from(([18, 64, 23, 181], 443));
+        
+        Self {
+            client: reqwest::Client::builder()
+                .resolve("api.binance.com", bypass_ip)
+                .timeout(std::time::Duration::from_secs(10))
+                .build()
+                .unwrap_or_default(),
+        }
+    }
+}
+
+#[cfg(feature = "live-pricing")]
+impl Default for BinancePriceProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(feature = "live-pricing")]
+#[async_trait::async_trait]
+impl PriceProvider for BinancePriceProvider {
+    async fn get_prices(&self) -> Result<Prices, ZakatError> {
+        // 1 Troy Ounce = 31.1034768 Grams
+        const OUNCE_TO_GRAM: rust_decimal::Decimal = rust_decimal_macros::dec!(31.1034768);
+        
+        // Fetch Gold Price (PAXG/USDT)
+        let url = "https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT";
+        let response = self.client.get(url)
+            .send()
+            .await
+            .map_err(|e| ZakatError::NetworkError(format!("Binance API error: {}", e)))?;
+            
+        let ticker: BinanceTicker = response.json()
+            .await
+            .map_err(|e| ZakatError::NetworkError(format!("Failed to parse Binance response: {}", e)))?;
+            
+        let price_per_ounce = rust_decimal::Decimal::from_str_exact(&ticker.price)
+            .map_err(|e| ZakatError::CalculationError { 
+                reason: format!("Failed to parse price decimal: {}", e),
+                source_label: None,
+                asset_id: None,
+            })?;
+            
+        let gold_per_gram = price_per_ounce / OUNCE_TO_GRAM;
+
+        // Warn about missing Silver support
+
+        tracing::warn!("BinancePriceProvider does not support live Silver prices; using fallback/zero");
+
+        Ok(Prices {
+            gold_per_gram,
+            silver_per_gram: rust_decimal::Decimal::ZERO,
+        })
+    }
+}
+
+#[cfg(all(test, feature = "live-pricing"))]
+mod live_tests {
+    use super::*;
+    
+    #[tokio::test]
+    #[ignore] // Ignore by default to avoid spamming the API during CI
+    async fn test_binance_live() {
+        let provider = BinancePriceProvider::new();
+        let prices = provider.get_prices().await.expect("Failed to fetch live prices");
+        
+        println!("Live Gold Price (Binance): {} USD/g", prices.gold_per_gram);
+        
+        assert!(prices.gold_per_gram > rust_decimal::Decimal::ZERO);
+        assert_eq!(prices.silver_per_gram, rust_decimal::Decimal::ZERO);
+    }
+}

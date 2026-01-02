@@ -1,0 +1,140 @@
+use crate::ledger::events::LedgerEvent;
+use crate::ledger::pricing::InMemoryPriceHistory;
+use crate::ledger::timeline::simulate_timeline;
+use crate::ledger::analyzer::analyze_hawl;
+use crate::types::{ZakatDetails, WealthType, ZakatError, CalculationStep};
+use crate::traits::{CalculateZakat, ZakatConfigArgument};
+use rust_decimal::Decimal;
+use rust_decimal_macros::dec;
+use uuid::Uuid;
+use chrono::NaiveDate;
+use serde::{Deserialize, Serialize};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerAsset {
+    pub id: Uuid,
+    pub label: String,
+    pub events: Vec<LedgerEvent>,
+    pub prices: InMemoryPriceHistory, 
+    pub start_date: NaiveDate,
+    pub end_date: NaiveDate,
+}
+
+impl LedgerAsset {
+    pub fn new(label: impl Into<String>, start_date: NaiveDate, end_date: NaiveDate) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            label: label.into(),
+            events: Vec::new(),
+            prices: InMemoryPriceHistory::new(),
+            start_date,
+            end_date,
+        }
+    }
+
+    pub fn with_event(mut self, event: LedgerEvent) -> Self {
+        self.events.push(event);
+        self
+    }
+
+    pub fn with_price(mut self, date: NaiveDate, price: Decimal) -> Self {
+        self.prices.add_price(date, price);
+        self
+    }
+}
+
+impl CalculateZakat for LedgerAsset {
+    fn calculate_zakat<C: ZakatConfigArgument>(&self, _config: C) -> Result<ZakatDetails, ZakatError> {
+        // Run simulation
+        let timeline = simulate_timeline(self.events.clone(), &self.prices, self.start_date, self.end_date)?;
+        
+        // Run analyzer
+        let result = analyze_hawl(&timeline);
+        
+        // Determine Nisab from last day
+        let final_nisab = timeline.last().map(|d| d.nisab_threshold).unwrap_or(Decimal::ZERO);
+        
+        // Assume Business/Monetary for now to ensure aggregation
+        let wealth_type = WealthType::Business;
+        
+        // Build Trace
+        let mut trace = Vec::new();
+        trace.push(CalculationStep::initial("step-ledger-balance", "Ledger Closing Balance", result.total_balance));
+        
+        if result.is_due {
+             trace.push(CalculationStep::info("info-hawl-met", format!("Hawl Met: {} days held", result.current_streak_days)));
+        } else {
+             if let Some(breach) = result.last_breach {
+                 trace.push(CalculationStep::info("info-hawl-broken", format!("Hawl Broken on {}", breach)));
+             }
+             trace.push(CalculationStep::info("info-hawl-progress", format!("Hawl Progress: {}/354 days", result.current_streak_days)));
+        }
+
+        let mut details = ZakatDetails::new(
+            result.total_balance,
+            Decimal::ZERO,
+            final_nisab,
+            dec!(0.025),
+            wealth_type.clone()
+        ).with_label(self.label.clone());
+        
+        // Override status based on Analyzer
+        if !result.is_due {
+            details.is_payable = false;
+            details.zakat_due = Decimal::ZERO;
+            details.status_reason = Some(format!("Hawl condition not met ({} days)", result.current_streak_days));
+        } else {
+            details.status_reason = Some("Hawl satisfied (Al-Hawl Al-Haqiqi)".to_string());
+        }
+        
+        // Append our trace to existing trace?
+        // ZakatDetails::new creates a basic trace. We can prepend/append.
+        // Getting access to trace is tricky as it's inside details.
+        // But we can rebuild it or just accept the basic one + logic.
+        // Actually, let's use `with_trace` if we want custom trace.
+        
+        // Re-make with custom trace
+        let mut final_trace = Vec::new();
+        final_trace.push(CalculationStep::initial("step-ledger-balance", "Ledger Closing Balance", result.total_balance));
+        final_trace.push(CalculationStep::compare("step-nisab-check", "Nisab Threshold (End Date)", final_nisab));
+        
+        if result.is_due {
+             final_trace.push(CalculationStep::info("info-hawl-met", format!("Hawl Met: {} days held since {}", result.current_streak_days, result.hawl_start_date.map(|d| d.to_string()).unwrap_or_default())));
+             final_trace.push(CalculationStep::rate("step-rate", "Zakat Rate", dec!(0.025)));
+             final_trace.push(CalculationStep::result("step-due", "Zakat Due", result.zakat_due));
+        } else {
+             if let Some(breach) = result.last_breach {
+                 final_trace.push(CalculationStep::info("info-hawl-broken", format!("Hawl reset due to breach on {}", breach)));
+             } else {
+                 final_trace.push(CalculationStep::info("info-hawl-short", "Wealth below Nisab or period too short"));
+             }
+             final_trace.push(CalculationStep::info("info-hawl-progress", format!("Current Streak: {}/354 days", result.current_streak_days)));
+        }
+        
+        let mut detailed_details = ZakatDetails::with_trace(
+            result.total_balance,
+            Decimal::ZERO,
+            final_nisab,
+            dec!(0.025),
+            wealth_type.clone(),
+            final_trace
+        ).with_label(self.label.clone());
+        
+        // Force the payable status from analyzer results
+        detailed_details.is_payable = result.is_due && result.total_balance >= final_nisab; // Ensure logic consistency
+        detailed_details.zakat_due = if detailed_details.is_payable { result.zakat_due } else { Decimal::ZERO };
+        if !detailed_details.is_payable {
+            detailed_details.status_reason = Some(format!("Hawl not met: {}/354 days", result.current_streak_days));
+        }
+
+        Ok(detailed_details)
+    }
+
+    fn get_label(&self) -> Option<String> {
+        Some(self.label.clone())
+    }
+
+    fn get_id(&self) -> Uuid {
+        self.id
+    }
+}

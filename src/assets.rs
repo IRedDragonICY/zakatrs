@@ -105,6 +105,7 @@ pub enum PortfolioItem {
     PreciousMetals(PreciousMetals),
     Fitrah(FitrahCalculator),
     Custom(CustomAsset),
+    Ledger(crate::ledger::assets::LedgerAsset),
 }
 
 impl CalculateZakat for PortfolioItem {
@@ -122,6 +123,7 @@ impl CalculateZakat for PortfolioItem {
             PortfolioItem::PreciousMetals(asset) => asset.calculate_zakat(config),
             PortfolioItem::Fitrah(asset) => asset.calculate_zakat(config),
             PortfolioItem::Custom(asset) => asset.calculate_zakat(config),
+            PortfolioItem::Ledger(asset) => asset.calculate_zakat(config),
         }
     }
 
@@ -136,6 +138,7 @@ impl CalculateZakat for PortfolioItem {
             PortfolioItem::PreciousMetals(asset) => asset.get_label(),
             PortfolioItem::Fitrah(asset) => asset.get_label(),
             PortfolioItem::Custom(asset) => asset.get_label(),
+            PortfolioItem::Ledger(asset) => asset.get_label(),
         }
     }
 
@@ -150,6 +153,7 @@ impl CalculateZakat for PortfolioItem {
             PortfolioItem::PreciousMetals(asset) => asset.get_id(),
             PortfolioItem::Fitrah(asset) => asset.get_id(),
             PortfolioItem::Custom(asset) => asset.get_id(),
+            PortfolioItem::Ledger(asset) => asset.get_id(),
         }
     }
 }
@@ -207,5 +211,11 @@ impl From<FitrahCalculator> for PortfolioItem {
 impl From<CustomAsset> for PortfolioItem {
     fn from(asset: CustomAsset) -> Self {
         PortfolioItem::Custom(asset)
+    }
+}
+
+impl From<crate::ledger::assets::LedgerAsset> for PortfolioItem {
+    fn from(asset: crate::ledger::assets::LedgerAsset) -> Self {
+        PortfolioItem::Ledger(asset)
     }
 }

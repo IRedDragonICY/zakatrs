@@ -3,11 +3,77 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::warn;
 
+/// Represents the age category of livestock for Zakat purposes.
+/// 
+/// These categories are based on the Hadith specification for camel and cattle ages.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LivestockAge {
+    /// Bint Makhad - 1-year female camel (just weaned)
+    BintMakhad,
+    /// Bint Labun - 2-year female camel (mother nursing another)
+    BintLabun,
+    /// Hiqqah - 3-year female camel (ready for breeding)
+    Hiqqah,
+    /// Jaza'ah - 4-year female camel (mature)
+    Jazaah,
+    /// Tabi - 1-year calf (male or female cow)
+    Tabi,
+    /// Musinnah - 2-year cow (fully grown)
+    Musinnah,
+    /// Generic sheep/goat (age not differentiated in Fiqh for payment)
+    Jadha,
+}
+
+/// Represents the kind of livestock for Zakat.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+pub enum LivestockKind {
+    Sheep,
+    Goat,
+    Cow,
+    Camel,
+}
+
+/// Represents a structured livestock payment item.
+/// 
+/// This struct enables frontends to translate livestock descriptions dynamically
+/// instead of receiving pre-translated strings.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct LivestockDueItem {
+    /// Number of animals due
+    pub count: u32,
+    /// Age category of the animal
+    pub age: LivestockAge,
+    /// Kind of animal
+    pub kind: LivestockKind,
+}
+
+impl LivestockDueItem {
+    /// Creates a new LivestockDueItem
+    pub fn new(count: u32, age: LivestockAge, kind: LivestockKind) -> Self {
+        Self { count, age, kind }
+    }
+    
+    /// Returns a translation key for this livestock item.
+    /// Frontends can use this key to fetch localized strings.
+    pub fn translation_key(&self) -> String {
+        let age_key = match self.age {
+            LivestockAge::BintMakhad => "camel-age-bint-makhad",
+            LivestockAge::BintLabun => "camel-age-bint-labun",
+            LivestockAge::Hiqqah => "camel-age-hiqqah",
+            LivestockAge::Jazaah => "camel-age-jazaah",
+            LivestockAge::Tabi => "cow-age-tabi",
+            LivestockAge::Musinnah => "cow-age-musinnah",
+            LivestockAge::Jadha => "livestock-kind-sheep",
+        };
+        age_key.to_string()
+    }
+}
+
 /// Represents the type of Zakat payment due.
 ///
 /// This enum distinguishes between:
 /// - **Monetary**: The default payment type, representing a currency value.
-/// - **Livestock**: In-kind payment of specific animals (e.g., "1 Bint Makhad").
+/// - **Livestock**: In-kind payment of specific animals with structured data for i18n.
 ///   Used when Zakat is due as heads of livestock rather than cash.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum PaymentPayload {
@@ -15,8 +81,8 @@ pub enum PaymentPayload {
     Monetary(Decimal),
     /// In-kind livestock payment specifying animal types and counts.
     Livestock {
-        description: String,
-        heads_due: Vec<(String, u32)>, 
+        /// Structured list of animals due (preferred for i18n)
+        heads_due: Vec<LivestockDueItem>,
     },
     /// In-kind agriculture payment specifying harvest details.
     Agriculture {
@@ -24,6 +90,37 @@ pub enum PaymentPayload {
         irrigation_method: String,
         crop_value: Decimal,
     },
+}
+
+impl PaymentPayload {
+    /// Generates a human-readable description string from the livestock payment.
+    /// Use this for display purposes; for i18n, iterate over `heads_due` directly.
+    pub fn livestock_description(&self) -> Option<String> {
+        match self {
+            PaymentPayload::Livestock { heads_due } => {
+                let parts: Vec<String> = heads_due.iter()
+                    .map(|item| {
+                        let name = match item.age {
+                            LivestockAge::BintMakhad => "Bint Makhad",
+                            LivestockAge::BintLabun => "Bint Labun",
+                            LivestockAge::Hiqqah => "Hiqqah",
+                            LivestockAge::Jazaah => "Jaza'ah",
+                            LivestockAge::Tabi => "Tabi'",
+                            LivestockAge::Musinnah => "Musinnah",
+                            LivestockAge::Jadha => match item.kind {
+                                LivestockKind::Sheep => "Sheep",
+                                LivestockKind::Goat => "Goat",
+                                _ => "Sheep/Goat",
+                            },
+                        };
+                        format!("{} {}", item.count, name)
+                    })
+                    .collect();
+                Some(parts.join(", "))
+            }
+            _ => None,
+        }
+    }
 }
 
 

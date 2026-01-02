@@ -149,12 +149,21 @@ impl CalculateZakat for IncomeZakatCalculator {
         let rate = config.strategy.get_rules().trade_goods_rate;
         let external_debt = self.liabilities_due_now; // Uses macro field
 
+        // Collect any warnings
+        let mut warnings = Vec::new();
+
         // Calculate total_assets and liabilities based on method
         let (total_assets, liabilities) = match self.method {
             IncomeCalculationMethod::Gross => {
                 // Gross Method: 2.5% of Total Income.
                 // Deducting debts is generally not standard in the Gross method (similar to agriculture),
                 // but we deduct external_debt if provided to support flexible user requirements.
+                
+                // Warn user if expenses were set but will be ignored
+                if self.expenses > Decimal::ZERO {
+                    warnings.push("Expenses are ignored when using the Gross calculation method.".to_string());
+                }
+                
                 (self.income, external_debt)
             },
             IncomeCalculationMethod::Net => {
@@ -199,6 +208,7 @@ impl CalculateZakat for IncomeZakatCalculator {
             label: self.label.clone(),
             hawl_satisfied: hawl_is_satisfied,
             trace_steps,
+            warnings,
         };
 
         calculate_monetary_asset(params)

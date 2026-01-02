@@ -136,6 +136,7 @@ impl CalculateZakat for MiningAssets {
                     label: self.label.clone(),
                     hawl_satisfied: self.hawl_satisfied,
                     trace_steps,
+                    warnings: Vec::new(),
                 };
 
                 calculate_monetary_asset(params)

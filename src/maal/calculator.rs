@@ -12,6 +12,7 @@ pub struct MonetaryCalcParams {
     pub label: Option<String>,
     pub hawl_satisfied: bool,
     pub trace_steps: Vec<CalculationStep>, // Asset-specific steps leading up to Total Assets
+    pub warnings: Vec<String>, // Non-fatal warnings to include in the result
 }
 
 /// Standardized Zakat calculation logic for monetary assets.
@@ -64,12 +65,17 @@ pub fn calculate_monetary_asset(params: MonetaryCalcParams) -> Result<ZakatDetai
         final_trace.push(CalculationStep::info("status-exempt", "Below Nisab"));
     }
 
-    Ok(ZakatDetails::with_trace(
+    let mut result = ZakatDetails::with_trace(
         params.total_assets,
         params.liabilities,
         params.nisab_threshold,
         params.rate,
         params.wealth_type,
         final_trace
-    ).with_label(params.label.unwrap_or_default()))
+    ).with_label(params.label.unwrap_or_default());
+    
+    // Add any warnings from params to the result
+    result.warnings.extend(params.warnings);
+    
+    Ok(result)
 }

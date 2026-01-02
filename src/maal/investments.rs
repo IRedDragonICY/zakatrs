@@ -201,6 +201,7 @@ impl CalculateZakat for InvestmentAssets {
             label: self.label.clone(),
             hawl_satisfied: hawl_is_satisfied,
             trace_steps,
+            warnings: Vec::new(),
         };
 
         calculate_monetary_asset(params)

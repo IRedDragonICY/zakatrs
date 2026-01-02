@@ -1,4 +1,5 @@
 use rust_decimal::Decimal;
+use std::borrow::Cow;
 use std::str::FromStr;
 use crate::types::{ZakatError, InvalidInputDetails};
 
@@ -107,8 +108,12 @@ pub fn validate_numeric_format(s: &str) -> bool {
 /// - `"1.234,56"` → `"1234.56"` (European thousands + decimal)
 /// - `"١٢٣٤.٥٠"` → `"1234.50"` (Eastern Arabic numerals)
 ///
+/// # Performance
+/// Returns `Cow::Borrowed` if the input is already clean (no sanitization needed),
+/// avoiding heap allocation. Returns `Cow::Owned` only when sanitization is required.
+///
 /// Negative numbers and decimal points are preserved.
-pub fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
+pub fn sanitize_numeric_string(s: &str) -> Result<Cow<'_, str>, ZakatError> {
     if s.len() > MAX_INPUT_LEN {
         return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
             field: "input".to_string(),
@@ -120,13 +125,25 @@ pub fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
         })));
     }
 
-    // Optimization: Pre-allocate buffer to avoid re-allocations
-    let mut buffer = String::with_capacity(s.len());
+    let trimmed = s.trim();
+    
+    // Fast path: Check if the string is already clean (only ASCII digits, '.', '-')
+    // If so, return borrowed reference without any allocation
+    let needs_sanitization = trimmed.chars().any(|c| {
+        !matches!(c, '0'..='9' | '.' | '-')
+    });
+    
+    if !needs_sanitization {
+        return Ok(Cow::Borrowed(trimmed));
+    }
+
+    // Slow path: String needs sanitization, allocate and clean
+    let mut buffer = String::with_capacity(trimmed.len());
     let mut last_comma_index = None;
     let mut last_dot_index = None;
     
     // Single pass for cleaning and normalization
-    for c in s.trim().chars() {
+    for c in trimmed.chars() {
         match c {
             // Arabic Numerals -> Normalize to ASCII
             '\u{0660}'..='\u{0669}' => buffer.push(char::from_u32(c as u32 - 0x0660 + '0' as u32).unwrap_or(c)),
@@ -158,57 +175,24 @@ pub fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
             // Skip control characters
             c if c.is_control() => {},
             
-            // Keep others? Or be strict? 
-            // Existing logic seemed to just effectively filter specific things and keep others via simple replace.
-            // But optimal is to whitelist or be specific. 
-            // For safety with existing tests that might pass weird chars, let's just ignore known "bad" ones.
-            // Actually, best practice for "sanitize numeric" is to mostly whitelist.
-            // But let's stick to the previous behavior of "remove specific junk, keep rest" essentially, 
-            // but implemented via match.
-            // The previous logic did: replace specific things, then trim.
-            // So if I had 'a', it would keep it. Leading to parse error later.
-            // Let's replicate that behavior for compatibility, OR improve it?
-            // "Others: Push to buffer" was in user instructions.
+            // Keep others for compatibility (will cause parse error later if invalid)
             _ => buffer.push(c), 
         }
     }
 
     // Heuristic for comma handling (Post-processing on the cleaned buffer)
-    // If comma is the last separator and followed by 1-2 digits at end...
-    // Note: Indices in `last_comma_index` refer to position in `buffer`.
-    
-    // We need to re-find indices because the buffer indices might differ from the original string.
-    // Logic check: if multiple commas were retained, `last_comma_index` points to the last one added to `buffer`.
-    
     if let Some(comma_pos) = last_comma_index {
         let len = buffer.len();
         let after_comma_len = len - 1 - comma_pos;
         
         // Check if it looks like a European decimal
-        // Conditions:
-        // 1. comma is after the last dot (if any)
-        // 2. 1 or 2 digits after comma
-        // 3. remaining chars are digits (already checked by flow mostly, but `buffer` might have trash)
-        
         let is_european_decimal = (last_dot_index.is_none() || comma_pos > last_dot_index.unwrap())
             && after_comma_len > 0
             && after_comma_len <= 2
             && buffer[comma_pos+1..].chars().all(|c| c.is_ascii_digit());
             
         if is_european_decimal {
-            // It's a decimal separator.
-            // 1. Remove all dots (thousands separators in EU)
-            // 2. Turn this comma into dot.
-            // 3. Remove other commas (though uncommon in valid EU format, we clean them for safety).
-            
-            // Note: Standard EU format is "1.234,56". 
-            // If we encounter mixed formatting like "1,234.56" (US), `is_european_decimal` evaluates to false 
-            // because the comma is not after the last dot.
-            
-            // Proceed with a secondary pass to finalize the string.
-            // Allocating a new string here is acceptable as the EU format is less common in this context,
-            // and this approach simplifies the mutation logic.
-            
+            // It's a decimal separator - convert comma to dot, remove dots (thousands seps)
             let mut final_res = String::with_capacity(buffer.len());
             for (i, c) in buffer.chars().enumerate() {
                 if i == comma_pos {
@@ -216,22 +200,19 @@ pub fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
                 } else if c == '.' {
                     // Skip (it was a thousands separator)
                 } else if c == ',' {
-                    // Skip (other commas? uncommon in valid EU but safe to remove)
+                    // Skip (other commas)
                 } else {
                     final_res.push(c);
                 }
             }
-            return Ok(final_res);
+            return Ok(Cow::Owned(final_res));
         } else {
             // Comma is a thousands separator (US). Remove all commas.
-            // This is the common case: "1,000".
-            // We can do this in place if `buffer` was mutable more smartly, but replace is fine.
-            // `buffer.retain` is efficient.
             buffer.retain(|c| c != ',');
         }
     }
     
-    Ok(buffer)
+    Ok(Cow::Owned(buffer))
 }
 
 /// Normalizes Arabic numerals to ASCII digits.

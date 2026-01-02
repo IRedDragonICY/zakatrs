@@ -37,6 +37,14 @@ impl ZakatLocale {
     pub fn to_icu_locale(&self) -> Locale {
         self.as_str().parse().expect("Valid BCP-47 locale")
     }
+
+    pub fn currency_code(&self) -> &'static str {
+        match self {
+            ZakatLocale::EnUS => "USD",
+            ZakatLocale::IdID => "IDR",
+            ZakatLocale::ArSA => "SAR",
+        }
+    }
 }
 
 impl FromStr for ZakatLocale {
@@ -61,13 +69,12 @@ impl CurrencyFormatter for ZakatLocale {
         let locale = self.to_icu_locale();
         
         // Use ICU4X FixedDecimalFormatter with compiled data
+        // TODO: Use icu::experimental::currency::CurrencyFormatter when available in crates.io
         let options = FixedDecimalFormatterOptions::default();
         let formatter = FixedDecimalFormatter::try_new(&locale.into(), options)
             .expect("Failed to create ICU formatter with compiled data");
 
         // Convert Decimal to FixedDecimal
-        // Using string format is the most robust way to ensure simple conversion
-        // without manually handling mantissa/scale differences.
         let amount_str = amount.to_string();
         let fixed_decimal = FixedDecimal::from_str(&amount_str)
             .unwrap_or_else(|_| FixedDecimal::from(0));
@@ -75,11 +82,10 @@ impl CurrencyFormatter for ZakatLocale {
         let formatted_number = formatter.format(&fixed_decimal);
         let number_str = formatted_number.write_to_string().into_owned();
 
-        // ICU4X 1.4 doesn't have a stable CurrencyFormatter yet, so we append symbols manually
-        // conforming to the locale's common practice.
+        // Manual fallback for currency symbols
         match self {
             ZakatLocale::EnUS => format!("${}", number_str),
-            ZakatLocale::IdID => format!("Rp{}", number_str),
+            ZakatLocale::IdID => format!("Rp{}", number_str), // Often Rp 1.234, but standard without space is sometimes used, keeping consistent
             ZakatLocale::ArSA => format!("{} ر.س", number_str),
         }
     }
@@ -157,5 +163,40 @@ impl Translator {
 
 pub fn default_translator() -> Translator {
     Translator::new()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn test_currency_formatting() {
+        let amount = dec!(1234.56);
+
+        // Test EnUS
+        let us = ZakatLocale::EnUS;
+        let res_us = us.format_currency(amount);
+        println!("EnUS: {}", res_us);
+        assert!(res_us.contains("$") || res_us.contains("US$"));
+        assert!(res_us.contains("1,234.56"));
+
+        // Test IdID
+        let id = ZakatLocale::IdID;
+        let res_id = id.format_currency(amount);
+        println!("IdID: {}", res_id);
+        // Expect: "Rp 1.234,56" or similar
+        assert!(res_id.contains("Rp"));
+        // Note: ICU might use non-breaking space or similar, so we check for components
+        assert!(res_id.contains("1.234,56"));
+
+        // Test ArSA
+        let ar = ZakatLocale::ArSA;
+        let res_ar = ar.format_currency(amount);
+        println!("ArSA: {}", res_ar);
+        // 1234.56 -> ١٬٢٣٤٫٥٦
+        assert!(res_ar.contains("١"));
+        assert!(res_ar.contains("ر.س") || res_ar.contains("SAR"));
+    }
 }
 

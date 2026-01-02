@@ -1,14 +1,15 @@
 //! SQLite-based persistence for Zakat Ledger events.
 //!
-//! This module provides a production-ready `SqliteLedgerStore` implementation
+//! This module provides a production-ready `SqliteStore` implementation
 //! that persists ledger events to a SQLite database using `sqlx`.
 //!
 //! # Example
 //!
 //! ```ignore
-//! use zakat::ledger::sqlite::SqliteLedgerStore;
+//! use zakat::ledger::sqlite::SqliteStore;
+//! use zakat::ledger::persistence::LedgerStore;
 //!
-//! let store = SqliteLedgerStore::connect("sqlite:ledger.db?mode=rwc").await?;
+//! let store = SqliteStore::new("sqlite::memory:").await?;
 //! store.save_event(&event).await?;
 //! let events = store.load_events().await?;
 //! ```
@@ -22,22 +23,27 @@ use super::events::{LedgerEvent, TransactionType};
 /// A SQLite-backed implementation of `LedgerStore`.
 ///
 /// Uses connection pooling via `sqlx::SqlitePool` for efficient concurrent access.
-pub struct SqliteLedgerStore {
+pub struct SqliteStore {
     pool: SqlitePool,
 }
 
-impl SqliteLedgerStore {
-    /// Connects to a SQLite database and ensures the schema is initialized.
+impl SqliteStore {
+    /// Creates a new SQLite store and ensures the schema is initialized.
     ///
     /// # Arguments
-    /// * `url` - SQLite connection URL (e.g., `"sqlite:ledger.db?mode=rwc"`)
+    /// * `db_url` - SQLite connection URL (e.g., `"sqlite::memory:"` or `"sqlite:ledger.db?mode=rwc"`)
     ///
     /// # Errors
     /// Returns `ZakatError::NetworkError` if connection or migration fails.
-    pub async fn connect(url: &str) -> Result<Self, ZakatError> {
+    ///
+    /// # Example
+    /// ```ignore
+    /// let store = SqliteStore::new("sqlite::memory:").await?;
+    /// ```
+    pub async fn new(db_url: &str) -> Result<Self, ZakatError> {
         let pool = SqlitePoolOptions::new()
             .max_connections(5)
-            .connect(url)
+            .connect(db_url)
             .await
             .map_err(|e| ZakatError::NetworkError(format!("SQLite connection error: {}", e)))?;
 
@@ -46,9 +52,9 @@ impl SqliteLedgerStore {
         Ok(store)
     }
 
-    /// Creates a new `SqliteLedgerStore` from an existing pool.
+    /// Creates a new `SqliteStore` from an existing pool.
     ///
-    /// Note: This does NOT run migrations. Use `connect()` for automatic schema setup.
+    /// Note: This does NOT run migrations. Use `new()` for automatic schema setup.
     pub fn from_pool(pool: SqlitePool) -> Self {
         Self { pool }
     }
@@ -81,7 +87,7 @@ impl SqliteLedgerStore {
 }
 
 #[async_trait]
-impl super::persistence::LedgerStore for SqliteLedgerStore {
+impl super::persistence::LedgerStore for SqliteStore {
     async fn save_event(&self, event: &LedgerEvent) -> Result<(), ZakatError> {
         let id = event.id.to_string();
         let date = event.date.format("%Y-%m-%d").to_string();
@@ -171,7 +177,7 @@ fn make_serialize_error(field: &str, error: &str) -> ZakatError {
         args: Some(std::collections::HashMap::from([
             ("error".to_string(), error.to_string()),
         ])),
-        source_label: Some("SqliteLedgerStore".to_string()),
+        source_label: Some("SqliteStore".to_string()),
         asset_id: None,
     }))
 }
@@ -184,7 +190,7 @@ fn make_parse_error(field: &str, value: &str, error: &str) -> ZakatError {
         args: Some(std::collections::HashMap::from([
             ("error".to_string(), error.to_string()),
         ])),
-        source_label: Some("SqliteLedgerStore".to_string()),
+        source_label: Some("SqliteStore".to_string()),
         asset_id: None,
     }))
 }
@@ -199,7 +205,7 @@ mod tests {
     #[tokio::test]
     async fn test_sqlite_store_roundtrip() {
         // Use in-memory SQLite for testing
-        let store = SqliteLedgerStore::connect("sqlite::memory:")
+        let store = SqliteStore::new("sqlite::memory:")
             .await
             .expect("Failed to connect to in-memory SQLite");
 
@@ -227,7 +233,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sqlite_store_ordered_by_date() {
-        let store = SqliteLedgerStore::connect("sqlite::memory:")
+        let store = SqliteStore::new("sqlite::memory:")
             .await
             .expect("Failed to connect");
 
@@ -260,7 +266,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_sqlite_store_wealth_type_other() {
-        let store = SqliteLedgerStore::connect("sqlite::memory:")
+        let store = SqliteStore::new("sqlite::memory:")
             .await
             .expect("Failed to connect");
 

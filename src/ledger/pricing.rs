@@ -7,6 +7,15 @@ use crate::types::{ZakatError, ErrorDetails};
 
 pub trait HistoricalPriceProvider {
     fn get_nisab_threshold(&self, date: NaiveDate) -> Result<Decimal, ZakatError>;
+
+    /// Returns the date of the next price update after the given date.
+    /// Returns None if there are no known future price changes (implies constant price indefinitely).
+    /// Returns Some(date) if the price changes on `date`.
+    fn next_price_change(&self, after: NaiveDate) -> Option<NaiveDate> {
+        // Default implementation: assumes we don't know, so we can't optimize skipping.
+        // Returning Some(after + 1) would force daily checks, which is safe.
+        Some(after + chrono::Duration::days(1))
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -45,5 +54,13 @@ impl HistoricalPriceProvider for InMemoryPriceHistory {
                 source_label: Some("HistoricalPriceProvider".to_string()),
                 asset_id: None
             })))
+    }
+
+    fn next_price_change(&self, after: NaiveDate) -> Option<NaiveDate> {
+        use std::ops::Bound;
+        // Find the first key strictly greater than 'after'
+        self.prices.range((Bound::Excluded(after), Bound::Unbounded))
+            .next()
+            .map(|(date, _)| *date)
     }
 }

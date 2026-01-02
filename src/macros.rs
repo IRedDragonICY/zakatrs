@@ -138,7 +138,20 @@ macro_rules! zakat_asset {
             pub fn get_id(&self) -> uuid::Uuid { self.id }
             
             /// Returns the optional label of the asset.
+            /// Returns the optional label of the asset.
             pub fn get_label(&self) -> Option<String> { self.label.clone() }
+        }
+
+        impl $crate::traits::TemporalAsset for $name {
+            fn with_acquisition_date(mut self, date: chrono::NaiveDate) -> Self {
+                self.acquisition_date = Some(date);
+                self
+            }
+
+            fn with_hawl_satisfied(mut self, satisfied: bool) -> Self {
+                self.hawl_satisfied = satisfied;
+                self
+            }
         }
     };
 }

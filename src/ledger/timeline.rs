@@ -43,7 +43,13 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
     // We need an iterator for events
     let mut event_iter = sorted_events.into_iter().peekable();
     
+    // Use an option to track the last known nisab to avoid fetching if not needed,
+    // though for now we simplify to fetching or jumping.
+    let mut current_nisab;
+
     while current_date <= end_date {
+        let mut balance_changed = false;
+
         // Process all events for the current day
         while let Some(event) = event_iter.peek() {
             if event.date == current_date {
@@ -63,7 +69,7 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
                     Deposit | Income | Profit => current_balance += event.amount,
                     Withdrawal | Expense | Loss => current_balance -= event.amount,
                 }
-                
+                balance_changed = true;
                 event_iter.next();
             } else if event.date < current_date {
                 // Should not happen if sorted and logic is correct, but safe to consume
@@ -74,15 +80,80 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
             }
         }
         
-        // Fail if price provider fails
-        let nisab_threshold = price_provider.get_nisab_threshold(current_date)?;
+        // Update Nisab only if we suspect a change (or just fetch it if we jumped)
+        // But since we track price changes via looking ahead, we can rely on cached value
+        // UNLESS this is a "jump target" day where things might have changed.
+        // Safest is to fetch on the days we explicitly visit loops, 
+        // OR rely on the jump logic to essentially guarantee we stop ON key dates.
         
+        // Here we just fetch it for correct current state
+        if balance_changed {
+             // If we just processed events, or if we just landed here, 
+             // we need to make sure nisab is correct for "today".
+             // Since we might have jumped, let's refresh.
+            current_nisab = price_provider.get_nisab_threshold(current_date)?;
+        } else {
+            // Check if today IS a price change day?
+            // Expensive to check 'is today a change?'.
+            // Prefer: get standard value.
+             current_nisab = price_provider.get_nisab_threshold(current_date)?;
+        }
+        
+        // Push result for TODAY
         timeline.push(DailyBalance {
             date: current_date,
             balance: current_balance,
-            nisab_threshold,
-            is_above_nisab: current_balance >= nisab_threshold,
+            nisab_threshold: current_nisab,
+            is_above_nisab: current_balance >= current_nisab,
         });
+
+        // TIME JUMP LOGIC
+        // Determine the next interesting date
+        let next_event_date = event_iter.peek().map(|e| e.date).unwrap_or(end_date + Duration::days(1));
+        
+        // Use optimized next_price_change lookup
+        // If returns None, it means no more changes -> Infinity
+        let next_price_date = price_provider.next_price_change(current_date)
+            .unwrap_or(end_date + Duration::days(1));
+            
+        let jump_target = std::cmp::min(next_event_date, next_price_date);
+        
+        // We can fill days from (current_date + 1) up to min(jump_target, end_date + 1)
+        // Strictly less than jump_target because on jump_target something distinct happens that we want to process in main loop.
+        
+        let fill_until = std::cmp::min(jump_target, end_date + Duration::days(1));
+        
+        // Ensure we don't go backwards
+        if fill_until > current_date + Duration::days(1) {
+            let days_to_fill = (fill_until - (current_date + Duration::days(1))).num_days();
+            
+            if days_to_fill > 0 {
+                // Pre-calculate the entry to reuse
+                let entry = DailyBalance {
+                    date: current_date, // placeholder, updated in loop
+                    balance: current_balance,
+                    nisab_threshold: current_nisab,
+                    is_above_nisab: current_balance >= current_nisab,
+                };
+                
+                // Reserve space to avoid reallocs
+                timeline.reserve(days_to_fill as usize);
+                
+                // Efficiently extend
+                for i in 1..=days_to_fill {
+                    let d = current_date + Duration::days(i);
+                    // Check strict boundary
+                    if d > end_date { break; } 
+                    
+                    let mut e = entry.clone();
+                    e.date = d;
+                    timeline.push(e);
+                }
+                
+                // Advance current_date
+                current_date += Duration::days(days_to_fill);
+            }
+        }
         
         current_date += Duration::days(1);
     }

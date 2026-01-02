@@ -9,6 +9,11 @@ pub fn init_app() {
     flutter_rust_bridge::setup_default_user_utils();
 }
 
+#[frb(sync)]
+pub fn validate_input_string(s: String) -> bool {
+    zakat::inputs::validate_numeric_format(&s)
+}
+
 // --- Data Types ---
 
 /// A wrapper around rust_decimal::Decimal to be used across the FFI boundary.
@@ -19,7 +24,8 @@ pub struct FrbDecimal(Decimal);
 impl FrbDecimal {
     #[frb(sync)]
     pub fn from_string(s: String) -> Result<Self> {
-        let d = Decimal::from_str(&s).map_err(|e| anyhow::anyhow!("Invalid decimal: {}", e))?;
+        let d = zakat::inputs::IntoZakatDecimal::into_zakat_decimal(s.as_str())
+            .map_err(|e| anyhow::anyhow!("Invalid decimal format '{}': {}", s, e))?;
         Ok(Self(d))
     }
 

@@ -149,21 +149,44 @@ pub struct BinancePriceProvider {
 
 #[cfg(feature = "live-pricing")]
 impl BinancePriceProvider {
-    /// Creates a new provider with automatic DNS bypass ("Internet Baik" proof).
+    /// Creates a new provider with resilient connection logic.
     ///
-    /// This uses a known Cloudfront IP (18.64.23.181) for `api.binance.com` to bypass
-    /// local DNS poisoning/blocking commonly found in Indonesia and other regions.
-    pub fn new() -> Self {
-        // Known Cloudfront IP for api.binance.com (Verified 2026-01-02 via Google DoH)
-        // This maps api.binance.com directly to 18.64.23.181, bypassing local DNS.
-        let bypass_ip = std::net::SocketAddr::from(([18, 64, 23, 181], 443));
-        
+    /// - Uses `config.binance_api_ip` if provided.
+    /// - Otherwise, attempts standard DNS resolution.
+    /// - Falls back to hardcoded Cloudfront IP (18.64.23.181) if DNS fails or `force-dns-bypass` is enabled.
+    pub fn new(config: &crate::config::NetworkConfig) -> Self {
+        let mut builder = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(config.timeout_seconds));
+
+        let use_hardcoded = if let Some(ip) = config.binance_api_ip {
+             let socket = std::net::SocketAddr::new(ip, 443);
+             builder = builder.resolve("api.binance.com", socket);
+             false
+        } else {
+             // Check if we should force bypass via feature flag (if we had one) or check DNS
+             // For now, check real DNS.
+             use std::net::ToSocketAddrs;
+             
+             // Check if "api.binance.com" resolves.
+             // Note: This is a blocking call. In async context this might block the thread, 
+             // but it's during initialization (creation).
+             #[cfg(feature = "force-dns-bypass")]
+             let dns_blocked = true;
+             
+             #[cfg(not(feature = "force-dns-bypass"))]
+             let dns_blocked = ("api.binance.com", 443).to_socket_addrs().is_err();
+             
+             dns_blocked
+        };
+
+        if use_hardcoded {
+             tracing::warn!("Binance DNS resolution failed or forced bypass; using hardcoded Cloudfront IP");
+             let bypass_ip = std::net::SocketAddr::from(([18, 64, 23, 181], 443));
+             builder = builder.resolve("api.binance.com", bypass_ip);
+        }
+
         Self {
-            client: reqwest::Client::builder()
-                .resolve("api.binance.com", bypass_ip)
-                .timeout(std::time::Duration::from_secs(10))
-                .build()
-                .unwrap_or_default(),
+            client: builder.build().unwrap_or_default(),
         }
     }
 }
@@ -171,7 +194,7 @@ impl BinancePriceProvider {
 #[cfg(feature = "live-pricing")]
 impl Default for BinancePriceProvider {
     fn default() -> Self {
-        Self::new()
+        Self::new(&crate::config::NetworkConfig::default())
     }
 }
 

@@ -42,6 +42,29 @@ pub struct ZakatConfig {
 
     #[serde(skip, default = "crate::i18n::default_translator")]
     pub translator: crate::i18n::Translator,
+
+    #[serde(default)]
+    pub networking: NetworkConfig,
+}
+
+/// Networking configuration for external API calls
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkConfig {
+    /// Optional direct IP for Binance API to bypass DNS issues.
+    /// If None, standard DNS resolution is used.
+    pub binance_api_ip: Option<std::net::IpAddr>,
+    
+    /// Request timeout in seconds. Default: 30.
+    pub timeout_seconds: u64,
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        Self {
+            binance_api_ip: None,
+            timeout_seconds: 30,
+        }
+    }
 }
 
 // Manual Debug impl since Arc<dyn Trait> doesn't auto-derive Debug
@@ -73,6 +96,7 @@ impl Default for ZakatConfig {
 
             locale: crate::i18n::ZakatLocale::default(),
             translator: crate::i18n::default_translator(),
+            networking: NetworkConfig::default(),
         }
     }
 }

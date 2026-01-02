@@ -7,6 +7,12 @@ pub trait ZakatConfigArgument {
     fn resolve_config(&self) -> Cow<'_, ZakatConfig>;
 }
 
+/// Trait for assets that track acquisition time (Hawl).
+pub trait TemporalAsset {
+    fn with_acquisition_date(self, date: chrono::NaiveDate) -> Self;
+    fn with_hawl_satisfied(self, satisfied: bool) -> Self;
+}
+
 // 1. Support passing &ZakatConfig directly
 impl ZakatConfigArgument for &ZakatConfig {
     fn resolve_config(&self) -> Cow<'_, ZakatConfig> {

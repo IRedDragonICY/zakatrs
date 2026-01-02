@@ -14,6 +14,11 @@ pub struct PyZakatConfig {
 
 #[pymethods]
 impl PyZakatConfig {
+    #[staticmethod]
+    fn is_valid_input(val: &str) -> bool {
+        crate::inputs::validate_numeric_format(val)
+    }
+
     #[new]
     #[pyo3(signature = (gold_price, silver_price, rice_price_kg=None, rice_price_liter=None))]
     pub fn new(
@@ -22,22 +27,23 @@ impl PyZakatConfig {
         rice_price_kg: Option<&str>,
         rice_price_liter: Option<&str>,
     ) -> PyResult<Self> {
-        let gold = gold_price.parse::<Decimal>()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid gold price: {}", e)))?;
-        let silver = silver_price.parse::<Decimal>()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid silver price: {}", e)))?;
+        use crate::inputs::IntoZakatDecimal;
+        let gold = gold_price.into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid gold price '{}': {}", gold_price, e)))?;
+        let silver = silver_price.into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid silver price '{}': {}", silver_price, e)))?;
 
         let mut config = ZakatConfig::hanafi(gold, silver);
 
         if let Some(price) = rice_price_kg {
-             let p = Decimal::from_str(&price)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid rice price (kg): {}", e)))?;
+             let p = price.into_zakat_decimal()
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid rice price (kg) '{}': {}", price, e)))?;
              config = config.with_rice_price_per_kg(p);
         }
         
         if let Some(price) = rice_price_liter {
-             let p = Decimal::from_str(&price)
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid rice price (liter): {}", e)))?;
+             let p = price.into_zakat_decimal()
+                .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid rice price (liter) '{}': {}", price, e)))?;
              config = config.with_rice_price_per_liter(p);
         }
 
@@ -170,10 +176,18 @@ pub struct PyPreciousMetals {
 
 #[pymethods]
 impl PyPreciousMetals {
+    #[staticmethod]
+    fn is_valid_input(val: &str) -> bool {
+        crate::inputs::validate_numeric_format(val)
+    }
+
     #[new]
     #[pyo3(signature = (weight="0", metal_type="gold", purity=24))]
     fn new(weight: &str, metal_type: &str, purity: u32) -> PyResult<Self> {
-        let w = weight.parse::<Decimal>().unwrap_or(Decimal::ZERO);
+        use crate::inputs::IntoZakatDecimal;
+        let w = weight.into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid weight '{}': {}", weight, e)))?;
+        
         let metal = match metal_type.to_lowercase().as_str() {
             "silver" => crate::maal::precious_metals::PreciousMetals::silver(w),
             _ => crate::maal::precious_metals::PreciousMetals::gold(w).purity(purity),
@@ -200,13 +214,23 @@ pub struct PyBusinessZakat {
 
 #[pymethods]
 impl PyBusinessZakat {
+    #[staticmethod]
+    fn is_valid_input(val: &str) -> bool {
+        crate::inputs::validate_numeric_format(val)
+    }
+
     #[new]
     #[pyo3(signature = (cash="0", merchandise="0", receivables="0", liabilities="0"))]
     fn new(cash: &str, merchandise: &str, receivables: &str, liabilities: &str) -> PyResult<Self> {
-        let c = cash.parse::<Decimal>().unwrap_or(Decimal::ZERO);
-        let m = merchandise.parse::<Decimal>().unwrap_or(Decimal::ZERO);
-        let r = receivables.parse::<Decimal>().unwrap_or(Decimal::ZERO);
-        let l = liabilities.parse::<Decimal>().unwrap_or(Decimal::ZERO);
+        use crate::inputs::IntoZakatDecimal;
+        let c = cash.into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid cash '{}': {}", cash, e)))?;
+        let m = merchandise.into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid merchandise '{}': {}", merchandise, e)))?;
+        let r = receivables.into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid receivables '{}': {}", receivables, e)))?;
+        let l = liabilities.into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid liabilities '{}': {}", liabilities, e)))?;
         
         Ok(PyBusinessZakat {
             inner: crate::maal::business::BusinessZakat::new()
@@ -234,10 +258,18 @@ pub struct PyInvestmentAssets {
 
 #[pymethods]
 impl PyInvestmentAssets {
+    #[staticmethod]
+    fn is_valid_input(val: &str) -> bool {
+        crate::inputs::validate_numeric_format(val)
+    }
+
     #[new]
     #[pyo3(signature = (value="0", investment_type="stock", hawl_satisfied=true))]
     fn new(value: &str, investment_type: &str, hawl_satisfied: bool) -> PyResult<Self> {
-        let v = value.parse::<Decimal>().unwrap_or(Decimal::ZERO);
+        use crate::inputs::IntoZakatDecimal;
+        let v = value.into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid value '{}': {}", value, e)))?;
+        
         let kind = match investment_type.to_lowercase().as_str() {
             "crypto" => crate::maal::investments::InvestmentType::Crypto,
             "mutualfund" | "mutual_fund" => crate::maal::investments::InvestmentType::MutualFund,
@@ -269,11 +301,19 @@ pub struct PyIncomeZakatCalculator {
 
 #[pymethods]
 impl PyIncomeZakatCalculator {
+    #[staticmethod]
+    fn is_valid_input(val: &str) -> bool {
+        crate::inputs::validate_numeric_format(val)
+    }
+
     #[new]
     #[pyo3(signature = (income, expenses="0", method="gross"))]
     fn new(income: &str, expenses: &str, method: &str) -> PyResult<Self> {
-        let i = income.parse::<Decimal>().unwrap_or(Decimal::ZERO);
-        let e = expenses.parse::<Decimal>().unwrap_or(Decimal::ZERO);
+        use crate::inputs::IntoZakatDecimal;
+        let i = income.into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid income '{}': {}", income, e)))?;
+        let e = expenses.into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid expenses '{}': {}", expenses, e)))?;
         
         let m = match method.to_lowercase().as_str() {
             "net" => crate::maal::income::IncomeCalculationMethod::Net,

@@ -79,7 +79,17 @@ impl_into_zakat_decimal_float!(f32, f64);
 /// - `"١٢٣٤.٥٠"` → `"1234.50"` (Eastern Arabic numerals)
 ///
 /// Negative numbers and decimal points are preserved.
-/// Negative numbers and decimal points are preserved.
+/// Validates if a string can be parsed into a Zakat Decimal.
+///
+/// This is useful for UI layers (Python, Dart, JS) to "Try Parse" before sending data.
+pub fn validate_numeric_format(s: &str) -> bool {
+    let sanitized = match sanitize_numeric_string(s) {
+        Ok(s) => s,
+        Err(_) => return false,
+    };
+    Decimal::from_str(&sanitized).is_ok()
+}
+
 /// Sanitizes a numeric string by removing common formatting characters.
 /// 
 /// This function handles:
@@ -98,7 +108,7 @@ impl_into_zakat_decimal_float!(f32, f64);
 /// - `"١٢٣٤.٥٠"` → `"1234.50"` (Eastern Arabic numerals)
 ///
 /// Negative numbers and decimal points are preserved.
-fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
+pub fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
     if s.len() > MAX_INPUT_LEN {
         return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
             field: "input".to_string(),

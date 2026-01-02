@@ -17,6 +17,7 @@
 use rust_decimal::Decimal;
 use crate::types::{ZakatDetails, ZakatError, WealthType, ErrorDetails, InvalidInputDetails};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
+use crate::utils::WeightUnit;
 
 
 use crate::inputs::IntoZakatDecimal;
@@ -90,6 +91,25 @@ impl PreciousMetals {
             Err(e) => self._input_errors.push(e),
         }
         self
+    }
+
+    /// Sets the weight using a specific unit.
+    pub fn weight_in(mut self, weight: impl IntoZakatDecimal, unit: WeightUnit) -> Self {
+         match weight.into_zakat_decimal() {
+            Ok(v) => self.weight_grams = unit.to_grams(v),
+            Err(e) => self._input_errors.push(e),
+        }
+        self
+    }
+
+    /// Sets the weight in Tola.
+    pub fn weight_tola(self, weight: impl IntoZakatDecimal) -> Self {
+        self.weight_in(weight, WeightUnit::Tola)
+    }
+
+    /// Sets the weight in Troy Ounces.
+    pub fn weight_ounce(self, weight: impl IntoZakatDecimal) -> Self {
+        self.weight_in(weight, WeightUnit::TroyOunce)
     }
 
     pub fn metal_type(mut self, metal_type: WealthType) -> Self {
@@ -439,5 +459,16 @@ mod tests {
         // Check calculation trace contains purity info
         let trace_str = format!("{:?}", zakat_high.calculation_trace);
         assert!(trace_str.contains("Silver Purity Adjustment"));
+    }
+
+    #[test]
+    fn test_weight_units_api() {
+        let metal_tola = PreciousMetals::new().weight_tola(10.0);
+        // 10 Tola * 11.66 = 116.6g
+        assert_eq!(metal_tola.weight_grams, dec!(116.6));
+
+        let metal_ounce = PreciousMetals::new().weight_ounce(10.0);
+        // 10 Ounce * 31.1034768 = 311.034768g
+        assert_eq!(metal_ounce.weight_grams, dec!(311.034768));
     }
 }

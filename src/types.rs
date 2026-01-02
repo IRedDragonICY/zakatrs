@@ -284,6 +284,11 @@ pub struct ZakatExplanation {
     pub status: String,
     /// The amount of Zakat due.
     pub amount_due: Decimal,
+    // [NEW] Unified View Model Fields
+    pub formatted_total: String,
+    pub formatted_due: String,
+    pub nisab_progress: f64,
+    pub currency_code: String,
     /// Step-by-step calculation steps.
     pub steps: Vec<CalculationStep>,
     /// Non-fatal warnings about the calculation.
@@ -516,7 +521,9 @@ impl ZakatDetails {
     /// Converts this ZakatDetails into a structured `ZakatExplanation`.
     ///
     /// This is preferred for API consumers who want to render their own UI.
-    pub fn to_explanation(&self) -> ZakatExplanation {
+    pub fn to_explanation(&self, config: &crate::config::ZakatConfig) -> ZakatExplanation {
+        use crate::i18n::CurrencyFormatter; // Ensure trait is in scope for .format_currency()
+
         let label = self.label.clone().unwrap_or_else(|| "Asset".to_string());
         let wealth_type = format!("{:?}", self.wealth_type);
         let status = if self.is_payable { "PAYABLE".to_string() } else { "EXEMPT".to_string() };
@@ -526,11 +533,24 @@ impl ZakatDetails {
             notes.push(reason.clone());
         }
 
+        // Calculate Nisab Progress (0.0 to 1.0)
+        let nisab_progress = if self.nisab_threshold > Decimal::ZERO {
+            use rust_decimal::prelude::ToPrimitive;
+            let ratio = (self.net_assets / self.nisab_threshold).to_f64().unwrap_or(0.0);
+            ratio.clamp(0.0, 1.0)
+        } else {
+            1.0 // If nisab is 0, everything is zakatable -> 100% progress
+        };
+
         ZakatExplanation {
             label,
             wealth_type,
             status,
             amount_due: self.zakat_due,
+            formatted_total: config.locale.format_currency(self.total_assets),
+            formatted_due: config.locale.format_currency(self.zakat_due),
+            nisab_progress,
+            currency_code: config.locale.currency_code().to_string(),
             steps: self.calculation_trace.0.clone(),
             warnings: self.warnings.clone(),
             notes,

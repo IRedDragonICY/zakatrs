@@ -140,15 +140,12 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
                 timeline.reserve(days_to_fill as usize);
                 
                 // Efficiently extend
-                for i in 1..=days_to_fill {
-                    let d = current_date + Duration::days(i);
-                    // Check strict boundary
-                    if d > end_date { break; } 
-                    
+                // Efficiently extend using iterator to allow bulk allocation
+                timeline.extend((1..=days_to_fill).map(|i| {
                     let mut e = entry.clone();
-                    e.date = d;
-                    timeline.push(e);
-                }
+                    e.date = current_date + Duration::days(i);
+                    e
+                }));
                 
                 // Advance current_date
                 current_date += Duration::days(days_to_fill);
@@ -210,5 +207,33 @@ mod tests {
         // Count days below nisab (June 1, 2, 3, 4) -> 4 days
         let days_below = timeline.iter().filter(|d| !d.is_above_nisab).count();
         assert_eq!(days_below, 4);
+    }
+
+    #[test]
+    fn test_performance_100_years() {
+        // 100 Years of silence.
+        // Should be instant due to jump logic.
+        // If O(Days), it would iterate ~36,500 times. Not slow, but jump logic makes it O(1).
+        
+        let start_date = NaiveDate::from_ymd_opt(2000, 1, 1).unwrap();
+        let end_date = NaiveDate::from_ymd_opt(2100, 1, 1).unwrap();
+        
+        let events = vec![
+            LedgerEvent::new(start_date, dec!(10000), crate::types::WealthType::Business, TransactionType::Deposit, None),
+        ]; // No other events
+        
+        // Mock price history with just one entry
+        let mut prices = InMemoryPriceHistory::new();
+        prices.add_price(start_date, dec!(1000));
+        
+        let start = std::time::Instant::now();
+        let timeline = simulate_timeline(events, &prices, start_date, end_date).expect("Simulation failed");
+        let duration = start.elapsed();
+        
+        println!("100 Years Simulation took: {:?}", duration);
+        
+        let days = (end_date - start_date).num_days() + 1;
+        assert_eq!(timeline.len() as i64, days);
+        assert!(duration.as_millis() < 500, "Simulation took too long: {:?} (Expected < 500ms)", duration);
     }
 }

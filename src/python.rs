@@ -3,7 +3,7 @@ use rust_decimal::Decimal;
 use std::str::FromStr;
 use crate::config::ZakatConfig;
 use crate::types::WealthType;
-use pyo3::types::PyAny;
+use pyo3::types::{PyAny, PyDict};
 
 /// Python wrapper for ZakatConfig
 #[pyclass(name = "ZakatConfig")]
@@ -140,10 +140,15 @@ impl PyZakatDetails {
     
     /// Returns the data as a Python dictionary
     fn to_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
-        let json_str = serde_json::to_string(&self.inner)
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-        let dict = py.import("json")?.call_method1("loads", (json_str,))?;
-        Ok(dict.unbind())
+        let dict = PyDict::new(py);
+        dict.set_item("wealth_type", self.get_wealth_type())?;
+        dict.set_item("net_assets", self.inner.net_assets.to_string())?;
+        dict.set_item("zakat_due", self.inner.zakat_due.to_string())?;
+        dict.set_item("total_assets", self.inner.total_assets.to_string())?;
+        dict.set_item("is_payable", self.inner.is_payable)?;
+        dict.set_item("nisab_threshold", self.inner.nisab_threshold.to_string())?;
+        dict.set_item("status_reason", self.inner.status_reason.clone())?;
+        Ok(dict.into())
     }
     
     fn __repr__(&self) -> String {
@@ -347,10 +352,10 @@ impl PyPortfolioResult {
     }
     
     fn to_dict(&self, py: Python) -> PyResult<Py<PyAny>> {
-         let json_str = serde_json::to_string(&self.inner)
-            .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(e.to_string()))?;
-        let dict = py.import("json")?.call_method1("loads", (json_str,))?;
-        Ok(dict.unbind())
+        let dict = PyDict::new(py);
+        dict.set_item("total_zakat_due", self.inner.total_zakat_due.to_string())?;
+        dict.set_item("total_assets", self.inner.total_assets.to_string())?;
+        Ok(dict.into())
     }
 }
 

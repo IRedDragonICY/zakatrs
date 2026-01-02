@@ -96,6 +96,19 @@ impl ZakatConfig {
         Self::default()
     }
 
+    /// Creates a configuration with default values suitable for testing.
+    /// 
+    /// This sets arbitrary valid prices so that `validate()` passes immediately,
+    /// removing friction for quick prototypes.
+    /// 
+    /// Prices: Gold=$85.0, Silver=$1.0. Nisab Standard: Gold.
+    pub fn test_default() -> Self {
+        Self::new()
+            .with_gold_price(dec!(85.0))
+            .with_silver_price(dec!(1.0))
+            .with_nisab_standard(NisabStandard::Gold)
+    }
+
     /// Creates a pre-configured ZakatConfig for the Hanafi Madhab.
     /// Sets strategy to Hanafi and Nisab standard to LowerOfTwo (typically Silver).
     pub fn hanafi(gold_price: impl IntoZakatDecimal, silver_price: impl IntoZakatDecimal) -> Self {

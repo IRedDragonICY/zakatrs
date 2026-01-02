@@ -10,6 +10,8 @@ use rust_decimal::prelude::ToPrimitive;
 pub enum KotlinZakatError {
     /// Failed to parse a decimal value from string input.
     ParseError { field: String, message: String },
+    /// Error during Zakat calculation.
+    CalculationError { reason: String },
 }
 
 impl std::fmt::Display for KotlinZakatError {
@@ -17,6 +19,9 @@ impl std::fmt::Display for KotlinZakatError {
         match self {
             Self::ParseError { field, message } => {
                 write!(f, "Failed to parse '{}': {}", field, message)
+            }
+            Self::CalculationError { reason } => {
+                write!(f, "Calculation error: {}", reason)
             }
         }
     }
@@ -89,7 +94,7 @@ impl KotlinBusinessZakat {
         }))
     }
 
-    pub fn calculate(&self, config: Arc<KotlinConfigWrapper>) -> f64 {
+    pub fn calculate(&self, config: Arc<KotlinConfigWrapper>) -> Result<f64, KotlinZakatError> {
         let business = BusinessZakat::new()
             .cash(self.cash)
             .inventory(self.merchandise)
@@ -97,10 +102,10 @@ impl KotlinBusinessZakat {
             .debt(self.debt)
             .liabilities(self.expenses);
             
-        match business.calculate_zakat(&config.inner) {
-            Ok(result) => result.zakat_due.to_f64().unwrap_or(0.0),
-            Err(_) => 0.0
-        }
+        let result = business.calculate_zakat(&config.inner)
+            .map_err(|e| KotlinZakatError::CalculationError { reason: e.to_string() })?;
+            
+        Ok(result.zakat_due.to_f64().unwrap_or(0.0))
     }
 }
 
@@ -121,27 +126,27 @@ impl KotlinPreciousMetals {
         }))
     }
 
-    pub fn calculate(&self, config: Arc<KotlinConfigWrapper>) -> f64 {
+    pub fn calculate(&self, config: Arc<KotlinConfigWrapper>) -> Result<f64, KotlinZakatError> {
         let mut total_zakat = Decimal::ZERO;
 
         if self.gold_grams > Decimal::ZERO {
             let metals = PreciousMetals::new()
                 .weight(self.gold_grams)
                 .metal_type(WealthType::Gold);
-            if let Ok(res) = metals.calculate_zakat(&config.inner) {
-                total_zakat += res.zakat_due;
-            }
+            let res = metals.calculate_zakat(&config.inner)
+                .map_err(|e| KotlinZakatError::CalculationError { reason: e.to_string() })?;
+            total_zakat += res.zakat_due;
         }
 
         if self.silver_grams > Decimal::ZERO {
             let metals = PreciousMetals::new()
                 .weight(self.silver_grams)
                 .metal_type(WealthType::Silver);
-            if let Ok(res) = metals.calculate_zakat(&config.inner) {
-                total_zakat += res.zakat_due;
-            }
+            let res = metals.calculate_zakat(&config.inner)
+                .map_err(|e| KotlinZakatError::CalculationError { reason: e.to_string() })?;
+            total_zakat += res.zakat_due;
         }
 
-        total_zakat.to_f64().unwrap_or(0.0)
+        Ok(total_zakat.to_f64().unwrap_or(0.0))
     }
 }

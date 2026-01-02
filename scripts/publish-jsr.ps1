@@ -12,8 +12,13 @@ if (Test-Path "jsr-config") {
     Copy-Item -Path "pkg/zakat.js" -Destination "jsr-config/" -Force
     Copy-Item -Path "pkg/zakat_bg.wasm" -Destination "jsr-config/" -Force
     Copy-Item -Path "pkg/zakat.d.ts" -Destination "jsr-config/" -Force
+    Copy-Item -Path "pkg/zakat.d.ts" -Destination "jsr-config/" -Force
     # Copy bg type definitions if needed
     Copy-Item -Path "pkg/zakat_bg.wasm.d.ts" -Destination "jsr-config/" -Force
+
+    # Critical for JSR Score: Copy README and LICENSE
+    Copy-Item -Path "README.md" -Destination "jsr-config/" -Force
+    Copy-Item -Path "LICENSE" -Destination "jsr-config/" -Force
     
     Push-Location jsr-config
     Write-Host "   - Publishing to JSR..."

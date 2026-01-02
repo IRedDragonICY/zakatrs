@@ -22,6 +22,7 @@ async = ["dep:async-trait", "dep:tokio"]
 wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook"]
 python = ["dep:pyo3"]
 live-pricing = ["dep:reqwest"]
+sqlite = ["async", "dep:sqlx"]
 
 [dependencies]
 rust_decimal = { version = "1.39", features = ["serde"] }
@@ -51,6 +52,7 @@ icu = { version = "1.5", features = ["serde", "compiled_data", "experimental"] }
 fixed_decimal = "0.5"
 writeable = "0.5"
 tokio = { version = "1.48.0", features = ["io-util"], optional = true }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"], optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 tokio = { version = "1.48.0", features = ["fs"], optional = true }

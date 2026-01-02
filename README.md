@@ -42,9 +42,7 @@ Rust library for Islamic Zakat calculation. Uses `rust_decimal` for precision.
 - Input Sanitization & Validation (Rejects negative values, ensures safe configuration)
 - Arabic Numeral Support (Eastern Arabic ٠-٩, Perso-Arabic ۰-۹)
 - Flexible Configuration (Env Vars, JSON, Fluent API, Partial Loading)
-- Input Sanitization & Validation (Rejects negative values, ensures safe configuration)
-- Arabic Numeral Support (Eastern Arabic ٠-٩, Perso-Arabic ۰-۹)
-- Flexible Configuration (Env Vars, JSON, Fluent API, Partial Loading)
+
 - Fiqh Compliance (Jewelry exemptions, Madhab-specific rules, Hawl requirements)
 - **Hawl (Lunar Year) Tracking** (Precise date-based eligibility)
 - **Stock Purification (Tathir)** (Deduct impure income before calculation)

@@ -1,0 +1,7 @@
+# Ignored artifacts copied from root or pkg/ during build/publish
+README.md
+LICENSE
+zakat.js
+zakat.d.ts
+zakat_bg.wasm
+zakat_bg.wasm.d.ts

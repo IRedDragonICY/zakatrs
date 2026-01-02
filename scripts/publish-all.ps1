@@ -18,8 +18,11 @@ if ($confirm -ne 'y') { Write-Host "Aborted."; exit }
 # 2. Python (PyPI)
 .\scripts\publish-pypi.ps1
 
-# 3. NPM & JSR (JS)
+# 3. NPM (JS)
 .\scripts\publish-npm.ps1
+
+# 4. JSR (TS)
+.\scripts\publish-jsr.ps1
 
 # 4. Dart (Pub.dev)
 .\scripts\publish-dart.ps1

@@ -1,3 +1,4 @@
+// @deno-types="./zakat.d.ts"
 export {
     calculate_portfolio_wasm,
     calculate_single_asset,

@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.20.2] - 2026-01-02
+### Fixed
+- **Publish Workflow**: Fixed JSR and Dart publish scripts to correctly handle duplicate artifacts.
+- **Dart Metadata**: Added missing `.pubignore` to allow publishing of `README.md` and `LICENSE` despite being gitignored.
+
+## [0.20.1] - 2026-01-02
+### Fixed
+- **JSR Compliance**: Resolved "Slow Types" errors.
+- **Provider Resilience**: Added resilient Binance provider with IP fallback.
+
 ## [0.20.0] - 2026-01-02
 
 ### Added

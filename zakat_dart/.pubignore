@@ -40,6 +40,6 @@ app.*.map.json
 /android/app/release
 
 # EXPLICITLY ALLOWED FOR PUB (NOT IN THIS LIST):
-# README.md
-# LICENSE
-# CHANGELOG.md
+# /README.md
+# /LICENSE
+# /CHANGELOG.md

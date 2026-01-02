@@ -1,6 +1,6 @@
 [package]
 name = "zakat"
-version = "0.19.0"
+version = "0.20.0"
 edition = "2024"
 license = "MIT"
 authors = ["Mohammad Farid Hendianto (IRedDragonICY)"]
@@ -18,7 +18,7 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 default = ["async"]
-async = ["dep:async-trait"]
+async = ["dep:async-trait", "dep:tokio"]
 wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook"]
 python = ["dep:pyo3"]
 live-pricing = ["dep:reqwest"]
@@ -50,6 +50,10 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"], optional = true
 icu = { version = "1.5", features = ["serde", "compiled_data", "experimental"] }
 fixed_decimal = "0.5"
 writeable = "0.5"
+tokio = { version = "1.48.0", features = ["io-util"], optional = true }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { version = "1.48.0", features = ["fs"], optional = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.2", features = ["js"] }
@@ -57,6 +61,7 @@ uuid = { version = "1.19.0", features = ["v4", "serde", "js"] }
 wasm-bindgen = "0.2.106"
 serde-wasm-bindgen = "0.6.5"
 console_error_panic_hook = "0.1"
+
 
 [dev-dependencies]
 tokio = { version = "1.48.0", features = ["full", "macros"] }

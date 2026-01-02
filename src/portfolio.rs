@@ -12,7 +12,7 @@ use uuid::Uuid;
 use crate::traits::CalculateZakat;
 #[cfg(feature = "async")]
 use crate::traits::AsyncCalculateZakat;
-use crate::types::{ZakatDetails, ZakatError};
+use crate::types::{ZakatDetails, ZakatError, ErrorDetails, InvalidInputDetails};
 use tracing::{instrument, info, warn};
 
 /// Individual result for an asset in the portfolio.
@@ -85,16 +85,21 @@ impl PortfolioResult {
     pub fn expect_complete(self) -> Result<Self, ZakatError> {
         match self.status {
             PortfolioStatus::Complete => Ok(self),
-            PortfolioStatus::Partial => Err(ZakatError::CalculationError {
-                reason: format!("Portfolio calculation incomplete. {}/{} items failed.", self.items_failed, self.items_attempted), 
+            PortfolioStatus::Partial => Err(ZakatError::CalculationError(Box::new(ErrorDetails {
+                reason_key: "error-portfolio-incomplete".to_string(),
+                args: Some(std::collections::HashMap::from([
+                    ("failed".to_string(), self.items_failed.to_string()),
+                    ("attempted".to_string(), self.items_attempted.to_string())
+                ])), 
                 source_label: Some("Portfolio".to_string()),
                 asset_id: None,
-            }),
-            PortfolioStatus::Failed => Err(ZakatError::CalculationError {
-                reason: "Portfolio calculation failed completely.".to_string(), 
+            }))),
+            PortfolioStatus::Failed => Err(ZakatError::CalculationError(Box::new(ErrorDetails {
+                reason_key: "error-portfolio-failed".to_string(), 
+                args: None,
                 source_label: Some("Portfolio".to_string()),
                 asset_id: None,
-            }),
+            }))),
         }
     }
 }
@@ -113,54 +118,19 @@ impl ZakatPortfolio {
         }
     }
 
-    #[deprecated(since = "0.2.0", note = "Use generic .add(BusinessZakat::cash_only(...)) instead")]
-    pub fn add_business<F>(self, f: F) -> Self 
-    where F: FnOnce(crate::maal::business::BusinessZakat) -> crate::maal::business::BusinessZakat {
-        let asset = f(crate::maal::business::BusinessZakat::new());
-        self.add(asset)
-    }
 
-    #[deprecated(since = "0.2.0", note = "Use generic .add(AgricultureAssets::new()...) instead")]
-    pub fn add_agriculture<F>(self, f: F) -> Self 
-    where F: FnOnce(crate::maal::agriculture::AgricultureAssets) -> crate::maal::agriculture::AgricultureAssets {
-        let asset = f(crate::maal::agriculture::AgricultureAssets::new());
-        self.add(asset)
-    }
 
-    #[deprecated(since = "0.2.0", note = "Use generic .add(LivestockAssets::new()...) instead")]
-    pub fn add_livestock<F>(self, f: F) -> Self 
-    where F: FnOnce(crate::maal::livestock::LivestockAssets) -> crate::maal::livestock::LivestockAssets {
-        let asset = f(crate::maal::livestock::LivestockAssets::new());
-        self.add(asset)
-    }
 
-    #[deprecated(since = "0.2.0", note = "Use generic .add(IncomeZakatCalculator::from_salary(...)) instead")]
-    pub fn add_income<F>(self, f: F) -> Self 
-    where F: FnOnce(crate::maal::income::IncomeZakatCalculator) -> crate::maal::income::IncomeZakatCalculator {
-        let asset = f(crate::maal::income::IncomeZakatCalculator::new());
-        self.add(asset)
-    }
 
-    #[deprecated(since = "0.2.0", note = "Use generic .add(InvestmentAssets::stock(...)) instead")]
-    pub fn add_investment<F>(self, f: F) -> Self 
-    where F: FnOnce(crate::maal::investments::InvestmentAssets) -> crate::maal::investments::InvestmentAssets {
-        let asset = f(crate::maal::investments::InvestmentAssets::new());
-        self.add(asset)
-    }
 
-    #[deprecated(since = "0.2.0", note = "Use generic .add(MiningAssets::new()...) instead")]
-    pub fn add_mining<F>(self, f: F) -> Self 
-    where F: FnOnce(crate::maal::mining::MiningAssets) -> crate::maal::mining::MiningAssets {
-        let asset = f(crate::maal::mining::MiningAssets::new());
-        self.add(asset)
-    }
 
-    #[deprecated(since = "0.2.0", note = "Use generic .add(PreciousMetals::gold(...)) instead")]
-    pub fn add_precious_metals<F>(self, f: F) -> Self 
-    where F: FnOnce(crate::maal::precious_metals::PreciousMetals) -> crate::maal::precious_metals::PreciousMetals {
-        let asset = f(crate::maal::precious_metals::PreciousMetals::new());
-        self.add(asset)
-    }
+
+
+
+
+
+
+
 
     #[allow(clippy::should_implement_trait)]
     pub fn add<T: Into<PortfolioItem>>(mut self, item: T) -> Self {
@@ -200,13 +170,14 @@ impl ZakatPortfolio {
             self.items[pos] = new_item.into();
             Ok(())
         } else {
-            Err(ZakatError::InvalidInput {
+            Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                 field: "asset_id".to_string(),
                 value: id.to_string(),
-                reason: "Asset with ID not found".to_string(),
+                reason_key: "error-asset-not-found".to_string(),
+                args: None,
                 source_label: None,
                 asset_id: None,
-            })
+            })))
         }
     }
 

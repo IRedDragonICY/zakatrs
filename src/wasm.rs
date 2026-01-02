@@ -30,17 +30,52 @@ struct WasmZakatError {
 
 impl From<crate::types::ZakatError> for WasmZakatError {
     fn from(err: crate::types::ZakatError) -> Self {
-        let context = err.context();
-        let code = context["code"].as_str().unwrap_or("UNKNOWN_ERROR").to_string();
-        let message = context["message"].as_str().unwrap_or("An unknown error occurred").to_string();
-        let field = context.get("field").and_then(|v| v.as_str()).map(|s| s.to_string());
-        let hint = context.get("hint").and_then(|v| v.as_str()).map(|s| s.to_string());
-
-        WasmZakatError {
-            code,
-            message,
-            field,
-            hint,
+        // Use default translator (English) for now, or could potentially expose locale setting in future
+        let message = err.report_default(); 
+        
+        match err {
+            crate::types::ZakatError::CalculationError(details) => WasmZakatError {
+                code: "CALCULATION_ERROR".to_string(),
+                message, 
+                field: details.source_label,
+                hint: None,
+            },
+            crate::types::ZakatError::InvalidInput(details) => WasmZakatError {
+                code: "INVALID_INPUT".to_string(),
+                message,
+                field: Some(details.field),
+                hint: details.source_label,
+            },
+            crate::types::ZakatError::ConfigurationError(details) => WasmZakatError {
+                code: "CONFIG_ERROR".to_string(),
+                message,
+                field: details.source_label,
+                hint: None,
+            },
+            crate::types::ZakatError::MissingConfig { field, source_label, .. } => WasmZakatError {
+                code: "MISSING_CONFIG".to_string(),
+                message,
+                field: Some(field),
+                hint: source_label,
+            },
+            crate::types::ZakatError::Overflow { source_label, .. } => WasmZakatError {
+                code: "OVERFLOW".to_string(),
+                message,
+                field: source_label,
+                hint: None,
+            },
+            crate::types::ZakatError::MultipleErrors(errs) => WasmZakatError {
+                 code: "MULTIPLE_ERRORS".to_string(),
+                 message: format!("{} errors occurred: {}", errs.len(), message),
+                 field: None,
+                 hint: None,
+            },
+            crate::types::ZakatError::NetworkError(_) => WasmZakatError {
+                code: "NETWORK_ERROR".to_string(),
+                message,
+                field: None,
+                hint: None,
+            },
         }
     }
 }
@@ -62,7 +97,7 @@ pub fn calculate_portfolio_wasm(config_json: JsValue, assets_json: JsValue) -> R
                 field: None,
                 hint: Some("Check JSON format".to_string()),
             };
-            serde_wasm_bindgen::to_value(&err).unwrap()
+            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: JSON Error serialization failed"))
         })?;
         
     let assets: Vec<PortfolioItem> = from_value(assets_json)
@@ -73,7 +108,7 @@ pub fn calculate_portfolio_wasm(config_json: JsValue, assets_json: JsValue) -> R
                 field: None,
                 hint: Some("Check JSON format".to_string()),
             };
-            serde_wasm_bindgen::to_value(&err).unwrap()
+            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: JSON Error serialization failed"))
         })?;
 
     let mut portfolio = ZakatPortfolio::new();
@@ -91,7 +126,7 @@ pub fn calculate_portfolio_wasm(config_json: JsValue, assets_json: JsValue) -> R
                 field: None,
                 hint: None,
             };
-            serde_wasm_bindgen::to_value(&err).unwrap()
+            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: Result serialization failed"))
         })
 }
 
@@ -106,7 +141,7 @@ pub fn calculate_single_asset(config_json: JsValue, asset_json: JsValue) -> Resu
                 field: None,
                 hint: Some("Check JSON format".to_string()),
             };
-            serde_wasm_bindgen::to_value(&err).unwrap()
+            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: Config serialization failed"))
         })?;
     
     let asset: PortfolioItem = from_value(asset_json)
@@ -117,13 +152,13 @@ pub fn calculate_single_asset(config_json: JsValue, asset_json: JsValue) -> Resu
                 field: None,
                 hint: Some("Check JSON format".to_string()),
             };
-            serde_wasm_bindgen::to_value(&err).unwrap()
+            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: Asset serialization failed"))
         })?;
 
     let details = asset.calculate_zakat(&config)
         .map_err(|e| {
             let wasm_err: WasmZakatError = e.into();
-            serde_wasm_bindgen::to_value(&wasm_err).unwrap()
+            serde_wasm_bindgen::to_value(&wasm_err).unwrap_or_else(|_| JsValue::from_str("Critical: Zakat Error serialization failed"))
         })?;
         
     to_value(&details)
@@ -134,7 +169,7 @@ pub fn calculate_single_asset(config_json: JsValue, asset_json: JsValue) -> Resu
                 field: None,
                 hint: None,
             };
-            serde_wasm_bindgen::to_value(&err).unwrap()
+            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: Final Result serialization failed"))
         })
 }
 

@@ -159,6 +159,22 @@ impl Translator {
 
         format!("MISSING:{}", key)
     }
+
+    pub fn translate_with_args(&self, locale: ZakatLocale, key: &str, args: Option<&HashMap<String, String>>) -> String {
+        if let Some(map) = args {
+            let mut f_args = FluentArgs::new();
+            for (k, v) in map {
+                f_args.set(k.as_str(), v.to_string());
+            }
+            self.translate(locale, key, Some(&f_args))
+        } else {
+            self.translate(locale, key, None)
+        }
+    }
+
+    pub fn translate_map(&self, locale: ZakatLocale, key: &str, args: Option<&HashMap<String, String>>) -> String {
+        self.translate_with_args(locale, key, args)
+    }
 }
 
 pub fn default_translator() -> Translator {

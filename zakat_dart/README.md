@@ -81,7 +81,7 @@ We support multiple platforms. Please refer to the specific documentation for yo
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "0.19.0"
+zakat = "0.20.0"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] }
 ```
@@ -89,7 +89,7 @@ tokio = { version = "1", features = ["full"] }
 Synchronous Only:
 ```toml
 [dependencies]
-zakat = { version = "0.19.0", default-features = false }
+zakat = { version = "0.20.0", default-features = false }
 rust_decimal = "1.39"
 ```
 

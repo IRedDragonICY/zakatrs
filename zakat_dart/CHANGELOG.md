@@ -1,6 +1,43 @@
 # Changelog
 
 
+## [0.20.0] - 2026-01-02
+
+### Added
+- **Temporal Ledger**: Implemented `Al-Hawl Al-Haqiqi` (True Hawl) tracking.
+    - Added `LedgerAsset` and `LedgerEvent` for event-sourced wealth reconstruction.
+    - Added `LedgerStore` trait and `JsonFileStore` for async persistence.
+- **Fiqh Features**:
+    - **Hawl Tracking**: Precise day-count logic for Zakat eligibility (354 days).
+    - **Purification (Tathir)**: Support for purifying mixed-income assets (e.g. stocks) before calculation.
+- **Pricing Providers**:
+    - **Binance Integration**: Added `BinancePriceProvider` with DNS over HTTPS (DoH) bypass for censorship resistance.
+    - **Live Pricing**: `Currency` enum and `PriceProvider` trait improvements.
+- **Internationalization**:
+    - **ICU4X**: Migrated to `ICU4X` 1.5 for robust, locale-aware currency formatting (e.g., proper symbol placement, numbering systems).
+- **Strict Validation**:
+    - `ZakatConfig` now strictly prevents zero-price silent failures for Gold/Silver.
+    - WASM bindings are now panic-safe, returning structured `JsValue` errors.
+
+### Changed
+- **Error Handling**:
+    - **Review**: Boxed large `ZakatError` variants to optimize stack usage (`clippy::result_large_err`).
+    - **Localization**: Refactored `ZakatError` to fully support i18n with translation keys and arguments.
+- **Bindings & Integrations**:
+    - **Python**: Optimized `to_dict` performance and removed internal `serde_json` overhead.
+    - **Kotlin**: Fixed silent failures, added `CalculationError` variant, and switched to `String` inputs for financial precision.
+    - **Dart**: Removed `rust_builder` duplication and streamlined workspace integration.
+- **Refactoring**:
+    - **DRY Macros**: introduced universal `zakat_asset!` macro to eliminate boilerplate across all asset modules.
+    - **Monetary Logic**: Centralized monetary asset calculation logic to `src/maal/calculator.rs`.
+    - **Deprecation**: Removed legacy `add_*` methods from `ZakatPortfolio`.
+
+### Fixed
+- **Build System**:
+    - Fixed WASM build errors by splitting and gating `tokio` features.
+    - Fixed Kotlin binding silent errors.
+- **Logic**: Unified liability logic in `BusinessZakat` (removed `short_term_liabilities`).
+
 ## [0.19.0] - 2026-01-01
 
 ### Changed

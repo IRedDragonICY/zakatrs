@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
 use std::sync::Arc;
-use crate::types::ZakatError;
+use crate::types::{ZakatError, ErrorDetails};
 use crate::inputs::IntoZakatDecimal;
 use tracing::{instrument, debug};
 
@@ -83,11 +83,12 @@ impl std::str::FromStr for ZakatConfig {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         serde_json::from_str(s)
-            .map_err(|e| ZakatError::ConfigurationError {
-                reason: format!("Failed to parse config JSON: {}", e),
+            .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-parse-json".to_string(),
+                args: None, // TODO add details?
                 source_label: None,
                 asset_id: None,
-            })
+            })))
     }
 }
 
@@ -144,19 +145,21 @@ impl ZakatConfig {
     /// Validates the configuration for logical consistency and safety.
     #[instrument(skip(self))]
     pub fn validate(&self) -> Result<(), ZakatError> {
-        if self.gold_price_per_gram < Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError {
-                reason: "Gold price must be non-negative".to_string(),
+        if self.gold_price_per_gram <= Decimal::ZERO {
+            return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-config-gold-positive".to_string(),
+                args: None,
                 source_label: None,
                 asset_id: None,
-            });
+            })));
         }
-        if self.silver_price_per_gram < Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError {
-                reason: "Silver price must be non-negative".to_string(),
+        if self.silver_price_per_gram <= Decimal::ZERO {
+            return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-config-silver-positive".to_string(),
+                args: None,
                 source_label: None,
                 asset_id: None,
-            });
+            })));
         }
 
         // Validation Logic based on Nisab Standard
@@ -171,35 +174,39 @@ impl ZakatConfig {
         }
         
         if self.cash_nisab_standard == NisabStandard::Gold && self.gold_price_per_gram <= Decimal::ZERO {
-             return Err(ZakatError::ConfigurationError {
-                 reason: "Gold price must be > 0 for Gold Nisab Standard".to_string(),
+             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                 reason_key: "error-config-gold-positive".to_string(),
+                 args: None,
                  source_label: None,
                 asset_id: None,
-             });
+             })));
         }
 
         if self.cash_nisab_standard == NisabStandard::Silver && self.silver_price_per_gram <= Decimal::ZERO {
-             return Err(ZakatError::ConfigurationError {
-                 reason: "Silver price must be > 0 for Silver Nisab Standard".to_string(),
+             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                 reason_key: "error-config-silver-positive".to_string(),
+                 args: None,
                  source_label: None,
                 asset_id: None,
-             });
+             })));
         }
 
         if self.cash_nisab_standard == NisabStandard::LowerOfTwo {
             if self.gold_price_per_gram <= Decimal::ZERO {
-                return Err(ZakatError::ConfigurationError {
-                    reason: "Missing 'Gold Price'. Required because 'LowerOfTwo' standard is active.".to_string(),
+                return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                    reason_key: "error-gold-price-required".to_string(),
+                    args: None,
                     source_label: Some("ZakatConfig validation".to_string()),
                     asset_id: None,
-                });
+                })));
             }
             if self.silver_price_per_gram <= Decimal::ZERO {
-                return Err(ZakatError::ConfigurationError {
-                    reason: "Missing 'Silver Price'. Required because 'LowerOfTwo' standard is active.".to_string(),
+                return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                    reason_key: "error-silver-price-required".to_string(),
+                    args: None,
                     source_label: Some("ZakatConfig validation".to_string()),
                     asset_id: None,
-                });
+                })));
             }
         }
 
@@ -211,30 +218,34 @@ impl ZakatConfig {
     pub fn from_env() -> Result<Self, ZakatError> {
         debug!("Loading configuration from environment variables");
         let gold_str = env::var("ZAKAT_GOLD_PRICE")
-            .map_err(|_| ZakatError::ConfigurationError {
-                reason: "ZAKAT_GOLD_PRICE env var not set".to_string(),
+            .map_err(|_| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-env-var-missing".to_string(),
+                args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_GOLD_PRICE".to_string())])),
                 source_label: None,
                 asset_id: None,
-            })?;
+            })))?;
         let silver_str = env::var("ZAKAT_SILVER_PRICE")
-            .map_err(|_| ZakatError::ConfigurationError {
-                 reason: "ZAKAT_SILVER_PRICE env var not set".to_string(),
-                 source_label: None,
+            .map_err(|_| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-env-var-missing".to_string(),
+                args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_SILVER_PRICE".to_string())])),
+                source_label: None,
                 asset_id: None,
-            })?;
+            })))?;
 
         let gold_price = gold_str.trim().parse::<Decimal>()
-            .map_err(|e| ZakatError::ConfigurationError {
-                reason: format!("Invalid gold price format: {}", e),
+            .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-env-var-invalid".to_string(),
+                args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_GOLD_PRICE".to_string())])),
                 source_label: None,
                 asset_id: None,
-            })?;
+            })))?;
         let silver_price = silver_str.trim().parse::<Decimal>()
-            .map_err(|e| ZakatError::ConfigurationError {
-                reason: format!("Invalid silver price format: {}", e),
+            .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-env-var-invalid".to_string(),
+                args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_SILVER_PRICE".to_string())])),
                 source_label: None,
                 asset_id: None,
-            })?;
+            })))?;
 
         Ok(Self {
             gold_price_per_gram: gold_price,
@@ -246,18 +257,20 @@ impl ZakatConfig {
     /// Attempts to load configuration from a JSON file.
     pub fn try_from_json(path: &str) -> Result<Self, ZakatError> {
         let content = fs::read_to_string(path)
-            .map_err(|e| ZakatError::ConfigurationError {
-                reason: format!("Failed to read config file: {}", e),
+            .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-read-file".to_string(),
+                args: None,
                 source_label: None,
                 asset_id: None,
-            })?;
+            })))?;
         
         let config: ZakatConfig = serde_json::from_str(&content)
-            .map_err(|e| ZakatError::ConfigurationError {
-                reason: format!("Failed to parse config JSON: {}", e),
+            .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-parse-json".to_string(),
+                args: None,
                 source_label: None,
                 asset_id: None,
-            })?;
+            })))?;
             
         config.validate()?;
         Ok(config)
@@ -460,11 +473,27 @@ mod tests {
 
     #[test]
     fn test_validate_prices() {
-        // Zero prices with default settings.
-        // Whether this fails depends on the default Madhab/NisabStandard.
+        // Zero prices should fail validation
         let config = ZakatConfig::new()
             .with_gold_price(0)
             .with_silver_price(0);
-        let _res = config.validate();
+        
+        let res = config.validate();
+        assert!(res.is_err(), "Validation should fail for zero/default prices");
+        
+        match res {
+            Err(ZakatError::ConfigurationError { reason_key, .. }) => {
+                assert!(reason_key.contains("error-config-gold-positive"), "Error should match key. Got: {}", reason_key);
+            }
+            _ => panic!("Expected ConfigurationError"),
+        }
+    }
+
+    #[test]
+    fn test_valid_prices() {
+        // test_default() should pass validation
+        let config = ZakatConfig::test_default();
+        let res = config.validate();
+        assert!(res.is_ok(), "test_default() should produce valid config");
     }
 }

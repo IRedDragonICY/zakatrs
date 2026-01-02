@@ -1,6 +1,6 @@
 # Rust Usage Guide 🦀
 
-Configuration and advanced usage examples for the `zakat` crate.
+Configuration and advanced usage examples for the `zakat = "0.20.0"
 
 ## Basic Business Zakat
 
@@ -192,8 +192,7 @@ let config = ZakatConfig::shafi(100);     // Sets Madhab=Shafi, Nisab=Gold, Pric
 // NEW (v0.14+): Merge Configurations (Layering)
 let base_config = ZakatConfig::default();
 let env_config = ZakatConfig::from_env().unwrap_or_default();
-// Env values override defaults
-let final_config = base_config.merge(env_config);
+// Env vzakat = { version = "0.20.0", default-features = false }_config = base_config.merge(env_config);
 ```
 
 ## Custom Zakat Strategy

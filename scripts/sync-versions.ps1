@@ -67,4 +67,12 @@ $ReadmePattern2 = 'zakat\s*=\s*\{\s*version\s*=\s*"(.*?)"'
 $ReadmeReplace2 = 'zakat = { version = "' + $Version + '"'
 Update-Manifest "README.md" $ReadmePattern2 $ReadmeReplace2
 
+# 5. Update pyproject.toml (Python)
+# Pattern: version = "x.y.z" (dynamically updated by maturin usually, but good to check if static)
+# Note: maturin uses Cargo.toml version dynamicially, but if we have [project] version, update it.
+# Check if version is static in pyproject.toml
+if (Select-String -Path "pyproject.toml" -Pattern 'version = "(.*?)"' -Quiet) {
+    Update-Manifest "pyproject.toml" 'version\s*=\s*"(.*?)"' ('version = "' + $Version + '"')
+}
+
 Write-Host "🔄 Version synchronization complete."

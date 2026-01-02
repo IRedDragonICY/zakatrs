@@ -8,7 +8,7 @@ Add the package to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  zakat: ^0.1.0 
+  zakat: ^0.20.0 
 ```
 *Note: Ensure the package version matches the latest release on pub.dev.*
 

@@ -1,7 +1,7 @@
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use serde::{Serialize, Deserialize};
-use crate::types::{ZakatDetails, ZakatError};
+use crate::types::{ZakatDetails, ZakatError, InvalidInputDetails, ErrorDetails};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
@@ -28,22 +28,24 @@ impl FitrahCalculator {
         };
 
         if person_count == 0 {
-            return Err(ZakatError::InvalidInput {
+            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                 field: "person_count".to_string(),
                 value: "0".to_string(),
-                reason: "Person count must be greater than 0".to_string(),
+                reason_key: "error-fitrah-count".to_string(),
+                args: None,
                 source_label: None,
                 asset_id: None,
-            });
+            })));
         }
         if price < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput {
+            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                 field: "price_per_unit".to_string(),
                 value: "negative".to_string(),
-                reason: "Price per unit must be non-negative".to_string(),
+                reason_key: "error-negative-value".to_string(),
+                args: None,
                 source_label: None,
                 asset_id: None,
-            });
+            })));
         }
 
         Ok(Self {
@@ -70,11 +72,12 @@ impl CalculateZakat for FitrahCalculator {
         let total_value = total_people_decimal
             .checked_mul(self.unit_amount)
             .and_then(|v| v.checked_mul(self.price_per_unit))
-            .ok_or(ZakatError::CalculationError {
-                reason: "Overflow calculating Fitrah total".to_string(),
+            .ok_or(ZakatError::CalculationError(Box::new(ErrorDetails {
+                reason_key: "error-fitrah-overflow".to_string(),
+                args: None,
                 source_label: None,
                 asset_id: None,
-            })?;
+            })))?;
 
         // Build calculation trace
         let trace = vec![

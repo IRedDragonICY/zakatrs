@@ -12,7 +12,7 @@ pub struct DailyBalance {
     pub is_above_nisab: bool,
 }
 
-use crate::types::ZakatError;
+use crate::types::{ZakatError, InvalidInputDetails};
 
 pub fn simulate_timeline<P: HistoricalPriceProvider>(
     events: Vec<LedgerEvent>,
@@ -21,13 +21,14 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
     end_date: NaiveDate,
 ) -> Result<Vec<DailyBalance>, ZakatError> {
     if start_date > end_date {
-        return Err(ZakatError::InvalidInput { 
+        return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
             field: "date_range".to_string(), 
             value: format!("{} > {}", start_date, end_date), 
-            reason: "Start date cannot be after end date".to_string(), 
+            reason_key: "error-date-range-invalid".to_string(),
+            args: None,
             source_label: Some("simulate_timeline".to_string()), 
             asset_id: None 
-        });
+        })));
     }
 
     let mut timeline = Vec::new();
@@ -47,13 +48,14 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
         while let Some(event) = event_iter.peek() {
             if event.date == current_date {
                 if event.amount < Decimal::ZERO {
-                     return Err(ZakatError::InvalidInput {
+                     return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                         field: "amount".to_string(),
                         value: event.amount.to_string(),
-                        reason: "LedgerEvent amount must be positive".to_string(),
+                        reason_key: "error-amount-positive".to_string(),
+                        args: None,
                         source_label: Some("simulate_timeline".to_string()),
                         asset_id: Some(event.id),
-                    });
+                    })));
                 }
 
                 use super::events::TransactionType::*;

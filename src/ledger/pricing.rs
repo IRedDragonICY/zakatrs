@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use serde::{Serialize, Deserialize};
 use chrono::NaiveDate;
 
-use crate::types::ZakatError;
+use crate::types::{ZakatError, ErrorDetails};
 
 pub trait HistoricalPriceProvider {
     fn get_nisab_threshold(&self, date: NaiveDate) -> Result<Decimal, ZakatError>;
@@ -39,10 +39,11 @@ impl HistoricalPriceProvider for InMemoryPriceHistory {
          // before or on that date.
          
          self.prices.range(..=date).next_back().map(|(_, &price)| price)
-            .ok_or_else(|| ZakatError::ConfigurationError { 
-                reason: format!("No Nisab price found for date {}", date),
+            .ok_or_else(|| ZakatError::ConfigurationError(Box::new(ErrorDetails { 
+                reason_key: "error-nisab-price-missing".to_string(),
+                args: Some(std::collections::HashMap::from([("date".to_string(), date.to_string())])),
                 source_label: Some("HistoricalPriceProvider".to_string()),
                 asset_id: None
-            })
+            })))
     }
 }

@@ -15,7 +15,7 @@
 //! - Logic: `weight * (karat / 24)` extracts the zakatable 24K equivalent.
 
 use rust_decimal::Decimal;
-use crate::types::{ZakatDetails, ZakatError, WealthType};
+use crate::types::{ZakatDetails, ZakatError, WealthType, ErrorDetails, InvalidInputDetails};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 
 
@@ -103,13 +103,14 @@ impl PreciousMetals {
     /// Specific bounds (24 for Gold) are checked during calculation/validation.
     pub fn purity(mut self, purity: u32) -> Self {
         if purity == 0 || purity > 1000 {
-            self._input_errors.push(ZakatError::InvalidInput {
+            self._input_errors.push(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                 field: "purity".to_string(),
                 value: purity.to_string(),
-                reason: "Purity must be between 1 and 1000".to_string(),
+                reason_key: "error-invalid-purity".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: Some(self.id),
-            });
+            })));
         } else {
             self.purity = purity;
         }
@@ -135,49 +136,53 @@ impl CalculateZakat for PreciousMetals {
         let config = config_cow.as_ref();
 
         let metal_type = self.metal_type.clone().ok_or_else(|| 
-            ZakatError::InvalidInput { 
+            ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
                 field: "metal_type".to_string(),
                 value: "None".to_string(),
-                reason: "Metal type must be specified (Gold or Silver)".to_string(), 
+                reason_key: "error-type-required".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            }
+            }))
         )?;
 
         if self.weight_grams < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput { 
+            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
                 field: "weight".to_string(),
                 value: "negative".to_string(),
-                reason: "Weight must be non-negative".to_string(), 
+                reason_key: "error-negative-value".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
 
         // Validate Purity Range based on Metal Type
         match metal_type {
             WealthType::Gold => {
                 if self.purity > 24 {
-                    return Err(ZakatError::InvalidInput { 
+                    return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
                         field: "purity".to_string(),
                         value: self.purity.to_string(),
-                        reason: "Gold purity must be between 1 and 24".to_string(), 
+                        reason_key: "error-gold-purity".to_string(),
+                        args: None,
                         source_label: self.label.clone(),
                         asset_id: None,
-                    });
+                    })));
                 }
             },
             WealthType::Silver => {
                  // Silver purity is usually 0-1000 (millesimal)
                  // No extra check needed as setter checks 0-1000
             },
-            _ => return Err(ZakatError::InvalidInput { 
+            _ => return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
                 field: "metal_type".to_string(),
                 value: format!("{:?}", metal_type),
-                reason: "Type must be Gold or Silver".to_string(), 
+                reason_key: "error-type-invalid".to_string(),
+                args: None, 
                 source_label: self.label.clone(),
                 asset_id: None,
-            }),
+            }))),
         };
 
         // Check for personal usage exemption first
@@ -196,11 +201,12 @@ impl CalculateZakat for PreciousMetals {
         };
 
         if price_per_gram <= Decimal::ZERO {
-             return Err(ZakatError::ConfigurationError { 
-                reason: "Price for metal not set".to_string(), 
+             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-price-required".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
 
         let nisab_value = ZakatDecimal::new(nisab_threshold_grams)

@@ -11,7 +11,7 @@
 
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use crate::types::{ZakatDetails, ZakatError};
+use crate::types::{ZakatDetails, ZakatError, InvalidInputDetails};
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 
@@ -115,13 +115,14 @@ impl CalculateZakat for AgricultureAssets {
         let config = config_cow.as_ref();
 
         if self.harvest_weight_kg < Decimal::ZERO || self.price_per_kg < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput {
+            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                 field: "harvest_weight_price".to_string(),
                 value: "negative".to_string(),
-                reason: "Harvest weight and price must be non-negative".to_string(),
+                reason_key: "error-negative-value".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
 
         let rate = match self.irrigation {

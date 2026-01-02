@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
 use std::str::FromStr;
-use crate::types::ZakatError;
+use crate::types::{ZakatError, InvalidInputDetails};
 
 const MAX_INPUT_LEN: usize = 64;
 
@@ -43,13 +43,14 @@ macro_rules! impl_into_zakat_decimal_float {
                      // Use string formatting to avoid binary precision noise.
                      // This aligns with user expectations for simple decimals like 0.025.
                     let s = self.to_string();
-                    Decimal::from_str(&s).map_err(|_| ZakatError::InvalidInput {
+                     Decimal::from_str(&s).map_err(|_| ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                         field: "fractional".to_string(),
                         value: s,
-                        reason: "Invalid float value".to_string(),
+                        reason_key: "error-invalid-float".to_string(),
+                        args: None,
                         source_label: None,
                         asset_id: None,
-                    })
+                    })))
                 }
             }
         )*
@@ -99,13 +100,14 @@ impl_into_zakat_decimal_float!(f32, f64);
 /// Negative numbers and decimal points are preserved.
 fn sanitize_numeric_string(s: &str) -> Result<String, ZakatError> {
     if s.len() > MAX_INPUT_LEN {
-        return Err(ZakatError::InvalidInput {
+        return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
             field: "input".to_string(),
             value: format!("{}...", &s[..std::cmp::min(s.len(), 20)]),
-            reason: format!("Input exceeds maximum length of {}", MAX_INPUT_LEN),
+            reason_key: "error-input-too-long".to_string(),
+            args: Some(std::collections::HashMap::from([("max".to_string(), MAX_INPUT_LEN.to_string())])),
             source_label: None,
             asset_id: None,
-        });
+        })));
     }
 
     // Optimization: Pre-allocate buffer to avoid re-allocations
@@ -244,26 +246,28 @@ fn normalize_arabic_numerals(s: &str) -> String {
 impl IntoZakatDecimal for &str {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
         let sanitized = sanitize_numeric_string(self)?;
-        Decimal::from_str(&sanitized).map_err(|e| ZakatError::InvalidInput {
+        Decimal::from_str(&sanitized).map_err(|e| ZakatError::InvalidInput(Box::new(InvalidInputDetails {
             field: "string".to_string(),
             value: self.to_string(),
-            reason: format!("Parse error: {}", e),
+            reason_key: "error-parse-error".to_string(),
+            args: Some(std::collections::HashMap::from([("details".to_string(), e.to_string())])),
             source_label: None,
             asset_id: None,
-        })
+        })))
     }
 }
 
 impl IntoZakatDecimal for String {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
         let sanitized = sanitize_numeric_string(&self)?;
-        Decimal::from_str(&sanitized).map_err(|e| ZakatError::InvalidInput {
+        Decimal::from_str(&sanitized).map_err(|e| ZakatError::InvalidInput(Box::new(InvalidInputDetails {
             field: "string".to_string(),
             value: self.clone(),
-            reason: format!("Parse error: {}", e),
+            reason_key: "error-parse-error".to_string(),
+            args: Some(std::collections::HashMap::from([("details".to_string(), e.to_string())])),
             source_label: None,
             asset_id: None,
-        })
+        })))
     }
 }
 
@@ -324,13 +328,14 @@ pub fn with_locale(val: &str, locale: InputLocale) -> LocalizedInput<'_> {
 impl IntoZakatDecimal for LocalizedInput<'_> {
     fn into_zakat_decimal(self) -> Result<Decimal, ZakatError> {
         if self.value.len() > MAX_INPUT_LEN {
-            return Err(ZakatError::InvalidInput {
+            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                 field: "localized_input".to_string(),
                 value: format!("{}...", &self.value[..std::cmp::min(self.value.len(), 20)]),
-                reason: format!("Input exceeds maximum length of {}", MAX_INPUT_LEN),
+                reason_key: "error-input-too-long".to_string(),
+                args: Some(std::collections::HashMap::from([("max".to_string(), MAX_INPUT_LEN.to_string())])),
                 source_label: None,
                 asset_id: None,
-            });
+            })));
         }
 
         // First normalize Arabic numerals
@@ -361,13 +366,17 @@ impl IntoZakatDecimal for LocalizedInput<'_> {
             }
         }
         
-        Decimal::from_str(&result).map_err(|e| ZakatError::InvalidInput {
+        Decimal::from_str(&result).map_err(|e| ZakatError::InvalidInput(Box::new(InvalidInputDetails {
             field: "localized_input".to_string(),
             value: self.value.to_string(),
-            reason: format!("Parse error with {:?} locale: {}", self.locale, e),
+            reason_key: "error-parse-locale".to_string(),
+            args: Some(std::collections::HashMap::from([
+                ("locale".to_string(), format!("{:?}", self.locale)), 
+                ("details".to_string(), e.to_string())
+            ])),
             source_label: None,
             asset_id: None,
-        })
+        })))
     }
 }
 

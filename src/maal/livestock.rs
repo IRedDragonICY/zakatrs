@@ -8,7 +8,7 @@
 
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
-use crate::types::{ZakatDetails, ZakatError};
+use crate::types::{ZakatDetails, ZakatError, InvalidInputDetails, ErrorDetails};
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
@@ -179,13 +179,14 @@ impl CalculateZakat for LivestockAssets {
         let config_ref = config_cow.as_ref();
 
         let animal_type = self.animal_type.as_ref().ok_or_else(|| 
-            ZakatError::InvalidInput {
+            ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                 field: "animal_type".to_string(),
                 value: "None".to_string(),
-                reason: "Animal type must be specified".to_string(),
+                reason_key: "error-type-required".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            }
+            }))
         )?;
 
         // Validate price for the specific animal type
@@ -201,11 +202,12 @@ impl CalculateZakat for LivestockAssets {
                 LivestockType::Cow => "Cow",
                 LivestockType::Camel => "Camel",
             };
-            return Err(ZakatError::ConfigurationError {
-                reason: format!("Price for {} must be greater than zero", animal_str), 
+            return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-price-zero".to_string(),
+                args: Some(std::collections::HashMap::from([("animal".to_string(), animal_str.to_string())])), 
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
 
         // Calculate Nisab Count Value for reporting consistency even if not payable

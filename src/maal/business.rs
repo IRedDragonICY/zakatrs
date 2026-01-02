@@ -9,7 +9,7 @@
 //! - **Debts**: Deducting `liabilities_due_now` aligns with the principle of *Dayn al-Hal* (immediate debt) preventing Zakat, as supported by AAOIFI Standard 35.
 
 use rust_decimal::Decimal;
-use crate::types::{ZakatDetails, ZakatError};
+use crate::types::{ZakatDetails, ZakatError, ErrorDetails, InvalidInputDetails};
 use crate::math::ZakatDecimal;
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
@@ -31,8 +31,7 @@ crate::zakat_asset! {
         pub cash_on_hand: Decimal,
         pub inventory_value: Decimal,
         pub receivables: Decimal,
-        // Business-specific liabilities (separate from common liabilities_due_now)
-        pub short_term_liabilities: Decimal,
+        // Business-specific liabilities are now unified with `liabilities_due_now`
     }
 }
 
@@ -43,7 +42,6 @@ impl Default for BusinessZakat {
             cash_on_hand: Decimal::ZERO,
             inventory_value: Decimal::ZERO,
             receivables: Decimal::ZERO,
-            short_term_liabilities: Decimal::ZERO,
             liabilities_due_now,
             hawl_satisfied,
             label,
@@ -107,7 +105,7 @@ impl BusinessZakat {
     /// collected and will be returned by `validate()` or `calculate_zakat()`.
     pub fn liabilities(mut self, liabilities: impl IntoZakatDecimal) -> Self {
         match liabilities.into_zakat_decimal() {
-            Ok(v) => self.short_term_liabilities = v,
+            Ok(v) => self.liabilities_due_now = v,
             Err(e) => self._input_errors.push(e),
         }
         self
@@ -128,22 +126,24 @@ impl CalculateZakat for BusinessZakat {
 
         // Validation moved here
         if self.cash_on_hand < Decimal::ZERO || self.inventory_value < Decimal::ZERO || self.receivables < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput {
+            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                 field: "business_assets".to_string(),
                 value: "negative".to_string(),
-                reason: "Business assets must be non-negative".to_string(),
+                reason_key: "error-negative-value".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
-        if self.short_term_liabilities < Decimal::ZERO || self.liabilities_due_now < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput {
+        if self.liabilities_due_now < Decimal::ZERO {
+             return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                 field: "liabilities".to_string(),
                 value: "negative".to_string(),
-                reason: "Liabilities must be non-negative".to_string(),
+                reason_key: "error-negative-value".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
 
         // For LowerOfTwo or Silver standard, we need silver price too
@@ -153,18 +153,20 @@ impl CalculateZakat for BusinessZakat {
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError {
-                reason: "Gold price needed for Business Nisab".to_string(),
+            return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-gold-price-required".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError {
-                reason: "Silver price needed for Business Nisab with current standard".to_string(),
+            return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-silver-price-required".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
         
         // Dynamic Nisab threshold based on config (Gold, Silver, or LowerOfTwo)
@@ -178,19 +180,11 @@ impl CalculateZakat for BusinessZakat {
             .safe_add(self.receivables)?
             .with_source(self.label.clone());
         
-        // Calculate intermediate business net (Gross - Short Term)
-        // This keeps logic consistent: short term is deducted before general liabilities
-        let business_net = gross_assets
-            .safe_sub(self.short_term_liabilities)?
-            .with_source(self.label.clone());
-
         let trace_steps = vec![
             crate::types::CalculationStep::initial("step-cash-on-hand", "Cash on Hand", self.cash_on_hand),
             crate::types::CalculationStep::add("step-inventory-value", "Inventory Value", self.inventory_value),
             crate::types::CalculationStep::add("step-receivables", "Receivables", self.receivables),
             crate::types::CalculationStep::result("step-gross-assets", "Gross Assets", *gross_assets),
-            crate::types::CalculationStep::subtract("step-short-term-liabilities", "Short-term Liabilities", self.short_term_liabilities),
-            crate::types::CalculationStep::result("step-business-net-intermediate", "Business Net Assets (Pre-Liabilities)", *business_net),
         ];
 
 
@@ -205,7 +199,7 @@ impl CalculateZakat for BusinessZakat {
         };        
 
         let params = MonetaryCalcParams {
-            total_assets: *business_net,
+            total_assets: *gross_assets,
             liabilities: self.liabilities_due_now,
             nisab_threshold: nisab_threshold_value,
             rate,

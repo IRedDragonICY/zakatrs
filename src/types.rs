@@ -1,5 +1,6 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tracing::warn;
 
 /// Represents the type of Zakat payment due.
@@ -683,39 +684,43 @@ impl std::fmt::Display for ZakatDetails {
     }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ErrorDetails {
+    pub reason_key: String,
+    pub args: Option<std::collections::HashMap<String, String>>,
+    pub source_label: Option<String>,
+    pub asset_id: Option<uuid::Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct InvalidInputDetails {
+    pub field: String,
+    pub value: String,
+    pub reason_key: String,
+    pub args: Option<std::collections::HashMap<String, String>>,
+    pub source_label: Option<String>,
+    pub asset_id: Option<uuid::Uuid>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, thiserror::Error)]
 pub enum ZakatError {
-    #[error("Calculation error for '{source_label:?}': {reason}")]
-    CalculationError {
-        reason: String,
-        source_label: Option<String>,
-        asset_id: Option<uuid::Uuid>,
-    },
+    #[error("Calculation error: {0:?}")]
+    CalculationError(Box<ErrorDetails>),
 
-    #[error("Invalid input for asset '{source_label:?}': Field '{field}' (value: '{value}') - {reason}")]
-    InvalidInput {
-        field: String,
-        value: String,
-        reason: String,
-        source_label: Option<String>,
-        asset_id: Option<uuid::Uuid>,
-    },
+    #[error("Invalid input: {0:?}")]
+    InvalidInput(Box<InvalidInputDetails>),
 
-    #[error("Configuration error for '{source_label:?}': {reason}")]
-    ConfigurationError {
-        reason: String,
-        source_label: Option<String>,
-        asset_id: Option<uuid::Uuid>,
-    },
+    #[error("Configuration error: {0:?}")]
+    ConfigurationError(Box<ErrorDetails>),
     
-    #[error("Calculation overflow in '{operation}' for '{source_label:?}'")]
+    #[error("Calculation overflow in '{operation}'")]
     Overflow {
         operation: String,
         source_label: Option<String>,
         asset_id: Option<uuid::Uuid>,
     },
 
-    #[error("Missing configuration for '{source_label:?}': Field '{field}' is required")]
+    #[error("Missing configuration: {field}")]
     MissingConfig {
         field: String,
         source_label: Option<String>,
@@ -732,22 +737,17 @@ pub enum ZakatError {
 impl ZakatError {
     pub fn with_source(self, source: String) -> Self {
         match self {
-            ZakatError::CalculationError { reason, asset_id, .. } => ZakatError::CalculationError {
-                reason,
-                source_label: Some(source),
-                asset_id,
+            ZakatError::CalculationError(mut details) => {
+                details.source_label = Some(source);
+                ZakatError::CalculationError(details)
             },
-            ZakatError::InvalidInput { field, value, reason, asset_id, .. } => ZakatError::InvalidInput {
-                field,
-                value,
-                reason,
-                source_label: Some(source),
-                asset_id,
+            ZakatError::InvalidInput(mut details) => {
+                details.source_label = Some(source);
+                ZakatError::InvalidInput(details)
             },
-            ZakatError::ConfigurationError { reason, asset_id, .. } => ZakatError::ConfigurationError {
-                reason,
-                source_label: Some(source),
-                asset_id,
+            ZakatError::ConfigurationError(mut details) => {
+                details.source_label = Some(source);
+                ZakatError::ConfigurationError(details)
             },
             ZakatError::Overflow { operation, asset_id, .. } => ZakatError::Overflow {
                 operation,
@@ -769,22 +769,17 @@ impl ZakatError {
     /// Sets the asset ID for debugging purposes.
     pub fn with_asset_id(self, id: uuid::Uuid) -> Self {
         match self {
-            ZakatError::CalculationError { reason, source_label, .. } => ZakatError::CalculationError {
-                reason,
-                source_label,
-                asset_id: Some(id),
+            ZakatError::CalculationError(mut details) => {
+                details.asset_id = Some(id);
+                ZakatError::CalculationError(details)
             },
-            ZakatError::InvalidInput { field, value, reason, source_label, .. } => ZakatError::InvalidInput {
-                field,
-                value,
-                reason,
-                source_label,
-                asset_id: Some(id),
+            ZakatError::InvalidInput(mut details) => {
+                details.asset_id = Some(id);
+                ZakatError::InvalidInput(details)
             },
-            ZakatError::ConfigurationError { reason, source_label, .. } => ZakatError::ConfigurationError {
-                reason,
-                source_label,
-                asset_id: Some(id),
+            ZakatError::ConfigurationError(mut details) => {
+                details.asset_id = Some(id);
+                ZakatError::ConfigurationError(details)
             },
             ZakatError::Overflow { operation, source_label, .. } => ZakatError::Overflow {
                 operation,
@@ -803,68 +798,61 @@ impl ZakatError {
         }
     }
 
-    /// Generates a user-friendly error report.
-    /// 
-    /// Format includes:
-    /// - The Asset Source (if available)
-    /// - The Asset ID (if available)
-    /// - The Error Reason
-    /// - A hinted remediation (if applicable)
-    pub fn report(&self) -> String {
-        // Handle MultipleErrors specially by combining reports
-        if let ZakatError::MultipleErrors(errors) = self {
-            let mut output = format!("Multiple Validation Errors ({} total):\n", errors.len());
-            for (i, err) in errors.iter().enumerate() {
-                output.push_str(&format!("\n--- Error {} ---\n{}", i + 1, err.report()));
-            }
-            return output;
-        }
+    /// Reports the error using the translator to resolve the reason key.
+    pub fn report(&self, translator: &crate::i18n::Translator) -> String {
+        self.report_in(crate::i18n::ZakatLocale::EnUS, translator)
+    }
 
-        let label = match self {
-            ZakatError::CalculationError { source_label, .. } => source_label.as_deref(),
-            ZakatError::InvalidInput { source_label, .. } => source_label.as_deref(),
-            ZakatError::ConfigurationError { source_label, .. } => source_label.as_deref(),
-            ZakatError::Overflow { source_label, .. } => source_label.as_deref(),
-            ZakatError::MissingConfig { source_label, .. } => source_label.as_deref(),
-            ZakatError::NetworkError(_) => Some("Network"),
-            ZakatError::MultipleErrors(_) => unreachable!(), // Handled above
-        }.unwrap_or("Unknown Source");
+    pub fn report_in(&self, locale: crate::i18n::ZakatLocale, translator: &crate::i18n::Translator) -> String {
 
-        let asset_id = match self {
-            ZakatError::CalculationError { asset_id, .. } => asset_id.as_ref(),
-            ZakatError::InvalidInput { asset_id, .. } => asset_id.as_ref(),
-            ZakatError::ConfigurationError { asset_id, .. } => asset_id.as_ref(),
-            ZakatError::Overflow { asset_id, .. } => asset_id.as_ref(),
-            ZakatError::MissingConfig { asset_id, .. } => asset_id.as_ref(),
-            ZakatError::NetworkError(_) => None,
-            ZakatError::MultipleErrors(_) => unreachable!(), // Handled above
-        };
-
-        let reason = match self {
-            ZakatError::CalculationError { reason, .. } => reason.clone(),
-            ZakatError::InvalidInput { field, value, reason, .. } => format!("Field '{}' has invalid value '{}' - {}", field, value, reason),
-            ZakatError::ConfigurationError { reason, .. } => reason.clone(),
-            ZakatError::Overflow { operation, .. } => format!("Overflow occurred during '{}'", operation),
-            ZakatError::MissingConfig { field, .. } => format!("Missing required configuration field '{}'", field),
-            ZakatError::NetworkError(msg) => msg.clone(),
-            ZakatError::MultipleErrors(_) => unreachable!(), // Handled above
-        };
-
-        let hint = self.get_hint();
-
-        let id_str = asset_id.map(|id| format!("\n  Asset ID: {}", id)).unwrap_or_default();
         
-        format!(
-            "Diagnostic Report:\n  Asset: {}{}
-  Error: {}\n  Hint: {}",
-            label, id_str, reason, hint
-        )
+        match self {
+            ZakatError::CalculationError(details) => {
+                let msg = translator.translate_with_args(locale, &details.reason_key, details.args.as_ref());
+                if let Some(lbl) = &details.source_label {
+                    format!("{} (Asset: {})", msg, lbl)
+                } else {
+                    msg
+                }
+            },
+            ZakatError::InvalidInput(details) => {
+                 let msg = translator.translate_with_args(locale, &details.reason_key, details.args.as_ref());
+                 let base = format!("Invalid input for '{}': {} (Value: {})", details.field, msg, details.value);
+                 if let Some(lbl) = &details.source_label {
+                    format!("{} (Asset: {})", base, lbl)
+                } else {
+                    base
+                }
+            },
+            ZakatError::ConfigurationError(details) => {
+                translator.translate_with_args(locale, &details.reason_key, details.args.as_ref())
+            },
+            ZakatError::MissingConfig { field, .. } => {
+                let mut args = HashMap::new();
+                args.insert("field".to_string(), field.clone());
+                translator.translate_map(locale, "error-config-missing", Some(&args))
+            },
+             ZakatError::Overflow { operation, .. } => {
+                 format!("Calculation overflow: {}", operation) // TODO localize
+             },
+             ZakatError::MultipleErrors(errs) => {
+                 let msgs: Vec<String> = errs.iter().map(|e| e.report_in(locale, translator)).collect();
+                 msgs.join("; ")
+             },
+             ZakatError::NetworkError(msg) => msg.clone(),
+        }
+    }
+
+    /// Generates a user-friendly error report using the default translator.
+    pub fn report_default(&self) -> String {
+        let t = crate::i18n::default_translator();
+        self.report(&t)
     }
 
     fn get_hint(&self) -> &'static str {
          match self {
-            ZakatError::ConfigurationError { reason, .. } => {
-                if reason.contains("Gold price") || reason.contains("Silver price") {
+            ZakatError::ConfigurationError(details) => {
+                if details.reason_key.contains("gold-price") || details.reason_key.contains("silver-price") {
                     "Suggestion: Set prices in ZakatConfig using .with_gold_price() / .with_silver_price()"
                 } else {
                     "Suggestion: Check ZakatConfig setup."
@@ -877,8 +865,7 @@ impl ZakatError {
                      "Suggestion: Ensure all required configuration fields are set."
                 }
             },
-
-            ZakatError::InvalidInput { .. } => "Suggestion: Ensure all input values are non-negative and correct.",
+            ZakatError::InvalidInput(_) => "Suggestion: Ensure all input values are non-negative and correct.",
             ZakatError::NetworkError(_) => "Suggestion: Check internet connection or API availability.",
             _ => "Suggestion: Check input data accuracy."
         }
@@ -889,18 +876,18 @@ impl ZakatError {
     pub fn context(&self) -> serde_json::Value {
         use serde_json::json;
         match self {
-             ZakatError::InvalidInput { field, value, reason, source_label, .. } => json!({
+             ZakatError::InvalidInput(details) => json!({
                  "code": "INVALID_INPUT",
-                 "message": reason,
-                 "field": field,
-                 "value": value,
-                 "source": source_label,
+                 "message": details.reason_key,
+                 "field": details.field,
+                 "value": details.value,
+                 "source": details.source_label,
                  "hint": self.get_hint()
              }),
-             ZakatError::ConfigurationError { reason, source_label, .. } => json!({
+             ZakatError::ConfigurationError(details) => json!({
                  "code": "CONFIG_ERROR",
-                 "message": reason,
-                 "source": source_label,
+                 "message": details.reason_key,
+                 "source": details.source_label,
                  "hint": self.get_hint()
              }),
              ZakatError::MissingConfig { field, source_label, .. } => json!({
@@ -910,10 +897,10 @@ impl ZakatError {
                  "source": source_label,
                  "hint": self.get_hint()
              }),
-             ZakatError::CalculationError { reason, source_label, .. } => json!({
+             ZakatError::CalculationError(details) => json!({
                  "code": "CALCULATION_ERROR",
-                 "message": reason,
-                 "source": source_label,
+                 "message": details.reason_key,
+                 "source": details.source_label,
                  "hint": self.get_hint()
              }),
              ZakatError::Overflow { operation, source_label, .. } => json!({

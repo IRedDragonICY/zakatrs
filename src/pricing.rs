@@ -6,7 +6,7 @@
 
 use rust_decimal::Decimal;
 
-use crate::types::ZakatError;
+use crate::types::{ZakatError, InvalidInputDetails};
 use crate::inputs::IntoZakatDecimal;
 
 /// Represents current market prices for metals used in Zakat calculations.
@@ -28,13 +28,14 @@ impl Prices {
         let silver = silver_per_gram.into_zakat_decimal()?;
 
         if gold < Decimal::ZERO || silver < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput { 
+            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
                 field: "prices".to_string(),
                 value: "negative".to_string(),
-                reason: "Prices must be non-negative".to_string(),
+                reason_key: "error-prices-negative".to_string(),
+                args: None,
                 source_label: None,
                 asset_id: None,
-            });
+            })));
         }
 
         Ok(Self {
@@ -193,11 +194,12 @@ impl PriceProvider for BinancePriceProvider {
             .map_err(|e| ZakatError::NetworkError(format!("Failed to parse Binance response: {}", e)))?;
             
         let price_per_ounce = rust_decimal::Decimal::from_str_exact(&ticker.price)
-            .map_err(|e| ZakatError::CalculationError { 
-                reason: format!("Failed to parse price decimal: {}", e),
+            .map_err(|e| ZakatError::CalculationError(Box::new(ErrorDetails { 
+                reason_key: "error-calculation-failed".to_string(),
+                args: Some(std::collections::HashMap::from([("details".to_string(), format!("Failed to parse price decimal: {}", e))])),
                 source_label: None,
                 asset_id: None,
-            })?;
+            })))?;
             
         let gold_per_gram = price_per_ounce / OUNCE_TO_GRAM;
 

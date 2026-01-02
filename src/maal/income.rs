@@ -9,7 +9,7 @@
 //! - **Net**: Deduct basic needs (*Hajah Asliyyah*) and debts before calculating surplus (Lenient).
 
 use rust_decimal::Decimal;
-use crate::types::{ZakatDetails, ZakatError};
+use crate::types::{ZakatDetails, ZakatError, ErrorDetails, InvalidInputDetails};
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
@@ -110,13 +110,14 @@ impl CalculateZakat for IncomeZakatCalculator {
         let config = config_cow.as_ref();
 
         if self.income < Decimal::ZERO || self.expenses < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput {
+            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
                 field: "income_expenses".to_string(),
                 value: "negative".to_string(),
-                reason: "Income and expenses must be non-negative".to_string(),
+                reason_key: "error-negative-value".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
 
         // For LowerOfTwo or Silver standard, we need silver price too
@@ -126,18 +127,20 @@ impl CalculateZakat for IncomeZakatCalculator {
         );
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
-            return Err(ZakatError::ConfigurationError {
-                reason: "Gold price needed for Income Nisab".to_string(),
+            return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-gold-price-required".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
-            return Err(ZakatError::ConfigurationError {
-                reason: "Silver price needed for Income Nisab with current standard".to_string(),
+            return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-silver-price-required".to_string(),
+                args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
-            });
+            })));
         }
         
         let nisab_threshold_value = config.get_monetary_nisab_threshold();

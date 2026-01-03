@@ -79,7 +79,7 @@ We support multiple platforms. Please refer to the specific documentation for yo
 With Async Support (Default):
 ```toml
 [dependencies]
-zakat = "1.0.0"
+zakat = "1.0.1"
 rust_decimal = "1.39"
 tokio = { version = "1", features = ["full"] }
 ```
@@ -87,7 +87,7 @@ tokio = { version = "1", features = ["full"] }
 Synchronous Only:
 ```toml
 [dependencies]
-zakat = { version = "1.0.0", default-features = false }
+zakat = { version = "1.0.1", default-features = false }
 rust_decimal = "1.39"
 ```
 
@@ -114,18 +114,75 @@ dart pub add zakat
 
 ## Build & Development
 
-The project includes a comprehensive set of cross-platform scripts (PowerShell for Windows, Bash for Linux/macOS) in the `scripts/` directory to automate common tasks.
+This project uses **xtask** — a Rust-based task runner that works cross-platform without needing external shell scripts.
 
-| Task | Script (Windows) | Script (Linux/Mac) | Description |
-| :--- | :--- | :--- | :--- |
-| **Build All** | `scripts/build-all.ps1` | `scripts/build-all.sh` | Builds Rust Core, WASM bindings, and Dart bindings. |
-| **Build Core** | `cargo build` | `cargo build` | Standard Rust build. |
-| **Build WASM** | `scripts/build-wasm.ps1` | `scripts/build-wasm.sh` | Compiles to WASM using `wasm-pack` and generates NPM package in `pkg/`. |
-| **Build Dart** | `scripts/build-dart.ps1` | `scripts/build-dart.sh` | Generates Flutter Rust Bridge bindings and compiles the Dart library. |
-| **Sync Versions** | `scripts/sync-versions.ps1` | `scripts/sync-versions.sh` | Synchronizes version numbers across `Cargo.toml`, `package.json`, and `pubspec.yaml` (coming soon). |
-| **Publish** | `scripts/publish-all.ps1` | `scripts/publish-all.sh` | Automates publishing to Crates.io, NPM, and JSR (requires auth tokens). |
+### Prerequisites
 
-> **Note**: For Windows users, run scripts from PowerShell. For Linux/Mac, ensure scripts are executable (`chmod +x scripts/*.sh`).
+- **Rust**: Install via [rustup](https://rustup.rs/)
+- **wasm-pack**: `cargo install wasm-pack`
+- **typeshare** (optional): `cargo install typeshare-cli` for type generation
+- **flutter_rust_bridge** (for Dart): See [flutter_rust_bridge docs](https://cjycode.com/flutter_rust_bridge/)
+
+### Available Commands
+
+```bash
+# Build everything (Rust core, WASM, Dart, and generate types)
+cargo xtask build-all
+
+# Sync version numbers across all manifests (Cargo.toml → package.json, pubspec.yaml, jsr.json)
+cargo xtask sync-versions
+
+# Publish to all registries (Crates.io, NPM, JSR, PyPI, Pub.dev)
+cargo xtask publish-all
+
+# Publish to individual platforms
+cargo xtask publish-crates   # Crates.io only
+cargo xtask publish-pypi     # PyPI only
+cargo xtask publish-npm      # NPM only
+cargo xtask publish-jsr      # JSR only
+cargo xtask publish-dart     # Pub.dev only
+
+# Dry run (validate without publishing)
+cargo xtask publish-dart --dry-run
+cargo xtask publish-all --dry-run
+```
+
+### What `build-all` Does
+
+1. **Rust Core**: Compiles the main library with `cargo build --release`
+2. **WASM Package**: Uses `wasm-pack build` to generate the NPM package in `pkg/`
+3. **Type Generation**: Uses `typeshare` to generate TypeScript (`pkg/types.ts`) and Kotlin (`zakat_android/.../Types.kt`) type definitions
+4. **Dart Bindings**: Runs `flutter_rust_bridge_codegen` for Flutter bindings in `zakat_dart/`
+
+### Manual Builds
+
+```bash
+# Build Rust core only
+cargo build --release
+
+# Build WASM only
+wasm-pack build --target web --out-dir pkg
+
+# Generate types only (requires typeshare-cli)
+typeshare ./zakat-core --lang=typescript --output-file=./pkg/types.ts
+typeshare ./zakat-core --lang=kotlin --output-file=./zakat_android/lib/src/main/java/com/islamic/zakat/Types.kt
+
+# Build Dart bindings only
+cd zakat_dart && flutter_rust_bridge_codegen generate
+```
+
+### Running Tests
+
+```bash
+# Run all tests
+cargo test
+
+# Run tests without async features
+cargo test --no-default-features
+
+# Run specific test file
+cargo test --test portfolio_aggregation
+```
 
 ## Modules
 

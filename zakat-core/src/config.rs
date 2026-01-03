@@ -22,13 +22,15 @@ fn default_strategy() -> Arc<dyn ZakatStrategy> {
 
 /// Networking configuration for external API calls
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub struct NetworkConfig {
     /// Optional direct IP for Binance API to bypass DNS issues.
     /// If None, standard DNS resolution is used.
-    pub binance_api_ip: Option<std::net::IpAddr>,
+    pub binance_api_ip: Option<String>,
     
     /// Request timeout in seconds. Default: 30.
-    pub timeout_seconds: u64,
+    pub timeout_seconds: u32,
 }
 
 impl Default for NetworkConfig {
@@ -40,16 +42,35 @@ impl Default for NetworkConfig {
     }
 }
 
+impl NetworkConfig {
+    /// Sets the Binance API IP address from a string.
+    pub fn with_binance_ip(mut self, ip: impl Into<String>) -> Self {
+        self.binance_api_ip = Some(ip.into());
+        self
+    }
+}
+
 /// Global configuration for Zakat prices.
 #[derive(Clone, Serialize, Deserialize)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub struct ZakatConfig {
     /// The Zakat calculation strategy. Uses `Madhab::Hanafi` by default.
     /// Can be set to any custom strategy implementing `ZakatStrategy`.
     #[serde(skip, default = "default_strategy")]
+    #[typeshare(skip)]
     pub strategy: Arc<dyn ZakatStrategy>,
+    /// Current market price of Gold per gram.
+    #[typeshare(serialized_as = "string")]
     pub gold_price_per_gram: Decimal,
+    /// Current market price of Silver per gram.
+    #[typeshare(serialized_as = "string")]
     pub silver_price_per_gram: Decimal,
+    /// Price of Rice per kg (for Zakat Fitrah).
+    #[typeshare(serialized_as = "Option<string>")]
     pub rice_price_per_kg: Option<Decimal>,
+    /// Price of Rice per liter (for Zakat Fitrah).
+    #[typeshare(serialized_as = "Option<string>")]
     pub rice_price_per_liter: Option<Decimal>,
     
     /// Nisab standard to use for cash, business assets, and investments.
@@ -57,9 +78,15 @@ pub struct ZakatConfig {
     pub cash_nisab_standard: NisabStandard,
     
     // Custom Thresholds (Optional override, defaults provided)
-    pub nisab_gold_grams: Option<Decimal>, // Default 85g
-    pub nisab_silver_grams: Option<Decimal>, // Default 595g
-    pub nisab_agriculture_kg: Option<Decimal>, // Default 653kg
+    /// Override default Gold Nisab (default: 85g).
+    #[typeshare(serialized_as = "Option<string>")]
+    pub nisab_gold_grams: Option<Decimal>,
+    /// Override default Silver Nisab (default: 595g).
+    #[typeshare(serialized_as = "Option<string>")]
+    pub nisab_silver_grams: Option<Decimal>,
+    /// Override default Agriculture Nisab (default: 653kg).
+    #[typeshare(serialized_as = "Option<string>")]
+    pub nisab_agriculture_kg: Option<Decimal>,
 
     /// Locale code for output formatting (e.g., "en-US", "ar-SA").
     /// Use `zakat-i18n` crate for full i18n support.
@@ -70,6 +97,7 @@ pub struct ZakatConfig {
     #[serde(default = "default_currency_code")]
     pub currency_code: String,
 
+    /// Network configuration for external API calls.
     #[serde(default)]
     pub networking: NetworkConfig,
 }

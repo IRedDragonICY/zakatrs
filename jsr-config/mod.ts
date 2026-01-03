@@ -15,9 +15,9 @@
  * import { calculate_single_asset, type ZakatConfig } from "@islam/zakat";
  * 
  * const config: ZakatConfig = {
- *   gold_price_per_gram: 100,
- *   silver_price_per_gram: 1.5,
- *   cash_nisab_standard: "Silver"
+ *   goldPricePerGram: "100",
+ *   silverPricePerGram: "1.5",
+ *   cashNisabStandard: "silver"
  * };
  * 
  * // Calculate Zakat on Cash
@@ -39,4 +39,5 @@ export {
     greet
 } from "./zakat.js";
 
-export type { ZakatConfig, PortfolioItem, NisabStandard, ZakatLocale } from "./definitions.ts";
+// Export TypeScript types generated from Rust via typeshare
+export * from "./types.ts";

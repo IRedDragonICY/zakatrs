@@ -19,15 +19,28 @@ use rust_decimal::Decimal;
 use uuid::Uuid;
 
 /// Generic asset type for user-defined assets.
+/// Allows users to create custom zakatable assets with custom rates and thresholds.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub struct CustomAsset {
+    /// Unique identifier for this asset.
+    #[typeshare(serialized_as = "string")]
     pub id: Uuid,
+    /// Human-readable label for this asset.
     pub label: String,
+    /// Total value of the asset.
+    #[typeshare(serialized_as = "string")]
     pub value: Decimal,
+    /// Zakat rate to apply (e.g., 0.025 for 2.5%).
+    #[typeshare(serialized_as = "string")]
     pub rate: Decimal,
+    /// Minimum threshold for Zakat obligation.
+    #[typeshare(serialized_as = "string")]
     pub nisab_threshold: Decimal,
+    /// Whether the Hawl (one lunar year) has been satisfied.
     pub hawl_satisfied: bool,
+    /// Name of the wealth type for categorization.
     pub wealth_type_name: String,
 }
 
@@ -98,20 +111,41 @@ impl CalculateZakat for CustomAsset {
 /// A wrapper enum for all zakatable asset types.
 /// This enables serialization and uniform handling in a portfolio.
 /// 
+/// Each variant represents a different category of zakatable wealth:
+/// - `Business`: Trade goods and business assets (Urud al-Tijarah).
+/// - `Income`: Professional income (Zakat al-Mustafad).
+/// - `Livestock`: Animals (camels, cattle, sheep/goats).
+/// - `Agriculture`: Crops and harvests.
+/// - `Investment`: Stocks, crypto, and mutual funds.
+/// - `Mining`: Mineral extraction (Ma'dan).
+/// - `PreciousMetals`: Gold and silver.
+/// - `Fitrah`: Zakat al-Fitr (obligatory charity at end of Ramadan).
+/// - `Custom`: User-defined assets with custom rules.
+/// 
 /// Note: The `Ledger` variant is provided by the `zakat-ledger` crate.
 /// When using the full zakat crate (facade), you can use `ExtendedPortfolioItem`
 /// which includes ledger assets.
 #[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[typeshare::typeshare]
+#[serde(tag = "type", content = "data", rename_all = "camelCase")]
 pub enum PortfolioItem {
+    /// Business assets (cash, inventory, receivables).
     Business(BusinessZakat),
+    /// Professional income (salary, freelance earnings).
     Income(IncomeZakatCalculator),
+    /// Livestock assets (camels, cattle, sheep, goats).
     Livestock(LivestockAssets),
+    /// Agricultural assets (crops, harvests).
     Agriculture(AgricultureAssets),
+    /// Investment assets (stocks, crypto, mutual funds).
     Investment(InvestmentAssets),
+    /// Mining assets (minerals, extracted resources).
     Mining(MiningAssets),
+    /// Precious metals (gold, silver).
     PreciousMetals(PreciousMetals),
+    /// Zakat al-Fitr calculator.
     Fitrah(FitrahCalculator),
+    /// User-defined custom assets.
     Custom(CustomAsset),
 }
 

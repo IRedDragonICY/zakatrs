@@ -86,6 +86,7 @@ impl LivestockDueItem {
 #[serde(tag = "type", content = "content", rename_all = "camelCase")]
 pub enum PaymentPayload {
     /// Currency-based Zakat payment (default for most wealth types).
+    #[typeshare(serialized_as = "string")]
     Monetary(Decimal),
     /// In-kind livestock payment specifying animal types and counts.
     Livestock {
@@ -94,8 +95,10 @@ pub enum PaymentPayload {
     },
     /// In-kind agriculture payment specifying harvest details.
     Agriculture {
+        #[typeshare(serialized_as = "string")]
         harvest_weight: Decimal,
         irrigation_method: String,
+        #[typeshare(serialized_as = "string")]
         crop_value: Decimal,
     },
 }
@@ -178,10 +181,12 @@ pub struct CalculationStep {
     /// Fallback English text.
     pub description: String,
     /// The value at this step (if applicable).
+    #[typeshare(serialized_as = "Option<string>")]
     pub amount: Option<Decimal>,
     /// The semantic operation type.
     pub operation: Operation,
     /// Variables for fluent.
+    #[typeshare(skip)]
     pub args: Option<std::collections::HashMap<String, String>>,
 }
 
@@ -357,16 +362,21 @@ impl std::fmt::Display for CalculationTrace {
 #[serde(rename_all = "camelCase")]
 pub struct ZakatDetails {
     /// Total assets subject to Zakat calculation.
+    #[typeshare(serialized_as = "string")]
     pub total_assets: Decimal,
     /// Liabilities that can be deducted from the total assets (Only debts due immediately).
+    #[typeshare(serialized_as = "string")]
     pub liabilities_due_now: Decimal,
     /// Net assets after deducting liabilities (total_assets - liabilities_due_now).
+    #[typeshare(serialized_as = "string")]
     pub net_assets: Decimal,
     /// The Nisab threshold applicable for this type of wealth.
+    #[typeshare(serialized_as = "string")]
     pub nisab_threshold: Decimal,
     /// Whether Zakat is due (net_assets >= nisab_threshold).
     pub is_payable: bool,
     /// The final Zakat amount due.
+    #[typeshare(serialized_as = "string")]
     pub zakat_due: Decimal,
     /// The type of wealth this calculation is for.
     pub wealth_type: WealthType,
@@ -397,11 +407,16 @@ pub struct ZakatExplanation {
     /// Status of the calculation: "Payable" or "Exempt".
     pub status: String,
     /// The amount of Zakat due.
+    #[typeshare(serialized_as = "string")]
     pub amount_due: Decimal,
     // [NEW] Unified View Model Fields
+    /// Formatted total assets string.
     pub formatted_total: String,
+    /// Formatted Zakat due string.
     pub formatted_due: String,
+    /// Progress towards Nisab threshold (0.0 to 1.0).
     pub nisab_progress: f64,
+    /// Currency code for the calculation.
     pub currency_code: String,
     /// Step-by-step calculation steps.
     pub steps: Vec<CalculationStep>,

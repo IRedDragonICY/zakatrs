@@ -35,6 +35,11 @@ fn main() -> Result<()> {
         "build-all" => build_all()?,
         "sync-versions" => sync_versions()?,
         "publish-all" => publish_all()?,
+        "publish-crates" => publish_crates()?,
+        "publish-pypi" => publish_pypi()?,
+        "publish-npm" => publish_npm()?,
+        "publish-jsr" => publish_jsr()?,
+        "publish-dart" => publish_dart()?,
         "test" => run_tests()?,
         "-h" | "--help" | "help" => print_usage(),
         _ => {
@@ -59,22 +64,31 @@ USAGE:
 COMMANDS:
     build-all       Build all targets (Rust, Python, WASM, Dart)
     sync-versions   Synchronize versions across all package manifests
-    publish-all     Publish to all registries (interactive)
     test            Run all tests
 
-PUBLISH-ALL OPTIONS:
+PUBLISH COMMANDS:
+    publish-all     Publish to all registries (interactive)
+    publish-crates  Publish to Crates.io only
+    publish-pypi    Publish to PyPI only
+    publish-npm     Publish to NPM only
+    publish-jsr     Publish to JSR only
+    publish-dart    Publish to Pub.dev only
+
+PUBLISH OPTIONS:
     --dry-run, -n   Validate without actually publishing
-    --skip-crates   Skip crates.io publishing
-    --skip-pypi     Skip PyPI publishing
-    --skip-npm      Skip NPM publishing
-    --skip-jsr      Skip JSR publishing
-    --skip-dart     Skip pub.dev publishing
+    --skip-crates   Skip crates.io publishing (publish-all only)
+    --skip-pypi     Skip PyPI publishing (publish-all only)
+    --skip-npm      Skip NPM publishing (publish-all only)
+    --skip-jsr      Skip JSR publishing (publish-all only)
+    --skip-dart     Skip pub.dev publishing (publish-all only)
 
 EXAMPLES:
-    cargo run -p xtask -- build-all
-    cargo run -p xtask -- sync-versions
-    cargo run -p xtask -- publish-all --dry-run
-    cargo run -p xtask -- publish-all --skip-dart --skip-pypi
+    cargo xtask build-all
+    cargo xtask sync-versions
+    cargo xtask publish-all --dry-run
+    cargo xtask publish-dart --dry-run
+    cargo xtask publish-npm
+    cargo xtask publish-all --skip-dart --skip-pypi
 "#
     );
 }
@@ -139,6 +153,78 @@ fn command_exists(cmd: &str) -> bool {
         .is_ok()
 }
 
+/// Generate type definitions for all supported languages using typeshare.
+/// 
+/// Generates:
+/// - TypeScript: `pkg/types.ts` (for NPM, JSR, WASM)
+/// - Kotlin: `zakat_android/lib/src/main/java/com/islamic/zakat/Types.kt` (for Android)
+/// - Swift: `zakat_ios/Sources/ZakatTypes.swift` (for iOS - future)
+/// 
+/// Note: Dart is not supported by typeshare. For Dart/Flutter, types are
+/// generated via `flutter_rust_bridge` which reads the Rust source directly.
+fn generate_types() -> Result<()> {
+    println!("📝 Generating type definitions for all platforms...");
+    
+    // Check if typeshare-cli is installed
+    if !command_exists("typeshare") {
+        println!("  ⚠️ 'typeshare' CLI not found. Installing via cargo...");
+        run_cmd("cargo", &["install", "typeshare-cli"])?;
+    }
+    
+    let root = project_root()?;
+    let zakat_core_path = root.join("zakat-core");
+    let input_str = zakat_core_path.to_string_lossy().to_string();
+
+    // === TypeScript (for NPM, JSR, WASM) ===
+    println!("\n  🟦 Generating TypeScript types...");
+    let ts_output = root.join("pkg").join("types.ts");
+    fs::create_dir_all(root.join("pkg"))?;
+    
+    run_cmd("typeshare", &[
+        &input_str,
+        "--lang=typescript",
+        &format!("--output-file={}", ts_output.to_string_lossy()),
+    ])?;
+    println!("    ✅ TypeScript: pkg/types.ts");
+
+    // === Kotlin (for Android) ===
+    println!("\n  🟩 Generating Kotlin types...");
+    let kotlin_dir = root.join("zakat_android").join("lib").join("src")
+        .join("main").join("java").join("com").join("islamic").join("zakat");
+    fs::create_dir_all(&kotlin_dir)?;
+    let kotlin_output = kotlin_dir.join("Types.kt");
+    
+    run_cmd("typeshare", &[
+        &input_str,
+        "--lang=kotlin",
+        "--java-package=com.islamic.zakat",
+        &format!("--output-file={}", kotlin_output.to_string_lossy()),
+    ])?;
+    println!("    ✅ Kotlin: zakat_android/.../Types.kt");
+
+    // === Swift (for iOS - optional, create directory if needed) ===
+    let swift_dir = root.join("zakat_ios").join("Sources");
+    if swift_dir.exists() || root.join("zakat_ios").exists() {
+        println!("\n  🟧 Generating Swift types...");
+        fs::create_dir_all(&swift_dir)?;
+        let swift_output = swift_dir.join("ZakatTypes.swift");
+        
+        run_cmd("typeshare", &[
+            &input_str,
+            "--lang=swift",
+            "--swift-prefix=Zakat",
+            &format!("--output-file={}", swift_output.to_string_lossy()),
+        ])?;
+        println!("    ✅ Swift: zakat_ios/Sources/ZakatTypes.swift");
+    } else {
+        println!("\n  🟧 Swift: Skipped (zakat_ios/ directory not found)");
+    }
+
+    println!("\n  ✅ All type definitions generated!");
+    println!("  ℹ️  Note: Dart types are generated by flutter_rust_bridge, not typeshare.");
+    Ok(())
+}
+
 /// Copy a file from src to dst, creating parent directories if needed
 fn copy_file(src: &Path, dst: &Path) -> Result<()> {
     if let Some(parent) = dst.parent() {
@@ -197,20 +283,26 @@ fn build_all() -> Result<()> {
     println!("🔄 Synchronizing Versions...");
     sync_versions()?;
 
-    // 1. Native Rust Build
+    // 1. Generate TypeScript Types from Rust
+    generate_types()?;
+
+    // 2. Native Rust Build
     println!("\n🦀 Building Native Rust (Release)...");
     run_cmd("cargo", &["build", "--release"])?;
 
-    // 2. Python Build (Maturin)
+    // 3. Python Build (Maturin)
     println!("\n🐍 Building Python Package (Maturin)...");
+    let zakat_manifest = root.join("zakat").join("Cargo.toml");
+    let manifest_arg = format!("-m={}", zakat_manifest.display());
+    
     if command_exists("maturin") {
-        run_cmd("maturin", &["build", "--release"])?;
+        run_cmd("maturin", &["build", "--release", &manifest_arg])?;
     } else {
         println!("  ⚠️ 'maturin' not in PATH, trying 'python -m maturin'...");
-        run_cmd("python", &["-m", "maturin", "build", "--release"])?;
+        run_cmd("python", &["-m", "maturin", "build", "--release", &manifest_arg])?;
     }
 
-    // 3. WASM & JSR Build
+    // 4. WASM & JSR Build
     println!("\n🕸️  Building WASM & JSR Package...");
     if command_exists("wasm-pack") {
         build_wasm()?;
@@ -221,7 +313,7 @@ fn build_all() -> Result<()> {
     // Always sync WASM/JS metadata
     sync_pkg_metadata()?;
 
-    // 4. Dart/Flutter Prep
+    // 5. Dart/Flutter Prep
     println!("\n💙 Preparing Dart/Flutter Package...");
     build_dart(&root)?;
 
@@ -236,9 +328,15 @@ fn build_all() -> Result<()> {
 
 fn build_wasm() -> Result<()> {
     let root = project_root()?;
+    let zakat_dir = root.join("zakat");
     
     println!("  🏗️  Building WASM package...");
-    run_cmd("wasm-pack", &["build", "--target", "nodejs", "--scope", "islamic"])?;
+    run_cmd_in_dir(&zakat_dir, "wasm-pack", &[
+        "build", 
+        "--target", "nodejs", 
+        "--scope", "islamic",
+        "--out-dir", root.join("pkg").to_string_lossy().as_ref(),
+    ])?;
     
     println!("  📦 Restoring JSR configuration...");
     copy_file(&root.join("jsr-config/jsr.json"), &root.join("pkg/jsr.json"))?;
@@ -262,6 +360,9 @@ fn sync_pkg_metadata() -> Result<()> {
     // Copy JSR Config
     copy_file(&root.join("jsr-config/jsr.json"), &root.join("pkg/jsr.json"))?;
     copy_file(&root.join("jsr-config/mod.ts"), &root.join("pkg/mod.ts"))?;
+    
+    // Note: types.ts is already generated directly to pkg/types.ts by generate_types()
+    // No need to copy it from jsr-config
     
     // Copy Root Metadata
     copy_file(&root.join("README.md"), &root.join("pkg/README.md"))?;
@@ -658,5 +759,242 @@ fn run_tests() -> Result<()> {
     run_cmd("cargo", &["test"])?;
     
     println!("\n✅ All tests passed!");
+    Ok(())
+}
+
+// =============================================================================
+// Individual Publish Tasks
+// =============================================================================
+
+/// Publish only to Crates.io
+fn publish_crates() -> Result<()> {
+    let args: Vec<String> = env::args().collect();
+    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+    
+    let root = project_root()?;
+    let version = read_cargo_version()?;
+    
+    println!("\n🦀 Publishing to Crates.io v{}", version);
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    if dry_run {
+        println!("🔍 DRY RUN MODE - No actual publishing will occur\n");
+    }
+    
+    println!("📋 Publishing {} crates in dependency order:", WORKSPACE_CRATES.len());
+    for crate_name in WORKSPACE_CRATES {
+        println!("   • {}", crate_name);
+    }
+    println!();
+    
+    if !dry_run {
+        print!("Proceed with publishing? (y/n) ");
+        io::stdout().flush()?;
+        
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        
+        if input.trim().to_lowercase() != "y" {
+            println!("❌ Aborted.");
+            return Ok(());
+        }
+    }
+
+    let mut success_count = 0;
+    let mut fail_count = 0;
+    
+    for (i, crate_name) in WORKSPACE_CRATES.iter().enumerate() {
+        println!("\n  [{}/{}] Publishing {}...", i + 1, WORKSPACE_CRATES.len(), crate_name);
+        
+        let crate_dir = root.join(crate_name);
+        if !crate_dir.exists() {
+            println!("    ⚠️  Directory not found: {}", crate_dir.display());
+            fail_count += 1;
+            continue;
+        }
+        
+        let result = if dry_run {
+            run_cmd_in_dir(&crate_dir, "cargo", &["publish", "--dry-run"])
+        } else {
+            run_cmd_in_dir(&crate_dir, "cargo", &["publish"])
+        };
+        
+        match result {
+            Ok(_) => {
+                println!("    ✅ {} published successfully!", crate_name);
+                success_count += 1;
+            }
+            Err(e) => {
+                println!("    ❌ Failed to publish {}: {}", crate_name, e);
+                fail_count += 1;
+                
+                if !dry_run {
+                    print!("    Continue with remaining crates? (y/n) ");
+                    io::stdout().flush()?;
+                    let mut input = String::new();
+                    io::stdin().read_line(&mut input)?;
+                    if input.trim().to_lowercase() != "y" {
+                        bail!("Publishing aborted by user after {} failure", crate_name);
+                    }
+                }
+            }
+        }
+        
+        // Wait between crates for crates.io index to update (except dry-run)
+        if !dry_run && i < WORKSPACE_CRATES.len() - 1 {
+            println!("    ⏳ Waiting 30s for crates.io index to update...");
+            std::thread::sleep(std::time::Duration::from_secs(30));
+        }
+    }
+
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    if fail_count == 0 {
+        println!("✅ Crates.io publish {}!", if dry_run { "validated" } else { "complete" });
+    } else {
+        println!("⚠️  {} success, {} failures", success_count, fail_count);
+    }
+    
+    Ok(())
+}
+
+/// Publish only to PyPI
+fn publish_pypi() -> Result<()> {
+    let args: Vec<String> = env::args().collect();
+    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+    
+    let root = project_root()?;
+    let version = read_cargo_version()?;
+    
+    println!("\n🐍 Publishing to PyPI v{}", version);
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    if dry_run {
+        println!("🔍 DRY RUN MODE - Will only build, not publish\n");
+    }
+    
+    let zakat_crate = root.join("zakat");
+    let manifest_arg = format!("-m={}", zakat_crate.join("Cargo.toml").display());
+    
+    let result = if dry_run {
+        if command_exists("maturin") {
+            run_cmd("maturin", &["build", "--release", &manifest_arg])
+        } else {
+            run_cmd("python", &["-m", "maturin", "build", "--release", &manifest_arg])
+        }
+    } else {
+        if command_exists("maturin") {
+            run_cmd("maturin", &["publish", &manifest_arg])
+        } else {
+            run_cmd("python", &["-m", "maturin", "publish", &manifest_arg])
+        }
+    };
+    
+    match result {
+        Ok(_) => println!("\n✅ PyPI {} successful!", if dry_run { "dry-run" } else { "publish" }),
+        Err(e) => println!("\n❌ PyPI failed: {}", e),
+    }
+    
+    Ok(())
+}
+
+/// Publish only to NPM
+fn publish_npm() -> Result<()> {
+    let args: Vec<String> = env::args().collect();
+    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+    
+    let root = project_root()?;
+    let version = read_cargo_version()?;
+    
+    println!("\n📦 Publishing to NPM v{}", version);
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    if dry_run {
+        println!("🔍 DRY RUN MODE - No actual publishing will occur\n");
+    }
+    
+    let pkg_dir = root.join("pkg");
+    if !pkg_dir.exists() {
+        bail!("pkg/ directory not found. Run 'cargo xtask build-all' first.");
+    }
+    
+    let result = if dry_run {
+        run_cmd_in_dir(&pkg_dir, "npm", &["publish", "--access", "public", "--dry-run"])
+    } else {
+        run_cmd_in_dir(&pkg_dir, "npm", &["publish", "--access", "public"])
+    };
+    
+    match result {
+        Ok(_) => println!("\n✅ NPM {} successful!", if dry_run { "dry-run" } else { "publish" }),
+        Err(e) => println!("\n❌ NPM failed: {}", e),
+    }
+    
+    Ok(())
+}
+
+/// Publish only to JSR
+fn publish_jsr() -> Result<()> {
+    let args: Vec<String> = env::args().collect();
+    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+    
+    let root = project_root()?;
+    let version = read_cargo_version()?;
+    
+    println!("\n🦕 Publishing to JSR v{}", version);
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    if dry_run {
+        println!("🔍 DRY RUN MODE - No actual publishing will occur\n");
+    }
+    
+    let pkg_dir = root.join("pkg");
+    if !pkg_dir.exists() {
+        bail!("pkg/ directory not found. Run 'cargo xtask build-all' first.");
+    }
+    
+    let result = if dry_run {
+        run_cmd_in_dir(&pkg_dir, "npx", &["jsr", "publish", "--dry-run"])
+    } else {
+        run_cmd_in_dir(&pkg_dir, "npx", &["jsr", "publish"])
+    };
+    
+    match result {
+        Ok(_) => println!("\n✅ JSR {} successful!", if dry_run { "dry-run" } else { "publish" }),
+        Err(e) => println!("\n❌ JSR failed: {}", e),
+    }
+    
+    Ok(())
+}
+
+/// Publish only to Pub.dev (Dart)
+fn publish_dart() -> Result<()> {
+    let args: Vec<String> = env::args().collect();
+    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+    
+    let root = project_root()?;
+    let version = read_cargo_version()?;
+    
+    println!("\n💙 Publishing to Pub.dev v{}", version);
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    if dry_run {
+        println!("🔍 DRY RUN MODE - No actual publishing will occur\n");
+    }
+    
+    let dart_dir = root.join("zakat_dart");
+    if !dart_dir.exists() {
+        bail!("zakat_dart/ directory not found.");
+    }
+    
+    let result = if dry_run {
+        run_cmd_in_dir(&dart_dir, "dart", &["pub", "publish", "--dry-run"])
+    } else {
+        run_cmd_in_dir(&dart_dir, "dart", &["pub", "publish", "--force"])
+    };
+    
+    match result {
+        Ok(_) => println!("\n✅ Pub.dev {} successful!", if dry_run { "dry-run" } else { "publish" }),
+        Err(e) => println!("\n❌ Pub.dev failed: {}", e),
+    }
+    
     Ok(())
 }

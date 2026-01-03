@@ -10,7 +10,12 @@
 use serde::{Deserialize, Serialize};
 
 /// Nisab standard for calculating the Zakat threshold on monetary wealth.
+/// - `Gold`: Use the gold Nisab (85g × gold_price).
+/// - `Silver`: Use the silver Nisab (595g × silver_price).
+/// - `LowerOfTwo`: Use the lower of gold or silver Nisab - most beneficial for the poor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub enum NisabStandard {
     /// Use the gold Nisab (85g × gold_price)
     #[default]
@@ -22,24 +27,41 @@ pub enum NisabStandard {
 }
 
 /// Islamic school of thought (Madhab) for Zakat calculation.
+/// Each Madhab has different rules regarding Nisab standards and jewelry exemptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub enum Madhab {
+    /// Hanafi Madhab - Uses LowerOfTwo Nisab standard, jewelry is zakatable.
     #[default]
     Hanafi,
+    /// Shafi'i Madhab - Uses Gold Nisab standard, personal jewelry is exempt.
     Shafi,
+    /// Maliki Madhab - Uses Gold Nisab standard, personal jewelry is exempt.
     Maliki,
+    /// Hanbali Madhab - Uses LowerOfTwo Nisab standard, personal jewelry is exempt.
     Hanbali,
 }
 
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 
+/// Rules that govern Zakat calculations for a specific Madhab.
+/// Contains Nisab standard, jewelry exemption policy, and Zakat rates.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub struct ZakatRules {
+    /// The Nisab standard to use for determining Zakat eligibility.
     pub nisab_standard: NisabStandard,
+    /// Whether personal jewelry is exempt from Zakat.
     pub jewelry_exempt: bool,
-    pub trade_goods_rate: Decimal, // default 0.025
-    pub agriculture_rates: (Decimal, Decimal, Decimal), // Rain, Irrigated, Mixed
+    /// Zakat rate for trade goods (default: 2.5% = 0.025).
+    #[typeshare(serialized_as = "string")]
+    pub trade_goods_rate: Decimal,
+    /// Agriculture Zakat rates: (Rain-fed, Irrigated, Mixed).
+    #[typeshare(skip)]
+    pub agriculture_rates: (Decimal, Decimal, Decimal),
 }
 
 use crate::inputs::IntoZakatDecimal;

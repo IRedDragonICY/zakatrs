@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.0.1] - 2026-01-03
+
+### Added
+- **Automated TypeScript Type Generation**: Integrated `typeshare` for automatic TypeScript definition generation from Rust types.
+  - Types are now auto-generated to `pkg/types.ts` during build.
+  - All `Decimal` fields are serialized as `string` for precision.
+  - JSDoc comments are generated from Rust doc comments (`///`).
+- **Multi-Platform Type Generation**: Extended `xtask build-all` to generate types for multiple platforms:
+  - **TypeScript**: `pkg/types.ts` (for NPM, JSR, WASM, Deno)
+  - **Kotlin**: `zakat_android/.../Types.kt` (for Android)
+  - **Swift**: `zakat_ios/.../ZakatTypes.swift` (for iOS, optional)
+- **Typeshare Annotations**: Added `#[typeshare::typeshare]` to core public types:
+  - `ZakatConfig`, `NetworkConfig` (config.rs)
+  - `NisabStandard`, `Madhab`, `ZakatRules` (madhab.rs)
+  - `ZakatDetails`, `ZakatExplanation`, `CalculationStep`, `CalculationTrace` (types.rs)
+  - `PortfolioItem`, `CustomAsset` (assets.rs)
+  - `WealthType`, `PaymentPayload`, `Operation` (types.rs)
+
+### Changed
+- **NetworkConfig**: Changed `binance_api_ip` from `IpAddr` to `String` for FFI compatibility.
+- **NetworkConfig**: Changed `timeout_seconds` from `u64` to `u32` for typeshare compatibility.
+- **JSR Configuration**: Replaced manual `definitions.ts` with auto-generated `types.ts`.
+
+### Removed
+- **Manual Type Definitions**: Deleted `jsr-config/definitions.ts` (replaced by auto-generated `pkg/types.ts`).
+
+---
+
 ## [1.0.0] - 2026-01-03
 
 ### 🎉 First Stable Release

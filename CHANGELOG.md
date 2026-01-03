@@ -1,5 +1,46 @@
 # Changelog
 
+## [1.0.0] - 2026-01-03
+
+### 🎉 First Stable Release
+
+This is the first stable release of `zakatrs`, marking the library as production-ready.
+
+### Changed
+- **Cargo Workspace Architecture**: Major refactor from monolithic crate to modular workspace structure.
+  - `zakat-core`: Core mathematical logic, types, inputs, and Maal calculations
+  - `zakat-i18n`: Fluent localization with embedded locale files (en-US, id-ID, ar-SA)
+  - `zakat-ledger`: Hawl tracking and timeline analysis for wealth history
+  - `zakat-providers`: Live pricing providers with Binance API integration
+  - `zakat-sqlite`: SQLite persistence layer for ledger storage
+  - `zakat`: Thin facade crate re-exporting all public APIs (backwards compatible)
+
+### Added
+- **WASM Providers Support**: Live pricing now works on WebAssembly using `gloo-net` instead of `reqwest`
+  - Platform-specific implementations: `reqwest` for native, `gloo-net` for WASM
+  - `web-time` for WASM-compatible timing in cache logic
+  - `#[async_trait(?Send)]` for relaxed WASM trait bounds
+
+### Fixed
+- **UUID WASM Randomness**: Added `js` feature to `uuid` for proper WASM random generation
+- **Feature Flag Isolation**: WASM-specific code now properly gated behind `feature = "wasm"` only
+
+### Technical
+- **Shared Dependencies**: All common dependencies managed via `[workspace.dependencies]`
+- **Incremental Builds**: Changes to one crate only rebuild affected crates
+- **Parallel Compilation**: Independent crates compile in parallel
+- **67 Tests Passing**: All unit and integration tests verified across all platforms
+
+### Platform Support
+| Platform | Status |
+|----------|--------|
+| Native (Windows/Linux/macOS) | ✅ |
+| WebAssembly (Browser) | ✅ |
+| Python (PyO3) | ✅ |
+| Dart/Flutter | ✅ |
+| Android (UniFFI) | ✅ |
+
+---
 
 ## [0.20.2] - 2026-01-02
 ### Fixed

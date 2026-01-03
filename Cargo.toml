@@ -15,7 +15,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.21.0"
+version = "1.0.0"
 edition = "2024"
 license = "MIT"
 authors = ["Mohammad Farid Hendianto (IRedDragonICY)"]

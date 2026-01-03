@@ -21,11 +21,35 @@
 /// }
 /// ```
 ///
+/// # With Extra Impl Block
+///
+/// You can inject additional methods (like static constructors) using `extra_impl`:
+///
+/// ```ignore
+/// dart_export_asset! {
+///     /// Precious metals wrapper
+///     PreciousMetals as DartPreciousMetals {
+///         decimal: [weight, debt],
+///         bool: [hawl],
+///         string: [label],
+///         u32: [purity],
+///     }
+///     extra_impl: {
+///         /// Create a new gold asset.
+///         #[flutter_rust_bridge::frb(sync)]
+///         pub fn gold(weight_grams: $crate::api::types::FrbDecimal) -> Self {
+///             Self { inner: PreciousMetals::gold(weight_grams.value) }
+///         }
+///     }
+/// }
+/// ```
+///
 /// This generates:
 /// - `DartBusiness` struct wrapping the core type
 /// - `new()` constructor
 /// - Fluent setters for each field (mutating in place for Opaque compat)
 /// - `calculate(&DartZakatConfig) -> Result<DartZakatResult>` method
+/// - Any additional methods from `extra_impl`
 #[macro_export]
 macro_rules! dart_export_asset {
     (
@@ -37,6 +61,7 @@ macro_rules! dart_export_asset {
             $(, u32: [$($u32_field:ident),* $(,)?])?
             $(,)?
         }
+        $(extra_impl: { $($extra:tt)* })?
     ) => {
         $(#[$meta])*
         pub struct $dart_name {
@@ -114,108 +139,14 @@ macro_rules! dart_export_asset {
             pub fn get_label(&self) -> Option<String> {
                 self.inner.get_label()
             }
+            
+            // Inject any extra implementation provided by the caller
+            $($($extra)*)?
         }
         
         impl Default for $dart_name {
             fn default() -> Self {
                 Self::new()
-            }
-        }
-    };
-}
-
-/// Generate a Dart-exportable wrapper for PreciousMetals with metal type constructors.
-#[macro_export]
-macro_rules! dart_export_precious_metals {
-    () => {
-        /// Precious metals (gold/silver) asset wrapper for Dart.
-        pub struct DartPreciousMetals {
-            inner: zakat::maal::precious_metals::PreciousMetals,
-        }
-
-        impl DartPreciousMetals {
-            /// Create a new gold asset.
-            #[flutter_rust_bridge::frb(sync)]
-            pub fn gold(weight_grams: $crate::api::types::FrbDecimal) -> Self {
-                Self {
-                    inner: zakat::maal::precious_metals::PreciousMetals::gold(weight_grams.value),
-                }
-            }
-            
-            /// Create a new silver asset.
-            #[flutter_rust_bridge::frb(sync)]
-            pub fn silver(weight_grams: $crate::api::types::FrbDecimal) -> Self {
-                Self {
-                    inner: zakat::maal::precious_metals::PreciousMetals::silver(weight_grams.value),
-                }
-            }
-            
-            /// Set the weight in grams.
-            #[flutter_rust_bridge::frb(sync)]
-            pub fn weight(&mut self, grams: $crate::api::types::FrbDecimal) {
-                let inner = std::mem::take(&mut self.inner);
-                self.inner = inner.weight(grams.value);
-            }
-            
-            /// Set the purity (karat for gold 1-24, or per-mille for silver 1-1000).
-            #[flutter_rust_bridge::frb(sync)]
-            pub fn purity(&mut self, value: u32) {
-                let inner = std::mem::take(&mut self.inner);
-                self.inner = inner.purity(value);
-            }
-            
-            /// Set whether Hawl (1 lunar year) is satisfied.
-            #[flutter_rust_bridge::frb(sync)]
-            pub fn hawl(&mut self, satisfied: bool) {
-                let inner = std::mem::take(&mut self.inner);
-                self.inner = inner.hawl(satisfied);
-            }
-            
-            /// Set the asset label.
-            #[flutter_rust_bridge::frb(sync)]
-            pub fn label(&mut self, label: String) {
-                let inner = std::mem::take(&mut self.inner);
-                self.inner = inner.label(label);
-            }
-            
-            /// Set liabilities to deduct.
-            #[flutter_rust_bridge::frb(sync)]
-            pub fn debt(&mut self, amount: $crate::api::types::FrbDecimal) {
-                let inner = std::mem::take(&mut self.inner);
-                self.inner = inner.debt(amount.value);
-            }
-
-            /// Calculate Zakat for this precious metal.
-            #[flutter_rust_bridge::frb(sync)]
-            pub fn calculate(&self, config: &$crate::api::types::DartZakatConfig) -> anyhow::Result<$crate::api::types::DartZakatResult> {
-                use zakat::traits::CalculateZakat;
-                
-                let details = self.inner.calculate_zakat(&config.inner)
-                    .map_err(|e| anyhow::anyhow!("Calculation failed: {:?}", e))?;
-                
-                Ok($crate::api::types::DartZakatResult::from_core(details))
-            }
-            
-            /// Get the asset ID.
-            #[flutter_rust_bridge::frb(sync)]
-            pub fn get_id(&self) -> String {
-                self.inner.get_id().to_string()
-            }
-            
-            /// Get the asset label.
-            #[flutter_rust_bridge::frb(sync)]
-            pub fn get_label(&self) -> Option<String> {
-                self.inner.get_label()
-            }
-        }
-
-        impl Default for DartPreciousMetals {
-            fn default() -> Self {
-                // Default precious metals isn't directly constructible via new(), 
-                // but PreciousMetals implements Default (zero value gold).
-                Self {
-                    inner: zakat::maal::precious_metals::PreciousMetals::default(),
-                }
             }
         }
     };

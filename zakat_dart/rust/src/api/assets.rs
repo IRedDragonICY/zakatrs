@@ -35,7 +35,42 @@ dart_export_asset! {
 // Precious Metals (Gold & Silver)
 // ============================================================================
 
-dart_export_precious_metals!();
+dart_export_asset! {
+    /// Precious metals (gold/silver) asset wrapper for Dart.
+    ///
+    /// # Example (Dart)
+    /// ```dart
+    /// final gold = DartPreciousMetals.gold(FrbDecimal.fromString("100"))
+    ///     .purity(24)
+    ///     .hawl(true)
+    ///     .label("Gold Savings");
+    ///
+    /// final result = gold.calculate(config);
+    /// ```
+    zakat::maal::precious_metals::PreciousMetals as DartPreciousMetals {
+        decimal: [weight, debt],
+        bool: [hawl],
+        string: [label],
+        u32: [purity],
+    }
+    extra_impl: {
+        /// Create a new gold asset with the specified weight in grams.
+        #[flutter_rust_bridge::frb(sync)]
+        pub fn gold(weight_grams: crate::api::types::FrbDecimal) -> Self {
+            Self {
+                inner: zakat::maal::precious_metals::PreciousMetals::gold(weight_grams.value),
+            }
+        }
+        
+        /// Create a new silver asset with the specified weight in grams.
+        #[flutter_rust_bridge::frb(sync)]
+        pub fn silver(weight_grams: crate::api::types::FrbDecimal) -> Self {
+            Self {
+                inner: zakat::maal::precious_metals::PreciousMetals::silver(weight_grams.value),
+            }
+        }
+    }
+}
 
 // ============================================================================
 // Income Assets

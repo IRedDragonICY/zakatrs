@@ -15,10 +15,10 @@
 //! - Logic: `weight * (karat / 24)` extracts the zakatable 24K equivalent.
 
 use rust_decimal::Decimal;
-use crate::types::{ZakatDetails, ZakatError, WealthType, ErrorDetails, InvalidInputDetails};
+use crate::types::{ZakatDetails, ZakatError, WealthType, ErrorDetails, InvalidInputDetails, CalculationStep};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::utils::WeightUnit;
-
+use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
 
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
@@ -167,6 +167,7 @@ impl CalculateZakat for PreciousMetals {
         let config_cow = config.resolve_config();
         let config = config_cow.as_ref();
 
+        // 1. Validate metal type
         let metal_type = self.metal_type.clone().ok_or_else(|| 
             ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
                 field: "metal_type".to_string(),
@@ -178,6 +179,7 @@ impl CalculateZakat for PreciousMetals {
             }))
         )?;
 
+        // 2. Validate weight
         if self.weight_grams < Decimal::ZERO {
             return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
                 field: "weight".to_string(),
@@ -189,7 +191,7 @@ impl CalculateZakat for PreciousMetals {
             })));
         }
 
-        // Validate Purity Range based on Metal Type
+        // 3. Validate purity range based on metal type
         match metal_type {
             WealthType::Gold => {
                 if self.purity > 24 {
@@ -204,8 +206,7 @@ impl CalculateZakat for PreciousMetals {
                 }
             },
             WealthType::Silver => {
-                 // Silver purity is usually 0-1000 (millesimal)
-                 // No extra check needed as setter checks 0-1000
+                // Silver purity is usually 0-1000 (millesimal) - checked in setter
             },
             _ => return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
                 field: "metal_type".to_string(),
@@ -217,23 +218,24 @@ impl CalculateZakat for PreciousMetals {
             }))),
         };
 
-        // Check for personal usage exemption first
+        // 4. Check for personal usage exemption (Madhab-specific)
         if self.usage == JewelryUsage::PersonalUse && config.strategy.get_rules().jewelry_exempt {
-             return Ok(ZakatDetails::below_threshold(
-                 Decimal::ZERO, 
-                 metal_type, 
-                 "Exempt per Madhab (Huliyy al-Mubah)"
-             ).with_label(self.label.clone().unwrap_or_default()));
+            return Ok(ZakatDetails::below_threshold(
+                Decimal::ZERO, 
+                metal_type, 
+                "Exempt per Madhab (Huliyy al-Mubah)"
+            ).with_label(self.label.clone().unwrap_or_default()));
         }
 
+        // 5. Get price and nisab for metal type
         let (price_per_gram, nisab_threshold_grams) = match metal_type {
             WealthType::Gold => (config.gold_price_per_gram, config.get_nisab_gold_grams()),
             WealthType::Silver => (config.silver_price_per_gram, config.get_nisab_silver_grams()),
-            _ => unreachable!(), // Checked above
+            _ => unreachable!(),
         };
 
         if price_per_gram <= Decimal::ZERO {
-             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+            return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
                 reason_key: "error-price-required".to_string(),
                 args: None,
                 source_label: self.label.clone(),
@@ -241,11 +243,12 @@ impl CalculateZakat for PreciousMetals {
             })));
         }
 
+        // 6. Calculate nisab threshold in currency
         let nisab_value = ZakatDecimal::new(nisab_threshold_grams)
             .safe_mul(price_per_gram)?
             .with_source(self.label.clone());
 
-        // Override hawl_satisfied if acquisition_date is present
+        // 7. Determine hawl satisfaction (acquisition_date takes precedence)
         let hawl_is_satisfied = if let Some(date) = self.acquisition_date {
             crate::hawl::HawlTracker::new(chrono::Local::now().date_naive())
                 .acquired_on(date)
@@ -254,69 +257,88 @@ impl CalculateZakat for PreciousMetals {
             self.hawl_satisfied
         };
 
-        if !hawl_is_satisfied {
-            return Ok(ZakatDetails::below_threshold(*nisab_value, metal_type, "Hawl (1 lunar year) not met")
-                .with_label(self.label.clone().unwrap_or_default()));
-        }
+        // 8. Apply purity normalization (unique to precious metals)
+        let (effective_weight, purity_trace_steps) = self.normalize_purity(&metal_type)?;
 
-        // Normalize weight
-        let effective_weight = if metal_type == WealthType::Gold && self.purity < 24 {
-            // formula: weight * (karat / 24)
-            let purity_ratio = ZakatDecimal::new(Decimal::from(self.purity))
-                .safe_div(Decimal::from(24))?.with_source(self.label.clone());
-            ZakatDecimal::new(self.weight_grams)
-                .safe_mul(*purity_ratio)?.with_source(self.label.clone())
-        } else if metal_type == WealthType::Silver && self.purity < 1000 {
-            // formula: weight * (purity / 1000)
-             let purity_ratio = ZakatDecimal::new(Decimal::from(self.purity))
-                .safe_div(Decimal::from(1000))?.with_source(self.label.clone());
-            ZakatDecimal::new(self.weight_grams)
-                .safe_mul(*purity_ratio)?.with_source(self.label.clone())
-        } else {
-            ZakatDecimal::new(self.weight_grams)
-        };
-
+        // 9. Calculate total value
         let total_value = effective_weight
             .safe_mul(price_per_gram)?
             .with_source(self.label.clone());
-        let liabilities = self.liabilities_due_now; // Uses macro field
 
-        // Dynamic rate from strategy (default 2.5%)
+        // 10. Build trace steps (asset-specific preprocessing)
+        let mut trace_steps = vec![
+            CalculationStep::initial("step-weight", "Weight (grams)", self.weight_grams),
+            CalculationStep::initial("step-price-per-gram", "Price per gram", price_per_gram),
+        ];
+        trace_steps.extend(purity_trace_steps);
+        trace_steps.push(CalculationStep::result("step-total-value", "Total Value", *total_value));
+
+        // 11. Delegate to shared monetary calculator
         let rate = config.strategy.get_rules().trade_goods_rate;
 
-        // Build calculation trace
-        // Build calculation trace
-        let mut trace = Vec::new();
-        trace.push(crate::types::CalculationStep::initial("step-weight", "Weight (grams)", self.weight_grams));
-        trace.push(crate::types::CalculationStep::initial("step-price-per-gram", "Price per gram", price_per_gram));
-        
-        if metal_type == crate::types::WealthType::Gold && self.purity < 24 {
-             trace.push(crate::types::CalculationStep::info("info-purity-adjustment", format!("Gold Purity Adjustment ({}K / 24K)", self.purity))
-                .with_args(std::collections::HashMap::from([("purity".to_string(), self.purity.to_string())])));
-             trace.push(crate::types::CalculationStep::result("step-effective-weight", "Effective 24K Weight", *effective_weight));
-        } else if metal_type == crate::types::WealthType::Silver && self.purity < 1000 {
-             trace.push(crate::types::CalculationStep::info("info-purity-adjustment", format!("Silver Purity Adjustment ({}/1000)", self.purity))
-                .with_args(std::collections::HashMap::from([("purity".to_string(), self.purity.to_string())])));
-             trace.push(crate::types::CalculationStep::result("step-effective-weight", "Effective Pure Weight", *effective_weight));
-        }
-        
-        trace.push(crate::types::CalculationStep::result("step-total-value", "Total Value", *total_value));
-        trace.push(crate::types::CalculationStep::subtract("step-debts-due-now", "Debts Due Now", liabilities));
-        
-        let net_val = total_value
-            .safe_sub(liabilities)?
-            .with_source(self.label.clone());
-        trace.push(crate::types::CalculationStep::result("step-net-value", "Net Value", *net_val));
-        trace.push(crate::types::CalculationStep::compare("step-nisab-check", "Nisab Threshold", *nisab_value));
+        let params = MonetaryCalcParams {
+            total_assets: *total_value,
+            liabilities: self.liabilities_due_now,
+            nisab_threshold: *nisab_value,
+            rate,
+            wealth_type: metal_type,
+            label: self.label.clone(),
+            hawl_satisfied: hawl_is_satisfied,
+            trace_steps,
+            warnings: Vec::new(),
+        };
 
-        if *net_val >= *nisab_value && *net_val > Decimal::ZERO {
-            trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Trade Goods Rate", rate));
+        calculate_monetary_asset(params)
+    }
+}
+
+impl PreciousMetals {
+    /// Normalizes weight based on purity.
+    /// Returns (effective_weight, trace_steps_for_purity_adjustment)
+    fn normalize_purity(&self, metal_type: &WealthType) -> Result<(ZakatDecimal, Vec<CalculationStep>), ZakatError> {
+        let mut trace_steps = Vec::new();
+        
+        let effective_weight = if *metal_type == WealthType::Gold && self.purity < 24 {
+            // Gold: weight * (karat / 24)
+            let purity_ratio = ZakatDecimal::new(Decimal::from(self.purity))
+                .safe_div(Decimal::from(24))?
+                .with_source(self.label.clone());
+            let weight = ZakatDecimal::new(self.weight_grams)
+                .safe_mul(*purity_ratio)?
+                .with_source(self.label.clone());
+            
+            trace_steps.push(CalculationStep::info(
+                "info-purity-adjustment",
+                format!("Gold Purity Adjustment ({}K / 24K)", self.purity)
+            ).with_args(std::collections::HashMap::from([
+                ("purity".to_string(), self.purity.to_string())
+            ])));
+            trace_steps.push(CalculationStep::result("step-effective-weight", "Effective 24K Weight", *weight));
+            
+            weight
+        } else if *metal_type == WealthType::Silver && self.purity < 1000 {
+            // Silver: weight * (purity / 1000)
+            let purity_ratio = ZakatDecimal::new(Decimal::from(self.purity))
+                .safe_div(Decimal::from(1000))?
+                .with_source(self.label.clone());
+            let weight = ZakatDecimal::new(self.weight_grams)
+                .safe_mul(*purity_ratio)?
+                .with_source(self.label.clone());
+            
+            trace_steps.push(CalculationStep::info(
+                "info-purity-adjustment",
+                format!("Silver Purity Adjustment ({}/1000)", self.purity)
+            ).with_args(std::collections::HashMap::from([
+                ("purity".to_string(), self.purity.to_string())
+            ])));
+            trace_steps.push(CalculationStep::result("step-effective-weight", "Effective Pure Weight", *weight));
+            
+            weight
         } else {
-             trace.push(crate::types::CalculationStep::info("status-exempt", "Net Value below Nisab - No Zakat Due"));
-        }
-
-        Ok(ZakatDetails::with_trace(*total_value, liabilities, *nisab_value, rate, metal_type, trace)
-            .with_label(self.label.clone().unwrap_or_default()))
+            ZakatDecimal::new(self.weight_grams)
+        };
+        
+        Ok((effective_weight, trace_steps))
     }
 }
 

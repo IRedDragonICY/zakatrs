@@ -175,7 +175,7 @@ impl DartZakatResult {
             label: details.label.clone(),
             status_reason: details.status_reason.clone(),
             warnings: details.warnings.clone(),
-            calculation_trace: details.trace.iter().map(DartCalculationStep::from_core).collect(),
+            calculation_trace: details.calculation_trace.iter().map(DartCalculationStep::from_core).collect(),
         }
     }
 }
@@ -185,6 +185,7 @@ impl DartZakatResult {
 // ============================================================================
 
 /// A single step in the calculation trace.
+#[derive(Clone)]
 pub struct DartCalculationStep {
     /// The step key (for i18n).
     pub key: String,

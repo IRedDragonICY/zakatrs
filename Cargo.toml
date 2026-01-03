@@ -84,6 +84,6 @@ panic = "abort"      # Abort on panic (smaller binary)
 strip = true         # Strip symbols from binary
 
 [workspace]
-members = ["zakat_dart/rust"]
+members = ["zakat_dart/rust", "xtask"]
 
 

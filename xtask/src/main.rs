@@ -53,7 +53,7 @@ fn print_usage() {
 🚀 ZakatRS XTask - Unified Build System
 
 USAGE:
-    cargo run -p xtask -- <COMMAND>
+    cargo run -p xtask -- <COMMAND> [OPTIONS]
     cargo xtask <COMMAND>  (if .cargo/config.toml alias is set)
 
 COMMANDS:
@@ -62,9 +62,19 @@ COMMANDS:
     publish-all     Publish to all registries (interactive)
     test            Run all tests
 
+PUBLISH-ALL OPTIONS:
+    --dry-run, -n   Validate without actually publishing
+    --skip-crates   Skip crates.io publishing
+    --skip-pypi     Skip PyPI publishing
+    --skip-npm      Skip NPM publishing
+    --skip-jsr      Skip JSR publishing
+    --skip-dart     Skip pub.dev publishing
+
 EXAMPLES:
     cargo run -p xtask -- build-all
     cargo run -p xtask -- sync-versions
+    cargo run -p xtask -- publish-all --dry-run
+    cargo run -p xtask -- publish-all --skip-dart --skip-pypi
 "#
     );
 }
@@ -408,52 +418,231 @@ fn update_pyproject_version(path: &Path, version: &str) -> Result<()> {
 // Task: publish-all
 // =============================================================================
 
+/// Workspace crates in dependency order (leaves first, root last)
+const WORKSPACE_CRATES: &[&str] = &[
+    "zakat-core",      // No internal deps
+    "zakat-i18n",      // Depends on zakat-core
+    "zakat-ledger",    // Depends on zakat-core
+    "zakat-providers", // Depends on zakat-core
+    "zakat-sqlite",    // Depends on zakat-core, zakat-ledger
+    "zakat",           // Facade - depends on all above
+];
+
 fn publish_all() -> Result<()> {
-    let root = project_root()?;
+    let args: Vec<String> = env::args().collect();
+    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+    let skip_crates = args.iter().any(|a| a == "--skip-crates");
+    let skip_pypi = args.iter().any(|a| a == "--skip-pypi");
+    let skip_npm = args.iter().any(|a| a == "--skip-npm");
+    let skip_jsr = args.iter().any(|a| a == "--skip-jsr");
+    let skip_dart = args.iter().any(|a| a == "--skip-dart");
     
-    println!("\n🚀 Starting ZakatRS Master Publish...");
-    println!("⚠️  Checking prerequisites...");
-    println!("   1. Have you bumped the version in Cargo.toml?");
-    println!("   2. Have you run 'cargo xtask build-all'?");
-    println!("   3. Are you logged in to all registries (cargo, npm, dart)?");
+    let root = project_root()?;
+    let version = read_cargo_version()?;
+    
+    println!("\n🚀 ZakatRS Master Publish v{}", version);
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    if dry_run {
+        println!("🔍 DRY RUN MODE - No actual publishing will occur\n");
+    }
+    
+    println!("📋 Publish targets:");
+    println!("   • Crates.io: {} crates {}", WORKSPACE_CRATES.len(), if skip_crates { "(SKIPPED)" } else { "" });
+    println!("   • PyPI: zakatrs {}", if skip_pypi { "(SKIPPED)" } else { "" });
+    println!("   • NPM: @islamic/zakat {}", if skip_npm { "(SKIPPED)" } else { "" });
+    println!("   • JSR: @islam/zakat {}", if skip_jsr { "(SKIPPED)" } else { "" });
+    println!("   • pub.dev: zakat {}", if skip_dart { "(SKIPPED)" } else { "" });
     println!();
     
-    print!("Proceed with publishing to ALL repositories? (y/n) ");
-    io::stdout().flush()?;
-    
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    
-    if input.trim().to_lowercase() != "y" {
-        println!("Aborted.");
-        return Ok(());
+    if !dry_run {
+        println!("⚠️  Prerequisites:");
+        println!("   1. Version bumped in Cargo.toml");
+        println!("   2. 'cargo xtask build-all' completed successfully");
+        println!("   3. Logged in to: cargo, pypi, npm, jsr, dart pub");
+        println!();
+        
+        print!("Proceed with publishing? (y/n) ");
+        io::stdout().flush()?;
+        
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        
+        if input.trim().to_lowercase() != "y" {
+            println!("❌ Aborted.");
+            return Ok(());
+        }
     }
 
-    // 1. Rust (Crates.io)
-    println!("\n🦀 Publishing to Crates.io...");
-    run_cmd("cargo", &["publish"])?;
+    let mut success_count = 0;
+    let mut fail_count = 0;
+
+    // 1. Rust (Crates.io) - Publish each crate in dependency order
+    if !skip_crates {
+        println!("\n🦀 Publishing to Crates.io ({} crates)...", WORKSPACE_CRATES.len());
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        for (i, crate_name) in WORKSPACE_CRATES.iter().enumerate() {
+            println!("\n  [{}/{}] Publishing {}...", i + 1, WORKSPACE_CRATES.len(), crate_name);
+            
+            let crate_dir = root.join(crate_name);
+            if !crate_dir.exists() {
+                println!("    ⚠️  Directory not found: {}", crate_dir.display());
+                fail_count += 1;
+                continue;
+            }
+            
+            let result = if dry_run {
+                run_cmd_in_dir(&crate_dir, "cargo", &["publish", "--dry-run"])
+            } else {
+                run_cmd_in_dir(&crate_dir, "cargo", &["publish"])
+            };
+            
+            match result {
+                Ok(_) => {
+                    println!("    ✅ {} published successfully!", crate_name);
+                    success_count += 1;
+                }
+                Err(e) => {
+                    println!("    ❌ Failed to publish {}: {}", crate_name, e);
+                    fail_count += 1;
+                    
+                    if !dry_run {
+                        print!("    Continue with remaining crates? (y/n) ");
+                        io::stdout().flush()?;
+                        let mut input = String::new();
+                        io::stdin().read_line(&mut input)?;
+                        if input.trim().to_lowercase() != "y" {
+                            bail!("Publishing aborted by user after {} failure", crate_name);
+                        }
+                    }
+                }
+            }
+            
+            // Wait between crates for crates.io index to update (except dry-run)
+            if !dry_run && i < WORKSPACE_CRATES.len() - 1 {
+                println!("    ⏳ Waiting 30s for crates.io index to update...");
+                std::thread::sleep(std::time::Duration::from_secs(30));
+            }
+        }
+    }
 
     // 2. Python (PyPI)
-    println!("\n🐍 Publishing to PyPI...");
-    if command_exists("maturin") {
-        run_cmd("maturin", &["publish"])?;
-    } else {
-        run_cmd("python", &["-m", "maturin", "publish"])?;
+    if !skip_pypi {
+        println!("\n🐍 Publishing to PyPI...");
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        let zakat_crate = root.join("zakat");
+        let manifest_arg = format!("-m={}", zakat_crate.join("Cargo.toml").display());
+        
+        let result = if dry_run {
+            if command_exists("maturin") {
+                run_cmd("maturin", &["build", "--release", &manifest_arg])
+            } else {
+                run_cmd("python", &["-m", "maturin", "build", "--release", &manifest_arg])
+            }
+        } else {
+            if command_exists("maturin") {
+                run_cmd("maturin", &["publish", &manifest_arg])
+            } else {
+                run_cmd("python", &["-m", "maturin", "publish", &manifest_arg])
+            }
+        };
+        
+        match result {
+            Ok(_) => {
+                println!("  ✅ PyPI {} successful!", if dry_run { "dry-run" } else { "publish" });
+                success_count += 1;
+            }
+            Err(e) => {
+                println!("  ❌ PyPI failed: {}", e);
+                fail_count += 1;
+            }
+        }
     }
 
-    // 3. NPM (JS)
-    println!("\nnpm Publishing to NPM...");
-    run_cmd_in_dir(&root.join("pkg"), "npm", &["publish", "--access", "public"])?;
+    // 3. NPM
+    if !skip_npm {
+        println!("\n📦 Publishing to NPM...");
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        let result = if dry_run {
+            run_cmd_in_dir(&root.join("pkg"), "npm", &["publish", "--access", "public", "--dry-run"])
+        } else {
+            run_cmd_in_dir(&root.join("pkg"), "npm", &["publish", "--access", "public"])
+        };
+        
+        match result {
+            Ok(_) => {
+                println!("  ✅ NPM {} successful!", if dry_run { "dry-run" } else { "publish" });
+                success_count += 1;
+            }
+            Err(e) => {
+                println!("  ❌ NPM failed: {}", e);
+                fail_count += 1;
+            }
+        }
+    }
 
-    // 4. JSR (JS)
-    println!("\n🦕 Publishing to JSR...");
-    run_cmd_in_dir(&root.join("pkg"), "npx", &["jsr", "publish"])?;
+    // 4. JSR
+    if !skip_jsr {
+        println!("\n🦕 Publishing to JSR...");
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        let result = if dry_run {
+            run_cmd_in_dir(&root.join("pkg"), "npx", &["jsr", "publish", "--dry-run"])
+        } else {
+            run_cmd_in_dir(&root.join("pkg"), "npx", &["jsr", "publish"])
+        };
+        
+        match result {
+            Ok(_) => {
+                println!("  ✅ JSR {} successful!", if dry_run { "dry-run" } else { "publish" });
+                success_count += 1;
+            }
+            Err(e) => {
+                println!("  ❌ JSR failed: {}", e);
+                fail_count += 1;
+            }
+        }
+    }
 
     // 5. Dart (Pub.dev)
-    println!("\n💙 Publishing to Pub.dev...");
-    run_cmd_in_dir(&root.join("zakat_dart"), "dart", &["pub", "publish"])?;
+    if !skip_dart {
+        println!("\n💙 Publishing to Pub.dev...");
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        
+        let result = if dry_run {
+            run_cmd_in_dir(&root.join("zakat_dart"), "dart", &["pub", "publish", "--dry-run"])
+        } else {
+            run_cmd_in_dir(&root.join("zakat_dart"), "dart", &["pub", "publish", "--force"])
+        };
+        
+        match result {
+            Ok(_) => {
+                println!("  ✅ Pub.dev {} successful!", if dry_run { "dry-run" } else { "publish" });
+                success_count += 1;
+            }
+            Err(e) => {
+                println!("  ❌ Pub.dev failed: {}", e);
+                fail_count += 1;
+            }
+        }
+    }
 
-    println!("\n✅✅✅ GLOBAL PUBLISH COMPLETE! ✅✅✅");
+    // Summary
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    if fail_count == 0 {
+        println!("✅✅✅ ALL PUBLISH OPERATIONS {}! ✅✅✅", if dry_run { "VALIDATED" } else { "COMPLETE" });
+    } else {
+        println!("⚠️  Publish completed with {} success, {} failures", success_count, fail_count);
+    }
+    
+    if dry_run {
+        println!("\n💡 To actually publish, run without --dry-run:");
+        println!("   cargo run -p xtask -- publish-all");
+    }
+
     Ok(())
 }
 

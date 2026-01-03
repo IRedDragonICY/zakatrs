@@ -10,6 +10,7 @@ members = [
     "zakat-ledger",
     "zakat-providers",
     "zakat-sqlite",
+    "zakat-test-gen",
     "zakat_dart/rust",
     "xtask",
 ]

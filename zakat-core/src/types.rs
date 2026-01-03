@@ -740,6 +740,31 @@ pub enum ZakatError {
 }
 
 impl ZakatError {
+    /// Returns a standardized error code for FFI consumers.
+    ///
+    /// These codes are used by all FFI bindings (Python, Dart, WASM) to
+    /// programmatically identify error types without parsing error messages.
+    ///
+    /// # Error Codes
+    /// - `CALCULATION_ERROR`: Error during calculation logic
+    /// - `INVALID_INPUT`: Invalid input value provided
+    /// - `CONFIG_ERROR`: Configuration error (e.g., missing prices)
+    /// - `MISSING_CONFIG`: Required configuration field is missing
+    /// - `OVERFLOW`: Numeric overflow during calculation
+    /// - `MULTIPLE_ERRORS`: Multiple validation errors occurred
+    /// - `NETWORK_ERROR`: Network-related error (e.g., fetching prices)
+    pub fn code(&self) -> &'static str {
+        match self {
+            ZakatError::CalculationError(_) => "CALCULATION_ERROR",
+            ZakatError::InvalidInput(_) => "INVALID_INPUT",
+            ZakatError::ConfigurationError(_) => "CONFIG_ERROR",
+            ZakatError::MissingConfig { .. } => "MISSING_CONFIG",
+            ZakatError::Overflow { .. } => "OVERFLOW",
+            ZakatError::MultipleErrors(_) => "MULTIPLE_ERRORS",
+            ZakatError::NetworkError(_) => "NETWORK_ERROR",
+        }
+    }
+
     pub fn with_source(self, source: String) -> Self {
         match self {
             ZakatError::CalculationError(mut details) => {

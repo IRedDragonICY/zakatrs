@@ -4916,6 +4916,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "zakat-test-gen"
+version = "1.0.1"
+dependencies = [
+ "chrono",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_json",
+ "uuid",
+ "zakat-core",
+]
+
+[[package]]
 name = "zerocopy"
 version = "0.8.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -17,4 +17,5 @@ keywords = ["zakat", "islamic-finance", "fiqh"]
 dynamic = ["version"]
 
 [tool.maturin]
+manifest-path = "zakat-core/Cargo.toml"
 features = ["python"]

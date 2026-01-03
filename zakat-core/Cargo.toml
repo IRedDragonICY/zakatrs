@@ -11,7 +11,7 @@ authors.workspace = true
 repository.workspace = true
 
 [lib]
-crate-type = ["rlib"]
+crate-type = ["rlib", "cdylib"]
 
 [features]
 default = []

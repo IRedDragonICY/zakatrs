@@ -1,0 +1,21 @@
+[package]
+name = "zakat-test-gen"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Compliance test suite generator for zakat polyglot bindings"
+publish = false
+
+[[bin]]
+name = "zakat-test-gen"
+path = "src/main.rs"
+
+[dependencies]
+zakat-core = { path = "../zakat-core" }
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }

@@ -159,3 +159,50 @@ impl PyZakatDetails {
         self.inner.status_reason.clone()
     }
 }
+
+// -----------------------------------------------------------------------------
+// PyPreciousMetals - Python wrapper for PreciousMetals
+// -----------------------------------------------------------------------------
+#[cfg(feature = "python")]
+pub use crate::maal::precious_metals::python_ffi::PreciousMetals as PyPreciousMetals;
+
+// -----------------------------------------------------------------------------
+// PyBusinessZakat - Python wrapper for BusinessZakat
+// -----------------------------------------------------------------------------
+#[cfg(feature = "python")]
+pub use crate::maal::business::python_ffi::BusinessZakat as PyBusinessZakat;
+
+// -----------------------------------------------------------------------------
+// PyInvestmentAssets - Python wrapper for InvestmentAssets
+// -----------------------------------------------------------------------------
+#[cfg(feature = "python")]
+pub use crate::maal::investments::python_ffi::InvestmentAssets as PyInvestmentAssets;
+
+// -----------------------------------------------------------------------------
+// PyIncomeZakatCalculator - Python wrapper for IncomeZakatCalculator
+// -----------------------------------------------------------------------------
+#[cfg(feature = "python")]
+pub use crate::maal::income::python_ffi::IncomeZakatCalculator as PyIncomeZakatCalculator;
+
+// -----------------------------------------------------------------------------
+// PyMiningAssets - Python wrapper for MiningAssets
+// -----------------------------------------------------------------------------
+#[cfg(feature = "python")]
+pub use crate::maal::mining::python_ffi::MiningAssets as PyMiningAssets;
+
+// -----------------------------------------------------------------------------
+// Main Python module definition
+// -----------------------------------------------------------------------------
+#[cfg(feature = "python")]
+#[pymodule]
+fn zakatrs(m: &Bound<'_, PyModule>) -> PyResult<()> {
+    m.add_class::<PyZakatConfig>()?;
+    m.add_class::<PyWealthType>()?;
+    m.add_class::<PyZakatDetails>()?;
+    m.add_class::<PyPreciousMetals>()?;
+    m.add_class::<PyBusinessZakat>()?;
+    m.add_class::<PyIncomeZakatCalculator>()?;
+    m.add_class::<PyInvestmentAssets>()?;
+    m.add_class::<PyMiningAssets>()?;
+    Ok(())
+}

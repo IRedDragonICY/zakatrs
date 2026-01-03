@@ -4,6 +4,9 @@
 /pkg
 .env
 .DS_Store
+.venv/
+__pycache__/
+*.pyc
 
 # Android/Gradle
 .gradle/

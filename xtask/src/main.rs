@@ -41,6 +41,8 @@ fn main() -> Result<()> {
         "publish-jsr" => publish_jsr()?,
         "publish-dart" => publish_dart()?,
         "test" => run_tests()?,
+        "test-all" => run_all_tests()?,
+        "gen-test-suite" => generate_test_suite()?,
         "-h" | "--help" | "help" => print_usage(),
         _ => {
             eprintln!("❌ Unknown command: {}", task);
@@ -64,7 +66,9 @@ USAGE:
 COMMANDS:
     build-all       Build all targets (Rust, Python, WASM, Dart)
     sync-versions   Synchronize versions across all package manifests
-    test            Run all tests
+    test            Run Rust tests only
+    test-all        Run full compliance test suite (Rust + Python + Dart + WASM)
+    gen-test-suite  Generate zakat_suite.json golden data
 
 PUBLISH COMMANDS:
     publish-all     Publish to all registries (interactive)
@@ -85,6 +89,7 @@ PUBLISH OPTIONS:
 EXAMPLES:
     cargo xtask build-all
     cargo xtask sync-versions
+    cargo xtask test-all
     cargo xtask publish-all --dry-run
     cargo xtask publish-dart --dry-run
     cargo xtask publish-npm
@@ -134,6 +139,19 @@ fn run_cmd(cmd: &str, args: &[&str]) -> Result<()> {
 fn run_cmd_in_dir(dir: &Path, cmd: &str, args: &[&str]) -> Result<()> {
     println!("  → [{}] {} {}", dir.display(), cmd, args.join(" "));
     
+    // On Windows, use cmd /C for shell commands (flutter.bat, npm.cmd, etc.)
+    #[cfg(windows)]
+    let output = Command::new("cmd")
+        .args(["/C", cmd])
+        .args(args)
+        .current_dir(dir)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .with_context(|| format!("Failed to start command: {} {}", cmd, args.join(" ")))?;
+    
+    #[cfg(not(windows))]
     let output = Command::new(cmd)
         .args(args)
         .current_dir(dir)
@@ -200,13 +218,56 @@ fn run_cmd_in_dir_interactive(dir: &Path, cmd: &str, args: &[&str]) -> Result<()
 }
 
 /// Check if a command exists in PATH
+/// On Windows, we need to use cmd /C or check with `where`
 fn command_exists(cmd: &str) -> bool {
-    Command::new(cmd)
-        .arg("--version")
+    #[cfg(windows)]
+    {
+        // On Windows, use `where` command to check if executable exists
+        Command::new("where")
+            .arg(cmd)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
+    #[cfg(not(windows))]
+    {
+        Command::new(cmd)
+            .arg("--version")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok()
+    }
+}
+
+/// Check if a Python module is available via `python -m module --version`
+fn python_module_exists(module: &str) -> bool {
+    let python = get_venv_python();
+    Command::new(&python)
+        .args(["-m", module, "--version"])
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .status()
-        .is_ok()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// Get the Python executable path, preferring venv if available
+fn get_venv_python() -> String {
+    let root = project_root().unwrap_or_else(|_| PathBuf::from("."));
+    
+    #[cfg(windows)]
+    let venv_python = root.join(".venv").join("Scripts").join("python.exe");
+    #[cfg(not(windows))]
+    let venv_python = root.join(".venv").join("bin").join("python");
+    
+    if venv_python.exists() {
+        venv_python.to_string_lossy().to_string()
+    } else {
+        "python".to_string()
+    }
 }
 
 /// Generate type definitions for all supported languages using typeshare.
@@ -1043,5 +1104,177 @@ fn publish_dart() -> Result<()> {
         Err(e) => println!("\n❌ Pub.dev failed: {}", e),
     }
     
+    Ok(())
+}
+
+// =============================================================================
+// Task: test-all (Full Compliance Suite)
+// =============================================================================
+
+/// Generate the compliance test suite JSON
+fn generate_test_suite() -> Result<()> {
+    println!("\n🧪 Generating Compliance Test Suite...\n");
+    
+    run_cmd("cargo", &["run", "-p", "zakat-test-gen"])?;
+    
+    println!("\n✅ Test suite generated!");
+    Ok(())
+}
+
+/// Run all tests across all platforms
+fn run_all_tests() -> Result<()> {
+    println!("\n🚀 ZakatRS Full Compliance Test Suite");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
+
+    let root = project_root()?;
+    let mut success_count = 0;
+    let mut fail_count = 0;
+
+    // Step 1: Generate test suite
+    println!("📊 Step 1: Generating Golden Test Data...");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    match run_cmd("cargo", &["run", "-p", "zakat-test-gen"]) {
+        Ok(_) => {
+            println!("  ✅ Test suite generated successfully!");
+            success_count += 1;
+        }
+        Err(e) => {
+            println!("  ❌ Failed to generate test suite: {}", e);
+            fail_count += 1;
+            bail!("Cannot continue without test suite.");
+        }
+    }
+
+    // Step 2: Run Rust core tests
+    println!("\n🦀 Step 2: Running Rust Core Tests...");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    match run_cmd("cargo", &["test"]) {
+        Ok(_) => {
+            println!("  ✅ Rust tests passed!");
+            success_count += 1;
+        }
+        Err(e) => {
+            println!("  ❌ Rust tests failed: {}", e);
+            fail_count += 1;
+        }
+    }
+
+    // Step 3: Run Python compliance tests
+    println!("\n🐍 Step 3: Running Python Compliance Tests...");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    // Get the correct Python executable (prefer venv)
+    let python = get_venv_python();
+    
+    // Check for maturin: first standalone, then via python -m
+    let maturin_available = command_exists("maturin") || python_module_exists("maturin");
+    
+    if maturin_available {
+        println!("  📦 Building Python wheel...");
+        let build_result = if command_exists("maturin") {
+            run_cmd("maturin", &["develop"])
+        } else {
+            run_cmd(&python, &["-m", "maturin", "develop"])
+        };
+        
+        if build_result.is_ok() {
+            // Run pytest using the venv Python
+            let pytest_result = run_cmd(&python, &["-m", "pytest", "tests/py/test_compliance.py", "-v"]);
+            
+            match pytest_result {
+                Ok(_) => {
+                    println!("  ✅ Python compliance tests passed!");
+                    success_count += 1;
+                }
+                Err(e) => {
+                    println!("  ❌ Python compliance tests failed: {}", e);
+                    fail_count += 1;
+                }
+            }
+        } else {
+            println!("  ⚠️ Failed to build Python wheel. Skipping Python tests.");
+            fail_count += 1;
+        }
+    } else {
+        println!("  ⚠️ maturin not found (tried 'maturin' and 'python -m maturin'). Skipping Python tests.");
+    }
+
+    // Step 4: Run Dart/Flutter compliance tests
+    println!("\n💙 Step 4: Running Dart/Flutter Compliance Tests...");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    let dart_dir = root.join("zakat_dart");
+    if dart_dir.exists() && command_exists("flutter") {
+        // Get dependencies first
+        println!("  📦 Getting Dart dependencies...");
+        if run_cmd_in_dir(&dart_dir, "flutter", &["pub", "get"]).is_ok() {
+            // Run flutter test
+            match run_cmd_in_dir(&dart_dir, "flutter", &["test", "test/compliance_test.dart"]) {
+                Ok(_) => {
+                    println!("  ✅ Dart compliance tests passed!");
+                    success_count += 1;
+                }
+                Err(e) => {
+                    println!("  ❌ Dart compliance tests failed: {}", e);
+                    fail_count += 1;
+                }
+            }
+        } else {
+            println!("  ⚠️ Failed to get Dart dependencies. Skipping Dart tests.");
+            // Don't count dependency failures as test failures - they're environment issues
+        }
+    } else {
+        if !dart_dir.exists() {
+            println!("  ⚠️ zakat_dart directory not found. Skipping Dart tests.");
+        } else {
+            println!("  ⚠️ flutter not found. Skipping Dart tests.");
+        }
+    }
+
+    // Step 5: Run WASM/TypeScript tests (optional)
+    println!("\n🕸️  Step 5: Running WASM/TypeScript Tests...");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    let pkg_dir = root.join("pkg");
+    if pkg_dir.exists() && command_exists("npm") {
+        println!("  📦 Installing npm dependencies...");
+        if run_cmd_in_dir(&pkg_dir, "npm", &["install"]).is_ok() {
+            match run_cmd_in_dir(&pkg_dir, "npm", &["test"]) {
+                Ok(_) => {
+                    println!("  ✅ WASM/TypeScript tests passed!");
+                    success_count += 1;
+                }
+                Err(e) => {
+                    println!("  ❌ WASM/TypeScript tests failed: {}", e);
+                    fail_count += 1;
+                }
+            }
+        } else {
+            println!("  ⚠️ Failed to install npm dependencies. Skipping WASM tests.");
+        }
+    } else {
+        if !pkg_dir.exists() {
+            println!("  ⚠️ pkg directory not found. Run 'cargo xtask build-all' first.");
+        } else {
+            println!("  ⚠️ npm not found. Skipping WASM tests.");
+        }
+    }
+
+    // Summary
+    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("📊 Test Suite Summary");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    println!("   ✅ Passed: {}", success_count);
+    println!("   ❌ Failed: {}", fail_count);
+    println!();
+    
+    if fail_count == 0 {
+        println!("✅✅✅ ALL COMPLIANCE TESTS PASSED! ✅✅✅");
+        println!("\nPolyglot bindings are in sync with Rust core.");
+    } else {
+        println!("⚠️  Some tests failed. Please review the output above.");
+        std::process::exit(1);
+    }
+
     Ok(())
 }

@@ -167,6 +167,19 @@ fn run_cmd_in_dir(dir: &Path, cmd: &str, args: &[&str]) -> Result<()> {
 fn run_cmd_in_dir_interactive(dir: &Path, cmd: &str, args: &[&str]) -> Result<()> {
     println!("  → [{}] {} {}", dir.display(), cmd, args.join(" "));
     
+    // On Windows, use cmd /C for shell commands like npx, npm, etc.
+    #[cfg(windows)]
+    let status = Command::new("cmd")
+        .args(["/C", cmd])
+        .args(args)
+        .current_dir(dir)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .status()
+        .with_context(|| format!("Failed to start command: {} {}", cmd, args.join(" ")))?;
+    
+    #[cfg(not(windows))]
     let status = Command::new(cmd)
         .args(args)
         .current_dir(dir)

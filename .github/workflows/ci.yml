@@ -16,10 +16,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.11.1
+      - name: Generate Dart bindings
+        run: |
+          cd zakat_dart
+          flutter_rust_bridge_codegen generate
       - name: Run tests
-        # Exclude zakat_dart because it requires code generation (flutter_rust_bridge)
-        # which is not available in this simple test environment.
-        run: cargo test --verbose --workspace --exclude rust_lib_zakat_dart
+        run: cargo test --verbose --workspace
 
   build:
     needs: test
@@ -30,6 +37,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - name: Install flutter_rust_bridge_codegen
+        run: cargo install flutter_rust_bridge_codegen --version 2.11.1
+      - name: Generate Dart bindings
+        run: |
+          cd zakat_dart
+          flutter_rust_bridge_codegen generate
       - name: Build release
         run: cargo build --release
 

@@ -68,3 +68,81 @@ impl HistoricalPriceProvider for InMemoryPriceHistory {
             .map(|(date, _)| *date)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+    use chrono::NaiveDate;
+
+    #[test]
+    fn test_exact_date_lookup() {
+        let mut history = InMemoryPriceHistory::new();
+        let date = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+        history.add_price(date, dec!(8500));
+        
+        let result = history.get_nisab_threshold(date).unwrap();
+        assert_eq!(result, dec!(8500));
+    }
+    
+    #[test]
+    fn test_interpolation_carry_forward() {
+        // Feature 3: Ledger should use last known price if exact date not found
+        let mut history = InMemoryPriceHistory::new();
+        
+        // Add price for Jan 1st
+        let jan1 = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+        history.add_price(jan1, dec!(8000));
+        
+        // Add price for Feb 1st
+        let feb1 = NaiveDate::from_ymd_opt(2025, 2, 1).unwrap();
+        history.add_price(feb1, dec!(8500));
+        
+        // Query Jan 15 - should use Jan 1 price (carry forward)
+        let jan15 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+        let result = history.get_nisab_threshold(jan15).unwrap();
+        assert_eq!(result, dec!(8000)); // Uses Jan 1 price
+        
+        // Query Feb 15 - should use Feb 1 price
+        let feb15 = NaiveDate::from_ymd_opt(2025, 2, 15).unwrap();
+        let result = history.get_nisab_threshold(feb15).unwrap();
+        assert_eq!(result, dec!(8500)); // Uses Feb 1 price
+    }
+    
+    #[test]
+    fn test_no_price_before_date_returns_error() {
+        let mut history = InMemoryPriceHistory::new();
+        
+        // Add price for Feb 1st only
+        let feb1 = NaiveDate::from_ymd_opt(2025, 2, 1).unwrap();
+        history.add_price(feb1, dec!(8500));
+        
+        // Query Jan 15 - no price exists before this date
+        let jan15 = NaiveDate::from_ymd_opt(2025, 1, 15).unwrap();
+        let result = history.get_nisab_threshold(jan15);
+        
+        assert!(result.is_err());
+    }
+    
+    #[test]
+    fn test_next_price_change() {
+        let mut history = InMemoryPriceHistory::new();
+        
+        let jan1 = NaiveDate::from_ymd_opt(2025, 1, 1).unwrap();
+        let feb1 = NaiveDate::from_ymd_opt(2025, 2, 1).unwrap();
+        let mar1 = NaiveDate::from_ymd_opt(2025, 3, 1).unwrap();
+        
+        history.add_price(jan1, dec!(8000));
+        history.add_price(feb1, dec!(8500));
+        history.add_price(mar1, dec!(9000));
+        
+        // After Jan 1, next change is Feb 1
+        assert_eq!(history.next_price_change(jan1), Some(feb1));
+        
+        // After Feb 1, next change is Mar 1
+        assert_eq!(history.next_price_change(feb1), Some(mar1));
+        
+        // After Mar 1, no more changes
+        assert_eq!(history.next_price_change(mar1), None);
+    }
+}

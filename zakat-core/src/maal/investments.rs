@@ -51,12 +51,13 @@ crate::zakat_ffi_export! {
 
 impl Default for InvestmentAssets {
     fn default() -> Self {
-        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
+        let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
         Self {
             value: Decimal::ZERO,
             investment_type: InvestmentType::default(),
             purification_rate: None,
             liabilities_due_now,
+            named_liabilities,
             hawl_satisfied,
             label,
             id,
@@ -106,6 +107,7 @@ impl CalculateZakat for InvestmentAssets {
     fn get_label(&self) -> Option<String> { self.label.clone() }
     fn get_id(&self) -> uuid::Uuid { self.id }
 
+    #[allow(deprecated)]
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         self.validate()?;
         let config_cow = config.resolve_config();
@@ -191,7 +193,7 @@ impl CalculateZakat for InvestmentAssets {
 
         let params = MonetaryCalcParams {
             total_assets: zakatable_gross,
-            liabilities: self.liabilities_due_now, // Uses macro field
+            liabilities: self.total_liabilities(), // Uses total of legacy + named
             nisab_threshold: nisab_threshold_value,
             rate,
             wealth_type: crate::types::WealthType::Investment,

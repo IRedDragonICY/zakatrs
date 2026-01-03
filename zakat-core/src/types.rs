@@ -1,6 +1,160 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tracing::warn;
+
+// =============================================================================
+// Liability Types (v1.1 Feature: Granular Liability Management)
+// =============================================================================
+
+/// Represents a named liability that can be deducted from Zakat calculations.
+/// 
+/// # Example
+/// ```rust
+/// use zakat_core::types::Liability;
+/// use rust_decimal_macros::dec;
+/// 
+/// let mortgage = Liability::new("Mortgage Payment", dec!(1500));
+/// let credit_card = Liability::new("Credit Card", dec!(500));
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
+pub struct Liability {
+    /// Description of the liability (e.g., "Credit Card", "Mortgage")
+    pub description: String,
+    /// Amount of the liability
+    #[typeshare(serialized_as = "string")]
+    pub amount: Decimal,
+}
+
+impl Liability {
+    /// Creates a new named liability.
+    pub fn new(description: impl Into<String>, amount: Decimal) -> Self {
+        Self {
+            description: description.into(),
+            amount,
+        }
+    }
+    
+    /// Creates a liability from an amount that can be converted to Decimal.
+    pub fn from_amount(description: impl Into<String>, amount: impl crate::inputs::IntoZakatDecimal) -> Result<Self, super::types::ZakatError> {
+        Ok(Self {
+            description: description.into(),
+            amount: amount.into_zakat_decimal()?,
+        })
+    }
+}
+
+// =============================================================================
+// Warning System (v1.1 Feature: Structured Warning System)
+// =============================================================================
+
+/// Structured warning codes for localization support.
+/// 
+/// Frontends can use these codes to provide localized warning messages
+/// instead of hardcoded English strings.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum WarningCode {
+    /// Net assets were negative and clamped to zero.
+    NegativeAssetsClamped,
+    /// Expenses were ignored when using the Gross calculation method.
+    GrossMethodExpensesIgnored,
+    /// Livestock count is below minimum threshold for Zakat.
+    LivestockBelowNisab,
+    /// Gold or silver weight is below minimum threshold.
+    MetalBelowNisab,
+    /// Price data may be stale or unavailable.
+    PriceDataStale,
+    /// Hawl period not yet satisfied.
+    HawlNotMet,
+    /// Partial calculation due to missing data.
+    PartialCalculation,
+    /// Currency conversion applied.
+    CurrencyConversionApplied,
+    /// Other warning with custom code.
+    Other(String),
+}
+
+impl WarningCode {
+    /// Returns the fluent translation key for this warning code.
+    pub fn translation_key(&self) -> &str {
+        match self {
+            WarningCode::NegativeAssetsClamped => "warning-negative-assets-clamped",
+            WarningCode::GrossMethodExpensesIgnored => "warning-gross-method-expenses-ignored",
+            WarningCode::LivestockBelowNisab => "warning-livestock-below-nisab",
+            WarningCode::MetalBelowNisab => "warning-metal-below-nisab",
+            WarningCode::PriceDataStale => "warning-price-data-stale",
+            WarningCode::HawlNotMet => "warning-hawl-not-met",
+            WarningCode::PartialCalculation => "warning-partial-calculation",
+            WarningCode::CurrencyConversionApplied => "warning-currency-conversion-applied",
+            WarningCode::Other(_) => "warning-other",
+        }
+    }
+}
+
+/// A structured warning with code, message, and optional details.
+/// 
+/// This enables frontends to:
+/// - Localize warning messages using the `code` field
+/// - Display English fallback via `message` field
+/// - Access additional context through `details`
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
+pub struct CalculationWarning {
+    /// Structured warning code for programmatic handling and i18n.
+    pub code: WarningCode,
+    /// Human-readable fallback message in English.
+    pub message: String,
+    /// Optional additional details as key-value pairs.
+    #[typeshare(skip)]
+    pub details: Option<HashMap<String, String>>,
+}
+
+impl CalculationWarning {
+    /// Creates a new calculation warning.
+    pub fn new(code: WarningCode, message: impl Into<String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            details: None,
+        }
+    }
+    
+    /// Creates a warning with additional details.
+    pub fn with_details(code: WarningCode, message: impl Into<String>, details: HashMap<String, String>) -> Self {
+        Self {
+            code,
+            message: message.into(),
+            details: Some(details),
+        }
+    }
+    
+    /// Convenience constructor for negative assets clamped warning.
+    pub fn negative_assets_clamped(original_value: Decimal) -> Self {
+        let mut details = HashMap::new();
+        details.insert("original_value".to_string(), original_value.to_string());
+        Self::with_details(
+            WarningCode::NegativeAssetsClamped,
+            "Net assets were negative and clamped to zero.",
+            details,
+        )
+    }
+    
+    /// Convenience constructor for gross method expenses ignored warning.
+    pub fn gross_method_expenses_ignored(expenses: Decimal) -> Self {
+        let mut details = HashMap::new();
+        details.insert("expenses".to_string(), expenses.to_string());
+        Self::with_details(
+            WarningCode::GrossMethodExpensesIgnored,
+            "Expenses are ignored when using the Gross calculation method.",
+            details,
+        )
+    }
+}
 
 /// Represents the age category of livestock for Zakat purposes.
 /// 
@@ -364,8 +518,12 @@ pub struct ZakatDetails {
     #[typeshare(serialized_as = "string")]
     pub total_assets: Decimal,
     /// Liabilities that can be deducted from the total assets (Only debts due immediately).
+    #[deprecated(since = "1.1.0", note = "Use `liabilities` vector for granular liability tracking")]
     #[typeshare(serialized_as = "string")]
     pub liabilities_due_now: Decimal,
+    /// Named liabilities for granular tracking (v1.1+).
+    /// When calculating net assets, both `liabilities_due_now` and this vector are summed.
+    pub liabilities: Vec<Liability>,
     /// Net assets after deducting liabilities (total_assets - liabilities_due_now).
     #[typeshare(serialized_as = "string")]
     pub net_assets: Decimal,
@@ -387,7 +545,10 @@ pub struct ZakatDetails {
     pub payload: PaymentPayload,
     /// Step-by-step trace of how this calculation was derived.
     pub calculation_trace: CalculationTrace,
+    /// Structured warnings about the calculation (v1.1+).
+    pub structured_warnings: Vec<CalculationWarning>,
     /// Non-fatal warnings about the calculation (e.g., negative values clamped).
+    #[deprecated(since = "1.1.0", note = "Use `structured_warnings` for i18n support")]
     pub warnings: Vec<String>,
 }
 
@@ -458,6 +619,7 @@ impl std::fmt::Display for ZakatExplanation {
 }
 
 impl ZakatDetails {
+    #[allow(deprecated)]
     pub fn new(
         total_assets: Decimal,
         liabilities_due_now: Decimal,
@@ -468,10 +630,12 @@ impl ZakatDetails {
         let mut net_assets = total_assets - liabilities_due_now;
         let mut clamped_msg = None;
         let mut warnings = Vec::new();
+        let mut structured_warnings = Vec::new();
 
         // Business rule: If net assets are negative, clamp to zero.
         if net_assets < Decimal::ZERO {
             warn!("Net assets were negative ({}), clamped to zero.", net_assets);
+            structured_warnings.push(CalculationWarning::negative_assets_clamped(net_assets));
             net_assets = Decimal::ZERO;
             clamped_msg = Some("Net Assets are negative, clamped to zero for Zakat purposes");
             warnings.push("Net assets were negative and clamped to zero.".to_string());
@@ -509,6 +673,7 @@ impl ZakatDetails {
         ZakatDetails {
             total_assets,
             liabilities_due_now,
+            liabilities: Vec::new(),
             net_assets,
             nisab_threshold,
             is_payable,
@@ -518,12 +683,14 @@ impl ZakatDetails {
             label: None,
             payload: PaymentPayload::Monetary(zakat_due),
             calculation_trace: CalculationTrace(trace),
+            structured_warnings,
             warnings,
         }
     }
 
     /// Creates ZakatDetails with a custom calculation trace.
     /// Used by calculators that need more detailed step logging.
+    #[allow(deprecated)]
     pub fn with_trace(
         total_assets: Decimal,
         liabilities_due_now: Decimal,
@@ -534,9 +701,11 @@ impl ZakatDetails {
     ) -> Self {
         let mut net_assets = total_assets - liabilities_due_now;
         let mut warnings = Vec::new();
+        let mut structured_warnings = Vec::new();
         
         if net_assets < Decimal::ZERO {
             warn!("Net assets were negative ({}), clamped to zero.", net_assets);
+            structured_warnings.push(CalculationWarning::negative_assets_clamped(net_assets));
             net_assets = Decimal::ZERO;
             trace.push(CalculationStep::info("warn-negative-clamped", "Net Assets are negative, clamped to zero for Zakat purposes"));
             warnings.push("Net assets were negative and clamped to zero.".to_string());
@@ -553,6 +722,7 @@ impl ZakatDetails {
         ZakatDetails {
             total_assets,
             liabilities_due_now,
+            liabilities: Vec::new(),
             net_assets,
             nisab_threshold,
             is_payable,
@@ -562,11 +732,13 @@ impl ZakatDetails {
             label: None,
             payload: PaymentPayload::Monetary(zakat_due),
             calculation_trace: CalculationTrace(trace),
+            structured_warnings,
             warnings,
         }
     }
 
     /// Helper to create a non-payable ZakatDetail because it is below the threshold.
+    #[allow(deprecated)]
     pub fn below_threshold(nisab_threshold: Decimal, wealth_type: WealthType, reason: &str) -> Self {
         let trace = vec![
             CalculationStep::info("status-exempt", reason.to_string()),
@@ -575,6 +747,7 @@ impl ZakatDetails {
         ZakatDetails {
             total_assets: Decimal::ZERO,
             liabilities_due_now: Decimal::ZERO,
+            liabilities: Vec::new(),
             net_assets: Decimal::ZERO,
             nisab_threshold,
             is_payable: false,
@@ -584,6 +757,7 @@ impl ZakatDetails {
             label: None,
             payload: PaymentPayload::Monetary(Decimal::ZERO),
             calculation_trace: CalculationTrace(trace),
+            structured_warnings: Vec::new(),
             warnings: Vec::new(),
         }
     }

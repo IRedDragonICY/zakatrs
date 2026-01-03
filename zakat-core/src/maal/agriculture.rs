@@ -184,9 +184,11 @@ impl CalculateZakat for AgricultureAssets {
             trace.push(crate::types::CalculationStep::info("status-exempt", "Net Value below Nisab - No Zakat Due"));
         }
 
+        #[allow(deprecated)]
         Ok(ZakatDetails {
             total_assets: *total_value,
             liabilities_due_now: liabilities,
+            liabilities: Vec::new(),
             net_assets: *net_value,
             nisab_threshold: *nisab_value,
             is_payable,
@@ -201,6 +203,7 @@ impl CalculateZakat for AgricultureAssets {
             },
             calculation_trace: crate::types::CalculationTrace(trace),
             warnings: Vec::new(),
+            structured_warnings: Vec::new(),
         })
     }
 

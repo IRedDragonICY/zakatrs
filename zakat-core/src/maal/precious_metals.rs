@@ -57,13 +57,14 @@ crate::zakat_ffi_export! {
 
 impl Default for PreciousMetals {
     fn default() -> Self {
-        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
+        let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
         Self {
             weight_grams: Decimal::ZERO,
             metal_type: None,
             purity: 24,
             usage: JewelryUsage::Investment,
             liabilities_due_now,
+            named_liabilities,
             hawl_satisfied,
             label,
             id,

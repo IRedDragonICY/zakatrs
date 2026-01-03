@@ -72,6 +72,11 @@ impl Prices {
 pub trait PriceProvider: Send + Sync {
     /// Fetches current metal prices.
     async fn get_prices(&self) -> Result<Prices, ZakatError>;
+    
+    /// Returns a name for this provider (used in logging).
+    fn name(&self) -> &str {
+        "PriceProvider"
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -79,6 +84,11 @@ pub trait PriceProvider: Send + Sync {
 pub trait PriceProvider {
     /// Fetches current metal prices.
     async fn get_prices(&self) -> Result<Prices, ZakatError>;
+    
+    /// Returns a name for this provider (used in logging).
+    fn name(&self) -> &str {
+        "PriceProvider"
+    }
 }
 
 /// A static price provider for testing and development.
@@ -90,6 +100,7 @@ pub trait PriceProvider {
 #[derive(Debug, Clone)]
 pub struct StaticPriceProvider {
     prices: Prices,
+    name: String,
 }
 
 impl StaticPriceProvider {
@@ -100,12 +111,22 @@ impl StaticPriceProvider {
     ) -> Result<Self, ZakatError> {
         Ok(Self {
             prices: Prices::new(gold_per_gram, silver_per_gram)?,
+            name: "StaticPriceProvider".to_string(),
         })
     }
 
     /// Creates a StaticPriceProvider from an existing Prices instance.
     pub fn from_prices(prices: Prices) -> Self {
-        Self { prices }
+        Self { 
+            prices,
+            name: "StaticPriceProvider".to_string(),
+        }
+    }
+    
+    /// Sets a custom name for this provider.
+    pub fn with_name(mut self, name: impl Into<String>) -> Self {
+        self.name = name.into();
+        self
     }
 }
 
@@ -115,6 +136,10 @@ impl PriceProvider for StaticPriceProvider {
     async fn get_prices(&self) -> Result<Prices, ZakatError> {
         Ok(self.prices.clone())
     }
+    
+    fn name(&self) -> &str {
+        &self.name
+    }
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -122,6 +147,182 @@ impl PriceProvider for StaticPriceProvider {
 impl PriceProvider for StaticPriceProvider {
     async fn get_prices(&self) -> Result<Prices, ZakatError> {
         Ok(self.prices.clone())
+    }
+    
+    fn name(&self) -> &str {
+        &self.name
+    }
+}
+
+// =============================================================================
+// Feature 2: Failover Price Provider (Chain of Responsibility)
+// =============================================================================
+
+/// A resilient price provider that tries multiple providers in sequence.
+/// 
+/// If provider A fails, it logs a warning and tries provider B.
+/// If all providers fail, it returns the last error encountered.
+/// 
+/// # Example
+/// ```rust,ignore
+/// use zakat_providers::pricing::{FailoverPriceProvider, StaticPriceProvider, BinancePriceProvider};
+/// 
+/// let failover = FailoverPriceProvider::new()
+///     .add_provider(BinancePriceProvider::default())
+///     .add_provider(StaticPriceProvider::new(65, 1)?);
+/// 
+/// let prices = failover.get_prices().await?;
+/// ```
+#[cfg(not(target_arch = "wasm32"))]
+pub struct FailoverPriceProvider {
+    providers: Vec<Box<dyn PriceProvider>>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl FailoverPriceProvider {
+    /// Creates a new empty FailoverPriceProvider.
+    pub fn new() -> Self {
+        Self {
+            providers: Vec::new(),
+        }
+    }
+    
+    /// Adds a price provider to the failover chain.
+    /// Providers are tried in the order they are added.
+    pub fn add_provider<P: PriceProvider + 'static>(mut self, provider: P) -> Self {
+        self.providers.push(Box::new(provider));
+        self
+    }
+    
+    /// Returns the number of providers in the chain.
+    pub fn provider_count(&self) -> usize {
+        self.providers.len()
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl Default for FailoverPriceProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[async_trait::async_trait]
+impl PriceProvider for FailoverPriceProvider {
+    async fn get_prices(&self) -> Result<Prices, ZakatError> {
+        if self.providers.is_empty() {
+            return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-no-price-providers".to_string(),
+                args: None,
+                source_label: Some("FailoverPriceProvider".to_string()),
+                asset_id: None,
+            })));
+        }
+        
+        let mut last_error: Option<ZakatError> = None;
+        
+        for (index, provider) in self.providers.iter().enumerate() {
+            match provider.get_prices().await {
+                Ok(prices) => {
+                    if index > 0 {
+                        tracing::info!(
+                            "Price fetch succeeded using fallback provider '{}' (attempt {})",
+                            provider.name(),
+                            index + 1
+                        );
+                    }
+                    return Ok(prices);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Price provider '{}' failed (attempt {}/{}): {}",
+                        provider.name(),
+                        index + 1,
+                        self.providers.len(),
+                        e
+                    );
+                    last_error = Some(e);
+                }
+            }
+        }
+        
+        // All providers failed - return the last error
+        Err(last_error.unwrap_or_else(|| {
+            ZakatError::NetworkError("All price providers failed".to_string())
+        }))
+    }
+    
+    fn name(&self) -> &str {
+        "FailoverPriceProvider"
+    }
+}
+
+// WASM version
+#[cfg(target_arch = "wasm32")]
+pub struct FailoverPriceProvider {
+    providers: Vec<Box<dyn PriceProvider>>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl FailoverPriceProvider {
+    /// Creates a new empty FailoverPriceProvider.
+    pub fn new() -> Self {
+        Self {
+            providers: Vec::new(),
+        }
+    }
+    
+    /// Adds a price provider to the failover chain.
+    pub fn add_provider<P: PriceProvider + 'static>(mut self, provider: P) -> Self {
+        self.providers.push(Box::new(provider));
+        self
+    }
+    
+    /// Returns the number of providers in the chain.
+    pub fn provider_count(&self) -> usize {
+        self.providers.len()
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+impl Default for FailoverPriceProvider {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[async_trait::async_trait(?Send)]
+impl PriceProvider for FailoverPriceProvider {
+    async fn get_prices(&self) -> Result<Prices, ZakatError> {
+        if self.providers.is_empty() {
+            return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                reason_key: "error-no-price-providers".to_string(),
+                args: None,
+                source_label: Some("FailoverPriceProvider".to_string()),
+                asset_id: None,
+            })));
+        }
+        
+        let mut last_error: Option<ZakatError> = None;
+        
+        for provider in &self.providers {
+            match provider.get_prices().await {
+                Ok(prices) => return Ok(prices),
+                Err(e) => {
+                    last_error = Some(e);
+                }
+            }
+        }
+        
+        Err(last_error.unwrap_or_else(|| {
+            ZakatError::NetworkError("All price providers failed".to_string())
+        }))
+    }
+    
+    fn name(&self) -> &str {
+        "FailoverPriceProvider"
     }
 }
 
@@ -415,5 +616,96 @@ mod tests {
 
         let prices2 = cached_provider.get_prices().await.unwrap();
         assert_eq!(prices2.gold_per_gram, dec!(100));
+    }
+    
+    // =============================================================================
+    // Failover Price Provider Tests
+    // =============================================================================
+    
+    /// A mock provider that always fails.
+    #[cfg(not(target_arch = "wasm32"))]
+    struct MockFailingProvider {
+        name: String,
+    }
+    
+    #[cfg(not(target_arch = "wasm32"))]
+    impl MockFailingProvider {
+        fn new(name: impl Into<String>) -> Self {
+            Self { name: name.into() }
+        }
+    }
+    
+    #[cfg(not(target_arch = "wasm32"))]
+    #[async_trait::async_trait]
+    impl PriceProvider for MockFailingProvider {
+        async fn get_prices(&self) -> Result<Prices, ZakatError> {
+            Err(ZakatError::NetworkError(format!("{} failed", self.name)))
+        }
+        
+        fn name(&self) -> &str {
+            &self.name
+        }
+    }
+    
+    #[cfg(not(target_arch = "wasm32"))]
+    #[tokio::test]
+    async fn test_failover_provider_uses_first_successful() {
+        // First provider succeeds - should use its prices
+        let provider1 = StaticPriceProvider::new(100, 2).unwrap().with_name("Provider1");
+        let provider2 = StaticPriceProvider::new(200, 4).unwrap().with_name("Provider2");
+        
+        let failover = FailoverPriceProvider::new()
+            .add_provider(provider1)
+            .add_provider(provider2);
+        
+        let prices = failover.get_prices().await.unwrap();
+        assert_eq!(prices.gold_per_gram, dec!(100)); // First provider's price
+        assert_eq!(prices.silver_per_gram, dec!(2));
+    }
+    
+    #[cfg(not(target_arch = "wasm32"))]
+    #[tokio::test]
+    async fn test_failover_provider_falls_back_on_failure() {
+        // First provider fails, second succeeds
+        let failing = MockFailingProvider::new("FailingAPI");
+        let success = StaticPriceProvider::new(50, 1).unwrap().with_name("FallbackStatic");
+        
+        let failover = FailoverPriceProvider::new()
+            .add_provider(failing)
+            .add_provider(success);
+        
+        let prices = failover.get_prices().await.unwrap();
+        assert_eq!(prices.gold_per_gram, dec!(50)); // Fallback provider's price
+    }
+    
+    #[cfg(not(target_arch = "wasm32"))]
+    #[tokio::test]
+    async fn test_failover_provider_all_fail() {
+        // All providers fail - should return last error
+        let failing1 = MockFailingProvider::new("API1");
+        let failing2 = MockFailingProvider::new("API2");
+        
+        let failover = FailoverPriceProvider::new()
+            .add_provider(failing1)
+            .add_provider(failing2);
+        
+        let result = failover.get_prices().await;
+        assert!(result.is_err());
+        
+        if let Err(ZakatError::NetworkError(msg)) = result {
+            assert!(msg.contains("API2")); // Last provider's error
+        } else {
+            panic!("Expected NetworkError");
+        }
+    }
+    
+    #[cfg(not(target_arch = "wasm32"))]
+    #[tokio::test]
+    async fn test_failover_provider_empty_returns_error() {
+        let failover = FailoverPriceProvider::new();
+        
+        let result = failover.get_prices().await;
+        assert!(result.is_err());
+        assert!(matches!(result, Err(ZakatError::ConfigurationError(_))));
     }
 }

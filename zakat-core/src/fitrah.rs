@@ -93,9 +93,11 @@ impl CalculateZakat for FitrahCalculator {
             crate::types::CalculationStep::result("step-total-fitrah-due", "Total Fitrah Due", total_value),
         ];
 
+        #[allow(deprecated)]
         Ok(ZakatDetails {
             total_assets: total_value,
             liabilities_due_now: Decimal::ZERO,
+            liabilities: Vec::new(),
             net_assets: total_value,
             nisab_threshold: Decimal::ZERO, 
             is_payable: true, // Fitrah is obligatory
@@ -106,6 +108,7 @@ impl CalculateZakat for FitrahCalculator {
             payload: crate::types::PaymentPayload::Monetary(total_value),
             calculation_trace: crate::types::CalculationTrace(trace),
             warnings: Vec::new(),
+            structured_warnings: Vec::new(),
         })
     }
 

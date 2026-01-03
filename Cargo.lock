@@ -4856,6 +4856,8 @@ dependencies = [
  "rust_decimal",
  "rust_decimal_macros",
  "serde",
+ "thiserror 2.0.17",
+ "tracing",
  "unic-langid",
  "writeable 0.5.5",
  "zakat-core",

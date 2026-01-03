@@ -68,7 +68,10 @@ macro_rules! zakat_asset {
             
             // === Common Fields (Standardized) ===
             /// Debts/liabilities that are due immediately and can be deducted.
+            #[deprecated(since = "1.1.0", note = "Use `add_liability()` for granular liability tracking")]
             pub liabilities_due_now: rust_decimal::Decimal,
+            /// Named liabilities for granular tracking (v1.1+).
+            pub named_liabilities: Vec<$crate::types::Liability>,
             /// Whether the Hawl (1 lunar year holding period) has been satisfied.
             pub hawl_satisfied: bool,
             /// Optional label for identifying this asset.
@@ -88,13 +91,40 @@ macro_rules! zakat_asset {
             /// Creates a new instance with default values.
             pub fn new() -> Self { Self::default() }
             
-            /// Sets deductible debt.
+            /// Sets deductible debt (deprecated, use `add_liability` instead).
+            #[deprecated(since = "1.1.0", note = "Use `add_liability()` for granular liability tracking")]
             pub fn debt(mut self, val: impl $crate::inputs::IntoZakatDecimal) -> Self {
                 match val.into_zakat_decimal() {
                     Ok(v) => self.liabilities_due_now = v,
                     Err(e) => self._input_errors.push(e),
                 }
                 self
+            }
+            
+            /// Adds a named liability to the asset.
+            /// 
+            /// # Example
+            /// ```rust,ignore
+            /// let business = BusinessZakat::new()
+            ///     .cash(10000)
+            ///     .add_liability("Credit Card", 500)
+            ///     .add_liability("Mortgage Payment", 1500);
+            /// ```
+            pub fn add_liability(mut self, description: impl Into<String>, amount: impl $crate::inputs::IntoZakatDecimal) -> Self {
+                match amount.into_zakat_decimal() {
+                    Ok(v) => {
+                        self.named_liabilities.push($crate::types::Liability::new(description, v));
+                    },
+                    Err(e) => self._input_errors.push(e),
+                }
+                self
+            }
+            
+            /// Returns the total liabilities (legacy + named).
+            #[allow(deprecated)]
+            pub fn total_liabilities(&self) -> rust_decimal::Decimal {
+                let named_sum: rust_decimal::Decimal = self.named_liabilities.iter().map(|l| l.amount).sum();
+                self.liabilities_due_now + named_sum
             }
 
             pub fn hawl(mut self, satisfied: bool) -> Self {
@@ -118,9 +148,10 @@ macro_rules! zakat_asset {
             }
             
             /// Internal helper to init common fields.
-            /// Returns (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date)
-            fn default_common() -> (rust_decimal::Decimal, bool, Option<String>, uuid::Uuid, Vec<$crate::types::ZakatError>, Option<chrono::NaiveDate>) {
-                (rust_decimal::Decimal::ZERO, true, None, uuid::Uuid::new_v4(), Vec::new(), None)
+            /// Returns (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date)
+            #[allow(clippy::type_complexity)]
+            fn default_common() -> (rust_decimal::Decimal, Vec<$crate::types::Liability>, bool, Option<String>, uuid::Uuid, Vec<$crate::types::ZakatError>, Option<chrono::NaiveDate>) {
+                (rust_decimal::Decimal::ZERO, Vec::new(), true, None, uuid::Uuid::new_v4(), Vec::new(), None)
             }
             
             /// Validates the asset and returns any input errors.
@@ -484,6 +515,7 @@ macro_rules! zakat_ffi_export {
             }
             
             impl $name {
+                #[allow(deprecated)]
                 pub fn to_core(&self) -> Result<super::$name, crate::types::ZakatError> {
                      Ok(super::$name {
                          // User fields
@@ -508,6 +540,7 @@ macro_rules! zakat_ffi_export {
                                 source_label: self.label.clone(),
                                 asset_id: None,
                              })))?,
+                         named_liabilities: Vec::new(),
                          hawl_satisfied: self.hawl_satisfied,
                          label: self.label.clone(),
                          id: <uuid::Uuid as FromFfiString>::from_ffi_string(&self.id)

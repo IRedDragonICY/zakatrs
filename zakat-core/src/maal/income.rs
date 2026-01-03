@@ -49,12 +49,13 @@ crate::zakat_ffi_export! {
 
 impl Default for IncomeZakatCalculator {
     fn default() -> Self {
-        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
+        let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
         Self {
             income: Decimal::ZERO,
             expenses: Decimal::ZERO,
             method: IncomeCalculationMethod::default(),
             liabilities_due_now,
+            named_liabilities,
             hawl_satisfied,
             label,
             id,
@@ -117,6 +118,7 @@ impl CalculateZakat for IncomeZakatCalculator {
     fn get_label(&self) -> Option<String> { self.label.clone() }
     fn get_id(&self) -> uuid::Uuid { self.id }
 
+    #[allow(deprecated)]
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         self.validate()?;
         let config_cow = config.resolve_config();
@@ -154,7 +156,7 @@ impl CalculateZakat for IncomeZakatCalculator {
 
         // Dynamic rate from strategy (default 2.5%)
         let rate = config.strategy.get_rules().trade_goods_rate;
-        let external_debt = self.liabilities_due_now; // Uses macro field
+        let external_debt = self.total_liabilities(); // Uses total of legacy + named
 
         // Collect any warnings
         let mut warnings = Vec::new();

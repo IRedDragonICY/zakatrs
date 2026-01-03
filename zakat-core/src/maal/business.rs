@@ -39,12 +39,13 @@ crate::zakat_ffi_export! {
 
 impl Default for BusinessZakat {
     fn default() -> Self {
-        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
+        let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
         Self {
             cash_on_hand: Decimal::ZERO,
             inventory_value: Decimal::ZERO,
             receivables: Decimal::ZERO,
             liabilities_due_now,
+            named_liabilities,
             hawl_satisfied,
             label,
             id,
@@ -105,6 +106,7 @@ impl BusinessZakat {
     /// 
     /// If the value cannot be converted to a valid decimal, the error is
     /// collected and will be returned by `validate()` or `calculate_zakat()`.
+    #[deprecated(since = "1.1.0", note = "Use `add_liability()` for granular liability tracking")]
     pub fn liabilities(mut self, liabilities: impl IntoZakatDecimal) -> Self {
         match liabilities.into_zakat_decimal() {
             Ok(v) => self.liabilities_due_now = v,
@@ -119,6 +121,7 @@ impl CalculateZakat for BusinessZakat {
         self.validate()
     }
 
+    #[allow(deprecated)]
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         // Validate deferred input errors first
         self.validate()?;
@@ -175,7 +178,8 @@ impl CalculateZakat for BusinessZakat {
             crate::types::CalculationStep::result("step-gross-assets", "Gross Assets", *gross_assets),
         ];
 
-
+        // Calculate total liabilities (legacy + named)
+        let total_liabilities = self.total_liabilities();
 
         // Override hawl_satisfied if acquisition_date is present
         let hawl_is_satisfied = if let Some(date) = self.acquisition_date {
@@ -188,7 +192,7 @@ impl CalculateZakat for BusinessZakat {
 
         let params = MonetaryCalcParams {
             total_assets: *gross_assets,
-            liabilities: self.liabilities_due_now,
+            liabilities: total_liabilities,
             nisab_threshold: nisab_threshold_value,
             rate,
             wealth_type: crate::types::WealthType::Business,
@@ -220,6 +224,7 @@ mod tests {
     fn test_business_zakat() {
         let config = ZakatConfig { gold_price_per_gram: Decimal::from(100), ..Default::default() };
         
+        #[allow(deprecated)]
         let business = BusinessZakat::new()
             .cash(5000.0)
             .inventory(5000.0)
@@ -249,6 +254,7 @@ mod tests {
     fn test_business_specific_case() {
         let config = ZakatConfig { gold_price_per_gram: Decimal::from(1000000), ..Default::default() };
         
+        #[allow(deprecated)]
         let business = BusinessZakat::new()
             .cash(100000000.0)
             .liabilities(20000000.0)
@@ -268,5 +274,67 @@ mod tests {
             
         let result = business.calculate_zakat(&config);
         assert!(matches!(result, Err(ZakatError::InvalidInput { .. })));
+    }
+    
+    // =============================================================================
+    // Feature 1: Granular Liability Management Tests
+    // =============================================================================
+    
+    #[test]
+    fn test_add_liability_named() {
+        let config = ZakatConfig { gold_price_per_gram: Decimal::from(100), ..Default::default() };
+        
+        // Use the new add_liability API
+        let business = BusinessZakat::new()
+            .cash(10000.0)
+            .inventory(5000.0)
+            .add_liability("Credit Card", 500)
+            .add_liability("Mortgage Payment", 1500)
+            .add_liability("Car Loan", 1000)
+            .hawl(true);
+        
+        // Verify total liabilities
+        assert_eq!(business.total_liabilities(), dec!(3000));
+        assert_eq!(business.named_liabilities.len(), 3);
+        
+        let result = business.calculate_zakat(&config).unwrap();
+        
+        // Net = 15000 - 3000 = 12000
+        // Zakat = 12000 * 0.025 = 300
+        assert!(result.is_payable);
+        assert_eq!(result.net_assets, dec!(12000));
+        assert_eq!(result.zakat_due, dec!(300));
+    }
+    
+    #[test]
+    fn test_combined_legacy_and_named_liabilities() {
+        let config = ZakatConfig { gold_price_per_gram: Decimal::from(100), ..Default::default() };
+        
+        // Combine legacy debt() with new add_liability()
+        #[allow(deprecated)]
+        let business = BusinessZakat::new()
+            .cash(10000.0)
+            .debt(1000.0)  // Legacy API
+            .add_liability("Credit Card", 500)  // New API
+            .hawl(true);
+        
+        // Total should be legacy + named = 1500
+        assert_eq!(business.total_liabilities(), dec!(1500));
+        
+        let result = business.calculate_zakat(&config).unwrap();
+        
+        // Net = 10000 - 1500 = 8500
+        // 8500 == Nisab, so payable
+        assert!(result.is_payable);
+        assert_eq!(result.net_assets, dec!(8500));
+    }
+    
+    #[test]
+    fn test_liability_struct() {
+        use crate::types::Liability;
+        
+        let liability = Liability::new("Rent", dec!(2000));
+        assert_eq!(liability.description, "Rent");
+        assert_eq!(liability.amount, dec!(2000));
     }
 }

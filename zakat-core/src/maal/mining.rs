@@ -48,11 +48,12 @@ crate::zakat_ffi_export! {
 
 impl Default for MiningAssets {
     fn default() -> Self {
-        let (liabilities_due_now, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
+        let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
         Self {
             value: Decimal::ZERO,
             mining_type: MiningType::default(),
             liabilities_due_now,
+            named_liabilities,
             hawl_satisfied,
             label,
             id,

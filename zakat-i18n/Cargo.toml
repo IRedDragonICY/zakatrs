@@ -26,6 +26,8 @@ rust-embed = { workspace = true }
 icu = { workspace = true }
 fixed_decimal = { workspace = true }
 writeable = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 rust_decimal_macros = { workspace = true }

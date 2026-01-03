@@ -286,9 +286,11 @@ impl CalculateZakat for LivestockAssets {
             trace.push(crate::types::CalculationStep::info("status-exempt", "Count below Nisab - No Zakat Due"));
         }
 
+        #[allow(deprecated)]
         Ok(ZakatDetails {
             total_assets: *total_value,
             liabilities_due_now: self.liabilities_due_now,
+            liabilities: Vec::new(),
             net_assets: *total_value, 
             nisab_threshold: *nisab_threshold, 
             is_payable,
@@ -299,6 +301,7 @@ impl CalculateZakat for LivestockAssets {
             payload: crate::types::PaymentPayload::Livestock { heads_due },
             calculation_trace: crate::types::CalculationTrace(trace),
             warnings: Vec::new(),
+            structured_warnings: Vec::new(),
         })
     }
 

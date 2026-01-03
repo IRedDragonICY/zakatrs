@@ -17,7 +17,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Run tests
-        run: cargo test --verbose
+        # Exclude zakat_dart because it requires code generation (flutter_rust_bridge)
+        # which is not available in this simple test environment.
+        run: cargo test --verbose --workspace --exclude rust_lib_zakat_dart
 
   build:
     needs: test
@@ -42,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Publish to crates.io
-        run: cargo publish
+        run: cargo xtask publish-crates
 
   publish-pypi:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -75,7 +77,7 @@ jobs:
       - name: Install wasm-pack
         run: cargo install wasm-pack
       - name: Build all & sync
-        run: chmod +x scripts/*.sh && ./scripts/build-all.sh
+        run: cargo xtask sync-versions && cargo xtask build-wasm
       - name: Publish to NPM
         run: |
           cd pkg

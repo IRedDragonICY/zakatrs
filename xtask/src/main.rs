@@ -33,6 +33,7 @@ fn main() -> Result<()> {
     
     match task.as_str() {
         "build-all" => build_all()?,
+        "build-wasm" => build_wasm()?,
         "sync-versions" => sync_versions()?,
         "publish-all" => publish_all(None)?,
         "publish-crates" => publish_all(Some("crates"))?,
@@ -65,6 +66,7 @@ USAGE:
 
 COMMANDS:
     build-all       Build all targets (Rust, Python, WASM, Dart)
+    build-wasm      Build WASM target only
     sync-versions   Synchronize versions across all package manifests
     test            Run Rust tests only
     test-all        Run full compliance test suite (Rust + Python + Dart + WASM)
@@ -715,6 +717,7 @@ fn get_registry_targets() -> Vec<RegistryTarget<'static>> {
 fn publish_all(specific_target: Option<&str>) -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
+    let skip_confirm = args.iter().any(|a| a == "--yes" || a == "-y") || env::var("CI").is_ok();
     
     let root = project_root()?;
     let version = read_cargo_version()?;
@@ -781,7 +784,7 @@ fn publish_all(specific_target: Option<&str>) -> Result<()> {
          println!();
     }
 
-    if !dry_run {
+    if !dry_run && !skip_confirm {
         print!("Proceed with publishing? (y/n) ");
         io::stdout().flush()?;
         

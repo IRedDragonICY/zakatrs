@@ -24,15 +24,26 @@ use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, strum::Display, strum::EnumString)]
 pub enum JewelryUsage {
     #[default]
     Investment,    // Always Zakatable
     PersonalUse,   // Exempt in Shafi/Maliki/Hanbali (Jumhur), Zakatable in Hanafi
 }
 
+impl crate::inputs::ToFfiString for JewelryUsage {
+    fn to_ffi_string(&self) -> String { self.to_string() }
+}
+impl crate::inputs::FromFfiString for JewelryUsage {
+    type Err = strum::ParseError;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+        use std::str::FromStr;
+        Self::from_str(s)
+    }
+}
+
 // MACRO USAGE
-crate::zakat_asset! {
+crate::zakat_ffi_export! {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct PreciousMetals {
         pub weight_grams: Decimal,

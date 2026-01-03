@@ -2,6 +2,7 @@ use flutter_rust_bridge::frb;
 use zakat::prelude::*;
 use rust_decimal::prelude::*;
 use anyhow::Result;
+use zakat::maal::business::ffi_mirror::BusinessZakat as DartBusinessZakat;
 
 #[frb(init)]
 pub fn init_app() {
@@ -226,6 +227,19 @@ impl NativePortfolio {
         // push() returns the UUID of the added item
         let id = portfolio.push(zakat::assets::PortfolioItem::Business(business));
         
+        Ok(id.to_string())
+    }
+
+    /// Adds a business asset using the structured mirror (Strings).
+    #[frb(sync)]
+    pub fn add_business_struct(&self, item: DartBusinessZakat) -> Result<String> {
+        let business = item.to_core()
+             .map_err(|e| anyhow::anyhow!("Failed to parse business struct: {:?}", e))?;
+
+        let mut portfolio = self.portfolio.lock()
+            .map_err(|e| anyhow::anyhow!("Failed to lock portfolio: {}", e))?;
+        
+        let id = portfolio.push(zakat::assets::PortfolioItem::Business(business));
         Ok(id.to_string())
     }
 

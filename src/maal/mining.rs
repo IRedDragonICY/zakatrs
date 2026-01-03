@@ -15,7 +15,7 @@ use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, strum::Display, strum::EnumString)]
 pub enum MiningType {
     /// Buried Treasure / Ancient Wealth found.
     Rikaz,
@@ -24,8 +24,19 @@ pub enum MiningType {
     Mines,
 }
 
+impl crate::inputs::ToFfiString for MiningType {
+    fn to_ffi_string(&self) -> String { self.to_string() }
+}
+impl crate::inputs::FromFfiString for MiningType {
+    type Err = strum::ParseError;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+         use std::str::FromStr;
+        Self::from_str(s)
+    }
+}
+
 // MACRO USAGE
-crate::zakat_asset! {
+crate::zakat_ffi_export! {
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct MiningAssets {
         pub value: Decimal,

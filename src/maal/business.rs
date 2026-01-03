@@ -18,7 +18,8 @@ use crate::inputs::IntoZakatDecimal;
 use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
 
 // Use the zakat_asset! macro to generate common fields and setters
-crate::zakat_asset! {
+// Use the zakat_ffi_export! macro to generate common fields, setters, and FFI bindings
+crate::zakat_ffi_export! {
     /// Represents Business Assets for Zakat Calculation.
     /// 
     /// # Fiqh Note on Liabilities

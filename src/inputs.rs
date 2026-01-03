@@ -515,3 +515,105 @@ mod tests {
     }
 }
 
+
+// --- FFI Utilities ---
+
+/// Trait to convert types to String for FFI boundaries (WASM/UniFFI).
+/// Ensures Option<T> handles None gracefully.
+pub trait ToFfiString {
+    fn to_ffi_string(&self) -> String;
+}
+
+// Convert Option types
+impl<T: ToFfiString> ToFfiString for Option<T> {
+    fn to_ffi_string(&self) -> String {
+        match self {
+            Some(v) => v.to_ffi_string(),
+            None => String::new(),
+        }
+    }
+}
+
+// Specific Implementations
+impl ToFfiString for String {
+    fn to_ffi_string(&self) -> String { self.clone() }
+}
+impl ToFfiString for &str {
+    fn to_ffi_string(&self) -> String { self.to_string() }
+}
+impl ToFfiString for bool {
+    fn to_ffi_string(&self) -> String { self.to_string() }
+}
+impl ToFfiString for rust_decimal::Decimal {
+    fn to_ffi_string(&self) -> String { self.to_string() }
+}
+impl ToFfiString for uuid::Uuid {
+    fn to_ffi_string(&self) -> String { self.to_string() }
+}
+// Integers
+impl ToFfiString for i32 { fn to_ffi_string(&self) -> String { self.to_string() } }
+impl ToFfiString for u32 { fn to_ffi_string(&self) -> String { self.to_string() } }
+impl ToFfiString for i64 { fn to_ffi_string(&self) -> String { self.to_string() } }
+impl ToFfiString for u64 { fn to_ffi_string(&self) -> String { self.to_string() } }
+impl ToFfiString for isize { fn to_ffi_string(&self) -> String { self.to_string() } }
+impl ToFfiString for usize { fn to_ffi_string(&self) -> String { self.to_string() } }
+
+
+/// Trait to parse types from String for FFI boundaries.
+/// Handles Option<T> by treating empty strings/null as None.
+pub trait FromFfiString: Sized {
+    type Err;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err>;
+}
+
+// Blanket impl for Option
+impl<T: FromFfiString> FromFfiString for Option<T> {
+    type Err = T::Err;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+        if s.trim().is_empty() || s.eq_ignore_ascii_case("none") || s.eq_ignore_ascii_case("null") {
+            Ok(None)
+        } else {
+            T::from_ffi_string(s).map(Some)
+        }
+    }
+}
+
+// Specific Implementations
+impl FromFfiString for rust_decimal::Decimal {
+    type Err = rust_decimal::Error;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+        rust_decimal::Decimal::from_str(s)
+    }
+}
+
+impl FromFfiString for bool {
+    type Err = std::str::ParseBoolError;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+         // enhanced bool parsing
+         match s.to_lowercase().as_str() {
+             "1" | "true" | "yes" | "on" => Ok(true),
+             "0" | "false" | "no" | "off" => Ok(false),
+             _ => std::str::FromStr::from_str(s),
+         }
+    }
+}
+
+impl FromFfiString for String {
+    type Err = std::convert::Infallible;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+        Ok(s.to_string())
+    }
+}
+
+impl FromFfiString for uuid::Uuid {
+    type Err = uuid::Error;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+        uuid::Uuid::parse_str(s)
+    }
+}
+
+// Integers
+impl FromFfiString for i32 { type Err = std::num::ParseIntError; fn from_ffi_string(s: &str) -> Result<Self, Self::Err> { s.parse() } }
+impl FromFfiString for u32 { type Err = std::num::ParseIntError; fn from_ffi_string(s: &str) -> Result<Self, Self::Err> { s.parse() } }
+impl FromFfiString for i64 { type Err = std::num::ParseIntError; fn from_ffi_string(s: &str) -> Result<Self, Self::Err> { s.parse() } }
+impl FromFfiString for u64 { type Err = std::num::ParseIntError; fn from_ffi_string(s: &str) -> Result<Self, Self::Err> { s.parse() } }

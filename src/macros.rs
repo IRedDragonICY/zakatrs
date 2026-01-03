@@ -155,3 +155,459 @@ macro_rules! zakat_asset {
         }
     };
 }
+
+
+/// Macro for exporting Zakat assets to FFI (Python, WASM, etc.)
+#[macro_export]
+macro_rules! zakat_ffi_export {
+    (
+        $(#[$meta:meta])*
+        $vis:vis struct $name:ident {
+            $(
+                $(#[$field_meta:meta])*
+                $field_vis:vis $field:ident : $ty:ty
+            ),* $(,)?
+        }
+    ) => {
+        // 1. Generate the base Rust struct using zakat_asset!
+        crate::zakat_asset! {
+            $(#[$meta])*
+            // Removed direct uniffi derive because Decimal/Uuid are not supported directly
+            $vis struct $name {
+                $(
+                    $(#[$field_meta])*
+                    $field_vis $field : $ty
+                ),*
+            }
+        }
+
+        // 2. Python Projection
+        #[cfg(feature = "python")]
+        pub mod python_ffi {
+            use super::*;
+            use pyo3::prelude::*;
+            use pyo3::types::{PyDict};
+            use rust_decimal::Decimal;
+            use std::str::FromStr;
+            use crate::inputs::{ToFfiString, FromFfiString};
+
+            #[pyclass]
+            #[derive(Clone)]
+            pub struct $name {
+                pub inner: super::$name
+            }
+
+            #[pymethods]
+            impl $name {
+                #[new]
+                #[pyo3(signature = (**kwargs))]
+                pub fn new(kwargs: Option<&Bound<'_, PyDict>>) -> pyo3::PyResult<Self> {
+                    let mut obj = Self { inner: super::$name::default() };
+                    if let Some(k) = kwargs {
+                        obj.update(k)?;
+                    }
+                    Ok(obj)
+                }
+
+                /// Bulk update fields using keyword arguments
+                /// Example: obj.update(cash_on_hand="100", hawl_satisfied=True)
+                pub fn update(&mut self, kwargs: &Bound<'_, PyDict>) -> pyo3::PyResult<()> {
+                    for (key, value) in kwargs {
+                        let key_str = key.extract::<String>()?;
+                        let val_str = value.to_string(); 
+
+                        match key_str.as_str() {
+                            // User fields
+                            $(
+                                stringify!($field) => {
+                                    self.inner.$field = <$ty as FromFfiString>::from_ffi_string(&val_str)
+                                        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid {}: {}", stringify!($field), e)))?;
+                                }
+                            )*
+                            
+                            // Common fields
+                            "liabilities_due_now" | "liabilities" => {
+                                self.inner.liabilities_due_now = Decimal::from_str(&val_str)
+                                    .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid liabilities: {}", e)))?;
+                            }
+                            "hawl_satisfied" | "hawl" => {
+                                if let Ok(b) = value.extract::<bool>() {
+                                    self.inner.hawl_satisfied = b;
+                                } else {
+                                    let s = val_str.to_lowercase();
+                                    self.inner.hawl_satisfied = s == "true" || s == "1" || s == "yes";
+                                }
+                            }
+                            "label" => {
+                                self.inner.label = Some(val_str);
+                            }
+                            "id" => {}
+                            _ => {}
+                        }
+                    }
+                    Ok(())
+                }
+
+                // --- Getters ---
+                $(
+                    #[getter]
+                    pub fn $field(&self) -> String {
+                        crate::inputs::ToFfiString::to_ffi_string(&self.inner.$field)
+                    }
+                )*
+
+                #[getter]
+                pub fn liabilities_due_now(&self) -> String {
+                    self.inner.liabilities_due_now.to_string()
+                }
+
+                #[getter]
+                pub fn hawl_satisfied(&self) -> bool {
+                    self.inner.hawl_satisfied
+                }
+                
+                #[getter]
+                pub fn label(&self) -> Option<String> {
+                    self.inner.label.clone()
+                }
+
+                #[getter]
+                pub fn _input_errors(&self) -> Vec<String> {
+                    self.inner._input_errors.iter().map(|e| e.to_string()).collect::<std::vec::Vec<String>>()
+                }
+
+                fn calculate(&self, config: &crate::python::PyZakatConfig) -> pyo3::PyResult<crate::python::PyZakatDetails> {
+                     use crate::traits::CalculateZakat;
+                     let details = self.inner.calculate_zakat(&config.inner)
+                        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+                     Ok(crate::python::PyZakatDetails { inner: details })
+                }
+            }
+        }
+
+        // 3. WASM Projection
+        #[cfg(feature = "wasm")]
+        pub mod wasm_ffi {
+            use super::*;
+            use wasm_bindgen::prelude::*;
+            use rust_decimal::Decimal;
+            use std::str::FromStr;
+            use crate::inputs::{ToFfiString, FromFfiString};
+
+            #[wasm_bindgen]
+            pub struct $name {
+                inner: super::$name,
+            }
+
+            #[wasm_bindgen]
+            impl $name {
+                #[wasm_bindgen(constructor)]
+                pub fn new() -> Self {
+                    Self { inner: super::$name::default() }
+                }
+
+                // --- Getters and Setters ---
+                $(
+                    #[wasm_bindgen(getter)]
+                    pub fn $field(&self) -> String {
+                        crate::inputs::ToFfiString::to_ffi_string(&self.inner.$field)
+                    }
+                )*
+            }
+            
+            // We need a separate impl block for setters because we need paste! which handles the ident concatenation
+            paste::paste! {
+                #[wasm_bindgen]
+                impl $name {
+                    $(
+                        #[wasm_bindgen(setter)]
+                        pub fn [<set_ $field>](&mut self, val: &str) -> Result<(), JsError> {
+                            self.inner.$field = <$ty as FromFfiString>::from_ffi_string(val)
+                                .map_err(|e| JsError::new(&format!("Invalid {}: {}", stringify!($field), e)))?;
+                            Ok(())
+                        }
+                    )*
+                    
+                    #[wasm_bindgen(setter)]
+                    pub fn set_liabilities_due_now(&mut self, val: &str) -> Result<(), JsError> {
+                         self.inner.liabilities_due_now = Decimal::from_str(val)
+                            .map_err(|e| JsError::new(&format!("Invalid liabilities: {}", e)))?;
+                         Ok(())
+                    }
+                }
+            }
+
+            #[wasm_bindgen]
+            impl $name {
+                 // --- Common Fields Getters (Setters handled above or separately) ---
+                #[wasm_bindgen(getter)]
+                pub fn liabilities_due_now(&self) -> String {
+                    self.inner.liabilities_due_now.to_string()
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn hawl_satisfied(&self) -> bool {
+                    self.inner.hawl_satisfied
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_hawl_satisfied(&mut self, val: bool) {
+                    self.inner.hawl_satisfied = val;
+                }
+
+                #[wasm_bindgen(getter)]
+                pub fn label(&self) -> Option<String> {
+                    self.inner.label.clone()
+                }
+
+                #[wasm_bindgen(setter)]
+                pub fn set_label(&mut self, val: Option<String>) {
+                    self.inner.label = val;
+                }
+
+                // --- Calculation ---
+                pub fn calculate(&self, config_js: JsValue) -> Result<JsValue, JsValue> {
+                    let config: crate::config::ZakatConfig = serde_wasm_bindgen::from_value(config_js)?;
+                    use crate::traits::CalculateZakat;
+                    let res = self.inner.calculate_zakat(&config)
+                        .map_err(|e| JsValue::from_str(&e.to_string()))?;
+                    Ok(serde_wasm_bindgen::to_value(&res)?)
+                }
+            }
+        }
+
+        // 4. UniFFI Projection (Kotlin/Swift)
+        #[cfg(feature = "uniffi")]
+        pub mod uniffi_ffi {
+            use super::*;
+            use uniffi::Record;
+            use crate::inputs::{ToFfiString, FromFfiString};
+            
+            // Mirror struct with simplified types (String for Decimal)
+            #[derive(Record, Clone, Debug)]
+            pub struct $name {
+                // User fields
+                $(
+                    pub $field: String,
+                )*
+                // Common fields
+                pub liabilities_due_now: String,
+                pub hawl_satisfied: bool,
+                pub label: Option<String>,
+                pub id: String, // UUID as string
+            }
+
+            impl From<super::$name> for $name {
+                fn from(src: super::$name) -> Self {
+                    Self {
+                        $(
+                           $field: ToFfiString::to_ffi_string(&src.$field),
+                        )*
+                        liabilities_due_now: src.liabilities_due_now.to_string(),
+                        hawl_satisfied: src.hawl_satisfied,
+                        label: src.label,
+                        id: src.id.to_string(),
+                    }
+                }
+            }
+            
+            paste::paste! {
+                #[uniffi::export]
+                pub fn [<calculate_ $name:snake>](asset: $name, config: &crate::kotlin::KotlinConfigWrapper) -> Result<crate::types::FfiZakatDetails, crate::kotlin::KotlinZakatError> {
+                     let inner = super::$name {
+                         // User fields
+                         $(
+                             $field: <$ty as FromFfiString>::from_ffi_string(&asset.$field)
+                                 .map_err(|e| crate::kotlin::KotlinZakatError::ParseError {
+                                     field: stringify!($field).to_string(),
+                                     message: e.to_string()
+                                 })?,
+                         )*
+                         // Common fields
+                         liabilities_due_now: <rust_decimal::Decimal as FromFfiString>::from_ffi_string(&asset.liabilities_due_now)
+                             .map_err(|e| crate::kotlin::KotlinZakatError::ParseError { field: "liabilities".into(), message: e.to_string() })?,
+                         hawl_satisfied: asset.hawl_satisfied,
+                         label: asset.label,
+                         id: <uuid::Uuid as FromFfiString>::from_ffi_string(&asset.id)
+                              .unwrap_or_else(|_| uuid::Uuid::new_v4()),
+                         acquisition_date: None,
+                         _input_errors: Vec::new(),
+                     };
+                     
+                     use crate::traits::CalculateZakat;
+                     let details = inner.calculate_zakat(&config.inner)
+                          .map_err(|e| crate::kotlin::KotlinZakatError::CalculationError { reason: e.to_string() })?;
+                     
+                     Ok(details.into())
+                }
+            }
+        }
+
+        // 5. Generic FFI Mirror (Plain Rust structs with String fields, for FRB etc)
+        pub mod ffi_mirror {
+            use super::*;
+            use crate::inputs::{ToFfiString, FromFfiString};
+            
+            #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+            pub struct $name {
+                // User fields
+                $(
+                    pub $field: String,
+                )*
+                // Common fields
+                pub liabilities_due_now: String,
+                pub hawl_satisfied: bool,
+                pub label: Option<String>,
+                pub id: String,
+            }
+
+            impl From<super::$name> for $name {
+                fn from(src: super::$name) -> Self {
+                    Self {
+                        $(
+                           $field: ToFfiString::to_ffi_string(&src.$field),
+                        )*
+                        liabilities_due_now: src.liabilities_due_now.to_string(),
+                        hawl_satisfied: src.hawl_satisfied,
+                        label: src.label,
+                        id: src.id.to_string(),
+                    }
+                }
+            }
+            
+            impl $name {
+                pub fn to_core(&self) -> Result<super::$name, crate::types::ZakatError> {
+                     Ok(super::$name {
+                         // User fields
+                         $(
+                             $field: <$ty as FromFfiString>::from_ffi_string(&self.$field)
+                                 .map_err(|e| crate::types::ZakatError::InvalidInput(Box::new(crate::types::InvalidInputDetails {
+                                    field: stringify!($field).to_string(),
+                                    value: self.$field.clone(),
+                                    reason_key: "error-parse".to_string(),
+                                    args: None,
+                                    source_label: self.label.clone(),
+                                    asset_id: None,
+                                 })))?,
+                         )*
+                         // Common fields
+                         liabilities_due_now: <rust_decimal::Decimal as FromFfiString>::from_ffi_string(&self.liabilities_due_now)
+                             .map_err(|e| crate::types::ZakatError::InvalidInput(Box::new(crate::types::InvalidInputDetails{
+                                field: "liabilities".to_string(),
+                                value: self.liabilities_due_now.clone(),
+                                reason_key: "error-parse".to_string(),
+                                args: None,
+                                source_label: self.label.clone(),
+                                asset_id: None,
+                             })))?,
+                         hawl_satisfied: self.hawl_satisfied,
+                         label: self.label.clone(),
+                         id: <uuid::Uuid as FromFfiString>::from_ffi_string(&self.id)
+                              .unwrap_or_else(|_| uuid::Uuid::new_v4()),
+                         acquisition_date: None,
+                         _input_errors: Vec::new(),
+                     })
+                }
+
+                pub fn calculate(&self, config: &crate::config::ZakatConfig) -> Result<crate::types::FfiZakatDetails, crate::types::ZakatError> {
+                     let inner = self.to_core()?;
+                     
+                     use crate::traits::CalculateZakat;
+                     let details = inner.calculate_zakat(config)?;
+                     
+                     Ok(details.into())
+                }
+            }
+        }
+    };
+}
+
+
+// 6. Python View Implementation (Output Structs)
+#[macro_export]
+macro_rules! zakat_impl_py_view {
+    (
+        struct $core_type:path as $name:ident (name = $exposed_name:literal) {
+            $(
+                $field:ident : $ty:ty [$strategy:ident]
+            ),* $(,)?
+        }
+        $(
+            extra_methods {
+                $($extra:tt)*
+            }
+        )?
+    ) => {
+        paste::paste! {
+            #[pyo3::prelude::pyclass(name = $exposed_name)]
+            #[derive(Clone, Debug)]
+            pub struct $name {
+                pub inner: $core_type,
+            }
+
+            #[pyo3::prelude::pymethods]
+            impl $name {
+                $(
+                    #[getter]
+                    fn [<get_ $field>](&self) -> $ty {
+                        crate::zakat_impl_py_view!(@get self.inner.$field, $strategy)
+                    }
+                )*
+
+                fn to_dict(&self, py: pyo3::prelude::Python) -> pyo3::prelude::PyResult<pyo3::Py<pyo3::types::PyAny>> {
+                     let dict = pyo3::types::PyDict::new(py);
+                     $(
+                         dict.set_item(stringify!($field), self.[<get_ $field>]())?;
+                     )*
+                     Ok(dict.into())
+                }
+
+                fn __repr__(&self) -> String {
+                    format!(
+                        concat!("<", $exposed_name, " ", $(stringify!($field), "={:?} "),*, ">"),
+                        $(
+                            self.[<get_ $field>](),
+                        )*
+                    )
+                }
+
+                $(
+                    $($extra)*
+                )?
+            }
+        }
+    };
+
+    // Strategies
+    (@get $expr:expr, into) => { $expr.clone().into() };
+    (@get $expr:expr, to_string) => { $expr.to_string() };
+    (@get $expr:expr, copy) => { $expr };
+    (@get $expr:expr, clone) => { $expr.clone() };
+    (@get $expr:expr, option_clone) => { $expr.clone() };
+}
+
+// 7. Python Enum Mapper
+#[macro_export]
+macro_rules! zakat_pymap_enum {
+    (
+        enum $core_type:path as $name:ident (name = $exposed_name:literal) {
+            $( $variant:ident = $val:literal ),* $(,)?
+        } with_impl From<$core_type_from:path> {
+            $($match_pat:pat => $match_res:expr),* $(,)?
+        }
+    ) => {
+        #[pyo3::prelude::pyclass(name = $exposed_name, eq, eq_int)]
+        #[derive(Clone, PartialEq, Eq, Debug)]
+        pub enum $name {
+            $( $variant = $val, )*
+        }
+
+        impl From<$core_type_from> for $name {
+            fn from(val: $core_type_from) -> Self {
+                match val {
+                    $( $match_pat => $match_res, )*
+                }
+            }
+        }
+    };
+}

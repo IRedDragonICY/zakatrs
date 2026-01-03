@@ -1044,7 +1044,7 @@ impl ZakatError {
 
 
 /// Helper enum to categorize wealth types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, strum::Display, strum::EnumString)]
 pub enum WealthType {
     Fitrah,
     Gold,
@@ -1067,5 +1067,161 @@ impl WealthType {
             self,
             WealthType::Gold | WealthType::Silver | WealthType::Business | WealthType::Income | WealthType::Investment
         )
+    }
+}
+
+impl crate::inputs::ToFfiString for WealthType {
+    fn to_ffi_string(&self) -> String {
+        self.to_string()
+    }
+}
+
+impl crate::inputs::FromFfiString for WealthType {
+    type Err = strum::ParseError;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+        use std::str::FromStr;
+        Self::from_str(s)
+    }
+}
+
+#[cfg(feature = "uniffi")]
+use uniffi::Record;
+
+#[derive(Clone, Debug)]
+#[cfg_attr(feature = "uniffi", derive(Record))]
+pub struct FfiZakatDetails {
+    pub total_assets: String,
+    pub liabilities_due_now: String,
+    pub net_assets: String,
+    pub nisab_threshold: String,
+    pub is_payable: bool,
+    pub zakat_due: String,
+    pub wealth_type: String, // debug formatted string
+    pub status_reason: Option<String>,
+    pub label: Option<String>,
+    pub warnings: Vec<String>,
+}
+
+impl From<ZakatDetails> for FfiZakatDetails {
+    fn from(src: ZakatDetails) -> Self {
+        Self {
+            total_assets: src.total_assets.to_string(),
+            liabilities_due_now: src.liabilities_due_now.to_string(),
+            net_assets: src.net_assets.to_string(),
+            nisab_threshold: src.nisab_threshold.to_string(),
+            is_payable: src.is_payable,
+            zakat_due: src.zakat_due.to_string(),
+            wealth_type: format!("{:?}", src.wealth_type),
+            status_reason: src.status_reason,
+            label: src.label,
+            warnings: src.warnings,
+        }
+    }
+}
+// kept for backward compat if needed within file, or empty mod
+#[cfg(feature = "uniffi")]
+pub mod uniffi_types {
+    pub type UniffiZakatDetails = super::FfiZakatDetails;
+    pub type UniffiZakatError = super::FfiZakatError;
+}
+
+// =============================================================================
+// FFI Error Type (Auto-generated projection for FFI boundaries)
+// =============================================================================
+
+/// Unified FFI-compatible error structure for WASM, UniFFI, and other FFI targets.
+/// 
+/// This struct eliminates the need for manual error type maintenance in each
+/// FFI target module (wasm.rs, kotlin.rs, etc.). If you add a new variant to
+/// `ZakatError`, the `From<ZakatError>` implementation below handles it automatically.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
+pub struct FfiZakatError {
+    /// Error code for programmatic handling (e.g., "CALCULATION_ERROR", "INVALID_INPUT")
+    pub code: String,
+    /// Human-readable error message
+    pub message: String,
+    /// The field that caused the error (if applicable)
+    pub field: Option<String>,
+    /// Additional hint for fixing the error
+    pub hint: Option<String>,
+    /// Source label (which asset caused this error)
+    pub source_label: Option<String>,
+}
+
+impl From<ZakatError> for FfiZakatError {
+    fn from(err: ZakatError) -> Self {
+        // Use default translator for message
+        let message = err.report_default();
+        
+        match err {
+            ZakatError::CalculationError(details) => FfiZakatError {
+                code: "CALCULATION_ERROR".to_string(),
+                message,
+                field: None,
+                hint: None,
+                source_label: details.source_label,
+            },
+            ZakatError::InvalidInput(details) => FfiZakatError {
+                code: "INVALID_INPUT".to_string(),
+                message,
+                field: Some(details.field),
+                hint: Some(details.value),
+                source_label: details.source_label,
+            },
+            ZakatError::ConfigurationError(details) => FfiZakatError {
+                code: "CONFIG_ERROR".to_string(),
+                message,
+                field: None,
+                hint: None,
+                source_label: details.source_label,
+            },
+            ZakatError::MissingConfig { field, source_label, .. } => FfiZakatError {
+                code: "MISSING_CONFIG".to_string(),
+                message,
+                field: Some(field),
+                hint: None,
+                source_label,
+            },
+            ZakatError::Overflow { operation, source_label, .. } => FfiZakatError {
+                code: "OVERFLOW".to_string(),
+                message,
+                field: Some(operation),
+                hint: None,
+                source_label,
+            },
+            ZakatError::MultipleErrors(errs) => FfiZakatError {
+                code: "MULTIPLE_ERRORS".to_string(),
+                message: format!("{} errors occurred: {}", errs.len(), message),
+                field: None,
+                hint: None,
+                source_label: None,
+            },
+            ZakatError::NetworkError(_) => FfiZakatError {
+                code: "NETWORK_ERROR".to_string(),
+                message,
+                field: None,
+                hint: None,
+                source_label: None,
+            },
+        }
+    }
+}
+
+// WASM-specific error conversion
+#[cfg(feature = "wasm")]
+impl From<FfiZakatError> for wasm_bindgen::JsValue {
+    fn from(err: FfiZakatError) -> Self {
+        serde_wasm_bindgen::to_value(&err)
+            .unwrap_or_else(|_| wasm_bindgen::JsValue::from_str(&err.message))
+    }
+}
+
+// Helper to convert ZakatError directly to JsValue for WASM
+#[cfg(feature = "wasm")]
+impl From<ZakatError> for wasm_bindgen::JsValue {
+    fn from(err: ZakatError) -> Self {
+        let ffi_err: FfiZakatError = err.into();
+        ffi_err.into()
     }
 }

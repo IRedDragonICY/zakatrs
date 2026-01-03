@@ -3,8 +3,11 @@ use crate::prelude::*;
 use crate::config::ZakatConfig;
 use crate::portfolio::ZakatPortfolio;
 use crate::assets::PortfolioItem;
-use serde::Serialize;
 use serde_wasm_bindgen::{from_value, to_value};
+
+// Re-export the centralized FFI error type
+// No more manual maintenance needed - if ZakatError changes, FfiZakatError handles it!
+use crate::types::FfiZakatError;
 
 /// Initialize hooks for better debugging in WASM
 #[wasm_bindgen]
@@ -12,72 +15,28 @@ pub fn init_hooks() {
     console_error_panic_hook::set_once();
 }
 
-/// Calculate Zakat for a portfolio
-/// 
-/// Adapts the Rust `ZakatPortfolio::calculate_total` to JS.
-/// 
-/// # Arguments
-/// - `config_json`: `ZakatConfig` object
-/// - `assets_json`: Array of `PortfolioItem` objects
-#[wasm_bindgen]
-#[derive(Serialize)]
-struct WasmZakatError {
-    code: String,
-    message: String,
-    field: Option<String>,
-    hint: Option<String>,
+/// Helper to create a JSON parsing error
+fn json_error(message: String, hint: Option<String>) -> JsValue {
+    let err = FfiZakatError {
+        code: "JSON_ERROR".to_string(),
+        message,
+        field: None,
+        hint,
+        source_label: None,
+    };
+    err.into()
 }
 
-impl From<crate::types::ZakatError> for WasmZakatError {
-    fn from(err: crate::types::ZakatError) -> Self {
-        // Use default translator (English) for now, or could potentially expose locale setting in future
-        let message = err.report_default(); 
-        
-        match err {
-            crate::types::ZakatError::CalculationError(details) => WasmZakatError {
-                code: "CALCULATION_ERROR".to_string(),
-                message, 
-                field: details.source_label,
-                hint: None,
-            },
-            crate::types::ZakatError::InvalidInput(details) => WasmZakatError {
-                code: "INVALID_INPUT".to_string(),
-                message,
-                field: Some(details.field),
-                hint: details.source_label,
-            },
-            crate::types::ZakatError::ConfigurationError(details) => WasmZakatError {
-                code: "CONFIG_ERROR".to_string(),
-                message,
-                field: details.source_label,
-                hint: None,
-            },
-            crate::types::ZakatError::MissingConfig { field, source_label, .. } => WasmZakatError {
-                code: "MISSING_CONFIG".to_string(),
-                message,
-                field: Some(field),
-                hint: source_label,
-            },
-            crate::types::ZakatError::Overflow { source_label, .. } => WasmZakatError {
-                code: "OVERFLOW".to_string(),
-                message,
-                field: source_label,
-                hint: None,
-            },
-            crate::types::ZakatError::MultipleErrors(errs) => WasmZakatError {
-                 code: "MULTIPLE_ERRORS".to_string(),
-                 message: format!("{} errors occurred: {}", errs.len(), message),
-                 field: None,
-                 hint: None,
-            },
-            crate::types::ZakatError::NetworkError(_) => WasmZakatError {
-                code: "NETWORK_ERROR".to_string(),
-                message,
-                field: None,
-                hint: None,
-            },
-        }
-    }
+/// Helper to create a serialization error
+fn serialization_error(message: String) -> JsValue {
+    let err = FfiZakatError {
+        code: "SERIALIZATION_ERROR".to_string(),
+        message,
+        field: None,
+        hint: None,
+        source_label: None,
+    };
+    err.into()
 }
 
 /// Calculate Zakat for a portfolio
@@ -90,26 +49,10 @@ impl From<crate::types::ZakatError> for WasmZakatError {
 #[wasm_bindgen]
 pub fn calculate_portfolio_wasm(config_json: JsValue, assets_json: JsValue) -> Result<JsValue, JsValue> {
     let config: ZakatConfig = from_value(config_json)
-        .map_err(|e| {
-            let err = WasmZakatError {
-                code: "JSON_ERROR".to_string(),
-                message: format!("Invalid Config JSON: {}", e),
-                field: None,
-                hint: Some("Check JSON format".to_string()),
-            };
-            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: JSON Error serialization failed"))
-        })?;
+        .map_err(|e| json_error(format!("Invalid Config JSON: {}", e), Some("Check JSON format".to_string())))?;
         
     let assets: Vec<PortfolioItem> = from_value(assets_json)
-        .map_err(|e| {
-            let err = WasmZakatError {
-                code: "JSON_ERROR".to_string(),
-                message: format!("Invalid Assets JSON: {}", e),
-                field: None,
-                hint: Some("Check JSON format".to_string()),
-            };
-            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: JSON Error serialization failed"))
-        })?;
+        .map_err(|e| json_error(format!("Invalid Assets JSON: {}", e), Some("Check JSON format".to_string())))?;
 
     let mut portfolio = ZakatPortfolio::new();
     for asset in assets {
@@ -119,58 +62,23 @@ pub fn calculate_portfolio_wasm(config_json: JsValue, assets_json: JsValue) -> R
     let result = portfolio.calculate_total(&config);
     
     to_value(&result)
-        .map_err(|e| {
-             let err = WasmZakatError {
-                code: "SERIALIZATION_ERROR".to_string(),
-                message: format!("Failed to serialize result: {}", e),
-                field: None,
-                hint: None,
-            };
-            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: Result serialization failed"))
-        })
+        .map_err(|e| serialization_error(format!("Failed to serialize result: {}", e)))
 }
 
 /// Helper: Calculate Zakat for a single asset just like the portfolio but simpler
 #[wasm_bindgen]
 pub fn calculate_single_asset(config_json: JsValue, asset_json: JsValue) -> Result<JsValue, JsValue> {
     let config: ZakatConfig = from_value(config_json)
-        .map_err(|e| {
-            let err = WasmZakatError {
-                code: "JSON_ERROR".to_string(),
-                message: format!("Invalid Config JSON: {}", e),
-                field: None,
-                hint: Some("Check JSON format".to_string()),
-            };
-            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: Config serialization failed"))
-        })?;
+        .map_err(|e| json_error(format!("Invalid Config JSON: {}", e), Some("Check JSON format".to_string())))?;
     
     let asset: PortfolioItem = from_value(asset_json)
-        .map_err(|e| {
-            let err = WasmZakatError {
-                code: "JSON_ERROR".to_string(),
-                message: format!("Invalid Asset JSON: {}", e),
-                field: None,
-                hint: Some("Check JSON format".to_string()),
-            };
-            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: Asset serialization failed"))
-        })?;
+        .map_err(|e| json_error(format!("Invalid Asset JSON: {}", e), Some("Check JSON format".to_string())))?;
 
-    let details = asset.calculate_zakat(&config)
-        .map_err(|e| {
-            let wasm_err: WasmZakatError = e.into();
-            serde_wasm_bindgen::to_value(&wasm_err).unwrap_or_else(|_| JsValue::from_str("Critical: Zakat Error serialization failed"))
-        })?;
+    // ZakatError auto-converts to JsValue via the From impl in types.rs!
+    let details = asset.calculate_zakat(&config)?;
         
     to_value(&details)
-        .map_err(|e| {
-            let err = WasmZakatError {
-                code: "SERIALIZATION_ERROR".to_string(),
-                message: format!("Failed to serialize result: {}", e),
-                field: None,
-                hint: None,
-            };
-            serde_wasm_bindgen::to_value(&err).unwrap_or_else(|_| JsValue::from_str("Critical: Final Result serialization failed"))
-        })
+        .map_err(|e| serialization_error(format!("Failed to serialize result: {}", e)))
 }
 
 /// Helper: Test if WASM is alive
@@ -178,3 +86,4 @@ pub fn calculate_single_asset(config_json: JsValue, asset_json: JsValue) -> Resu
 pub fn greet(name: &str) -> String {
     format!("Hello, {}! Zakat WASM is ready.", name)
 }
+

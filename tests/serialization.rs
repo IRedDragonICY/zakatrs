@@ -44,7 +44,7 @@ fn test_portfolio_serialization() {
     assert!(json.contains("Main Store"));
     assert!(json.contains("Gold Reserve"));
     assert!(json.contains("type")); // Tag for enum
-    assert!(json.contains("Business"));
+    assert!(json.contains("business")); // camelCase due to serde rename_all
     
     // 3. Deserialize back
     let deserialized: ZakatPortfolio = serde_json::from_str(&json).expect("Failed to deserialize portfolio");
@@ -82,7 +82,7 @@ fn test_individual_asset_serialization() {
     // As PortfolioItem
     let item: PortfolioItem = asset.into();
     let json_item = serde_json::to_string(&item).unwrap();
-    assert!(json_item.contains("\"type\":\"Business\""));
+    assert!(json_item.contains("\"type\":\"business\"")); // camelCase due to serde rename_all
     let back_item: PortfolioItem = serde_json::from_str(&json_item).unwrap();
     
     if let PortfolioItem::Business(b) = back_item {

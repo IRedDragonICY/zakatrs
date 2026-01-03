@@ -10,7 +10,7 @@ void main() {
   test('Business Zakat Calculation via Macro Wrapper', () async {
     // 1. Setup Config
     // Gold Price = 100/g. Nisab Gold = 85g * 100 = 8500.
-    final config = await DartZakatConfig.new_(
+    final config = DartZakatConfig(
         goldPrice: Decimal.parse('100').toFrb(),
         silverPrice: Decimal.parse('2').toFrb(),
         madhab: 'hanafi',
@@ -39,7 +39,7 @@ void main() {
 
   test('Precious Metals (Gold) Calculation', () async {
      // 1. Setup Config
-    final config = await DartZakatConfig.new_(
+    final config = DartZakatConfig(
         goldPrice: Decimal.parse('100').toFrb(),
         silverPrice: Decimal.parse('2').toFrb(),
         madhab: 'hanafi',

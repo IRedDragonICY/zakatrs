@@ -1,0 +1,31 @@
+[package]
+name = "zakat-i18n"
+description = "Internationalization and localization support for Zakat library."
+readme = "../README.md"
+keywords = ["zakat", "i18n", "localization", "fluent", "icu"]
+categories = ["internationalization"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+zakat-core = { workspace = true }
+
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+fluent = { workspace = true }
+fluent-bundle = { workspace = true }
+intl-memoizer = { workspace = true }
+unic-langid = { workspace = true }
+rust-embed = { workspace = true }
+icu = { workspace = true }
+fixed_decimal = { workspace = true }
+writeable = { workspace = true }
+
+[dev-dependencies]
+rust_decimal_macros = { workspace = true }

@@ -1069,6 +1069,40 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0cc23270f6e1808e30a928bdc84dea0b9b4136a8bc82338574f23baf47bbd280"
 
 [[package]]
+name = "gloo-net"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c06f627b1a58ca3d42b45d6104bf1e1a03799df472df00988b6ba21accc10580"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "futures-sink",
+ "gloo-utils",
+ "http",
+ "js-sys",
+ "pin-project",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+]
+
+[[package]]
+name = "gloo-utils"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b5555354113b18c547c1d3a98fbf7fb32a9ff4f6fa112ce823a21641a0ba3aa"
+dependencies = [
+ "js-sys",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
+ "web-sys",
+]
+
+[[package]]
 name = "goblin"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2308,6 +2342,26 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+
+[[package]]
+name = "pin-project"
+version = "1.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "677f1add503faace112b9f1373e43e9e054bfdd22ff1a63c1bc485eaec6a6a8a"
+dependencies = [
+ "pin-project-internal",
+]
+
+[[package]]
+name = "pin-project-internal"
+version = "1.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e918e4ff8c4549eb882f14b3a4bc8c8bc93de829416eacf579f1207a8fbf861"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
+]
 
 [[package]]
 name = "pin-project-lite"
@@ -4738,41 +4792,127 @@ dependencies = [
 
 [[package]]
 name = "zakat"
-version = "0.20.2"
+version = "0.21.0"
+dependencies = [
+ "chrono",
+ "console_error_panic_hook",
+ "getrandom 0.2.16",
+ "pyo3",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde-wasm-bindgen",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uniffi",
+ "uuid",
+ "wasm-bindgen",
+ "zakat-core",
+ "zakat-i18n",
+ "zakat-ledger",
+ "zakat-providers",
+ "zakat-sqlite",
+]
+
+[[package]]
+name = "zakat-core"
+version = "0.21.0"
 dependencies = [
  "async-trait",
  "chrono",
- "console_error_panic_hook",
- "fixed_decimal",
- "fluent",
- "fluent-bundle",
  "futures",
- "getrandom 0.2.16",
- "icu",
- "intl-memoizer",
- "once_cell",
  "paste",
  "pyo3",
- "reqwest",
- "rust-embed",
  "rust_decimal",
  "rust_decimal_macros",
  "schemars",
  "serde",
  "serde-wasm-bindgen",
  "serde_json",
- "sqlx",
  "strum",
  "thiserror 2.0.17",
  "tokio",
  "tracing",
- "tracing-subscriber",
  "typeshare",
- "unic-langid",
  "uniffi",
  "uuid",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "zakat-i18n"
+version = "0.21.0"
+dependencies = [
+ "fixed_decimal",
+ "fluent",
+ "fluent-bundle",
+ "icu",
+ "intl-memoizer",
+ "rust-embed",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "unic-langid",
  "writeable 0.5.5",
+ "zakat-core",
+]
+
+[[package]]
+name = "zakat-ledger"
+version = "0.21.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "uuid",
+ "zakat-core",
+]
+
+[[package]]
+name = "zakat-providers"
+version = "0.21.0"
+dependencies = [
+ "async-trait",
+ "gloo-net",
+ "reqwest",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "wasm-bindgen-futures",
+ "web-time",
+ "zakat-core",
+]
+
+[[package]]
+name = "zakat-sqlite"
+version = "0.21.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "rust_decimal",
+ "rust_decimal_macros",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror 2.0.17",
+ "tokio",
+ "tracing",
+ "uuid",
+ "zakat-core",
+ "zakat-ledger",
 ]
 
 [[package]]

@@ -1,89 +1,83 @@
-[package]
-name = "zakat"
-version = "0.20.2"
+# Zakat Workspace - Cargo Workspace Root
+# This file defines the workspace structure for the modular Zakat library.
+
+[workspace]
+resolver = "2"
+members = [
+    "zakat",
+    "zakat-core",
+    "zakat-i18n",
+    "zakat-ledger",
+    "zakat-providers",
+    "zakat-sqlite",
+    "zakat_dart/rust",
+    "xtask",
+]
+
+[workspace.package]
+version = "0.21.0"
 edition = "2024"
 license = "MIT"
 authors = ["Mohammad Farid Hendianto (IRedDragonICY)"]
-description = "A type-safe, comprehensive, and Fiqh-compliant Zakat calculation library. Supports Gold, Silver, Business, Agriculture, Livestock, Professional Income, and Modern Assets (Crypto/Stocks)."
-readme = "README.md"
 repository = "https://github.com/IRedDragonICY/zakatrs"
-keywords = ["zakat", "islamic-finance", "fiqh", "finance", "halal"]
-categories = ["algorithms", "mathematics", "science"]
 
-[package.metadata.wasm-pack.profile.release]
-wasm-opt = false
+[workspace.dependencies]
+# Internal crates
+zakat-core = { path = "zakat-core" }
+zakat-i18n = { path = "zakat-i18n" }
+zakat-ledger = { path = "zakat-ledger" }
+zakat-providers = { path = "zakat-providers" }
+zakat-sqlite = { path = "zakat-sqlite" }
 
-[lib]
-crate-type = ["cdylib", "rlib"]
-
-[features]
-default = ["async"]
-async = ["dep:async-trait", "dep:tokio"]
-wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:console_error_panic_hook"]
-python = ["dep:pyo3"]
-live-pricing = ["dep:reqwest"]
-sqlite = ["async", "dep:sqlx"]
-uniffi = []
-
-[dependencies]
-# Schema Generation & Type Sync
-schemars = { version = "0.8", features = ["uuid1", "rust_decimal", "chrono"] }
-typeshare = "1.0"
-
+# Common dependencies
 rust_decimal = { version = "1.39", features = ["serde"] }
 rust_decimal_macros = "1.39"
-paste = "1.0"
-strum = { version = "0.26", features = ["derive"] }
-thiserror = "2.0.17"
 serde = { version = "1.0.228", features = ["derive"] }
-uuid = { version = "1.19.0", features = ["v4", "serde"] }
 serde_json = "1.0.148"
+thiserror = "2.0.17"
+uuid = { version = "1.19.0", features = ["v4", "serde", "js"] }
 chrono = { version = "0.4.38", features = ["serde"] }
-async-trait = { version = "0.1.89", optional = true }
-wasm-bindgen = { version = "0.2.106", optional = true }
-serde-wasm-bindgen = { version = "0.6.5", optional = true }
-console_error_panic_hook = { version = "0.1", optional = true }
-pyo3 = { version = "0.27.2", features = ["extension-module"], optional = true }
-futures = "0.3.31"
+strum = { version = "0.26", features = ["derive"] }
+schemars = { version = "0.8", features = ["uuid1", "rust_decimal", "chrono"] }
+typeshare = "1.0"
 tracing = "0.1.44"
+paste = "1.0"
+
+# Async dependencies
+async-trait = "0.1.89"
+tokio = { version = "1.48.0" }
+futures = "0.3.31"
+
+# i18n dependencies
 fluent = "0.16.0"
 fluent-bundle = "0.15.2"
 intl-memoizer = "0.5.1"
 unic-langid = "0.9.1"
 rust-embed = "8.0.0"
-once_cell = "1.18.0"
-
-uniffi = { version = "0.28.3", features = ["cli"] }
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], optional = true }
 icu = { version = "1.5", features = ["serde", "compiled_data", "experimental"] }
 fixed_decimal = "0.5"
 writeable = "0.5"
-tokio = { version = "1.48.0", features = ["io-util"], optional = true }
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"], optional = true }
 
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-tokio = { version = "1.48.0", features = ["fs"], optional = true }
+# Provider dependencies
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
 
-[target.'cfg(target_arch = "wasm32")'.dependencies]
-getrandom = { version = "0.2", features = ["js"] }
-uuid = { version = "1.19.0", features = ["v4", "serde", "js"] }
+# SQLite dependencies
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }
+
+# FFI dependencies
+uniffi = { version = "0.28.3", features = ["cli"] }
 wasm-bindgen = "0.2.106"
 serde-wasm-bindgen = "0.6.5"
 console_error_panic_hook = "0.1"
-
-
-[dev-dependencies]
-tokio = { version = "1.48.0", features = ["full", "macros"] }
-tracing-subscriber = "0.3.22"
+pyo3 = { version = "0.27.2", features = ["extension-module"] }
+once_cell = "1.18.0"
+getrandom = { version = "0.2", features = ["js"] }
 
 [profile.release]
-opt-level = "z"      # Optimize for size
-lto = true           # Enable Link Time Optimization
-codegen-units = 1    # Maximize optimization opportunities
-panic = "abort"      # Abort on panic (smaller binary)
-strip = true         # Strip symbols from binary
-
-[workspace]
-members = ["zakat_dart/rust", "xtask"]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
 
 

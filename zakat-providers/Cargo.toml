@@ -1,0 +1,40 @@
+[package]
+name = "zakat-providers"
+description = "Live price fetching providers for Zakat calculations (Binance, etc.)."
+readme = "../README.md"
+keywords = ["zakat", "pricing", "binance", "async", "api"]
+categories = ["asynchronous", "web-programming"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = ["live-pricing"]
+live-pricing = ["dep:reqwest"]
+
+[dependencies]
+zakat-core = { workspace = true }
+
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+
+# Non-WASM dependencies
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+tokio = { workspace = true }
+reqwest = { workspace = true, optional = true }
+
+# WASM dependencies
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+gloo-net = "0.6"
+web-time = "1.1"
+wasm-bindgen-futures = "0.4"

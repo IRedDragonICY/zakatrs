@@ -1,0 +1,32 @@
+[package]
+name = "zakat-sqlite"
+description = "SQLite persistence layer for Zakat ledger and event storage."
+readme = "../README.md"
+keywords = ["zakat", "sqlite", "persistence", "database", "async"]
+categories = ["database"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[dependencies]
+zakat-core = { workspace = true }
+zakat-ledger = { workspace = true }
+
+rust_decimal = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+tokio = { workspace = true, features = ["fs", "io-util"] }
+sqlx = { workspace = true }
+
+[dev-dependencies]
+rust_decimal_macros = { workspace = true }

@@ -1,0 +1,46 @@
+[package]
+name = "zakat-core"
+description = "Core mathematical logic, data structures, Fiqh rules, and input validation for Zakat calculations."
+readme = "../README.md"
+keywords = ["zakat", "islamic-finance", "fiqh", "finance", "halal"]
+categories = ["algorithms", "mathematics", "science"]
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lib]
+crate-type = ["rlib"]
+
+[features]
+default = []
+async = ["dep:async-trait", "dep:tokio", "dep:futures"]
+uniffi = ["dep:uniffi"]
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen"]
+python = ["dep:pyo3"]
+
+[dependencies]
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+strum = { workspace = true }
+schemars = { workspace = true }
+typeshare = { workspace = true }
+tracing = { workspace = true }
+paste = { workspace = true }
+
+# Optional async support
+async-trait = { workspace = true, optional = true }
+tokio = { workspace = true, optional = true }
+futures = { workspace = true, optional = true }
+
+# Optional FFI
+uniffi = { workspace = true, optional = true }
+wasm-bindgen = { workspace = true, optional = true }
+serde-wasm-bindgen = { workspace = true, optional = true }
+pyo3 = { workspace = true, optional = true }

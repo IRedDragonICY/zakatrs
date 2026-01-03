@@ -8,7 +8,7 @@ crate-type = ["cdylib", "staticlib"]
 
 [dependencies]
 flutter_rust_bridge = "=2.11.1"
-zakat = { path = "../../", features = ["async"] }
+zakat = { path = "../../zakat", features = ["async"] }
 rust_decimal = "1.39"
 anyhow = "1.0.100"
 uuid = "1"

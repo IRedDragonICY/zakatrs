@@ -1,6 +1,5 @@
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use tracing::warn;
 
 /// Represents the age category of livestock for Zakat purposes.

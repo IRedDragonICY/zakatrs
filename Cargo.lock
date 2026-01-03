@@ -4823,6 +4823,8 @@ dependencies = [
  "async-trait",
  "chrono",
  "futures",
+ "icu_calendar",
+ "icu_locid",
  "paste",
  "pyo3",
  "rust_decimal",

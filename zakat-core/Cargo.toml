@@ -33,6 +33,8 @@ schemars = { workspace = true }
 typeshare = { workspace = true }
 tracing = { workspace = true }
 paste = { workspace = true }
+icu_calendar = { version = "1.5", features = ["serde"] }
+icu_locid = "1.5"
 
 # Optional async support
 async-trait = { workspace = true, optional = true }

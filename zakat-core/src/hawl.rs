@@ -7,9 +7,10 @@
 //! This module provides logic to track acquisition dates and determine if Hawl 
 //! is satisfied relative to a calculation date.
 
-use chrono::{NaiveDate, Local};
+use chrono::{NaiveDate, Local, Datelike};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
+use icu_calendar::{Date, islamic::IslamicCivil};
 
 /// Tracks the holding period of an asset to determine Zakat eligibility (Hawl).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -35,16 +36,60 @@ impl HawlTracker {
         self
     }
 
-    /// Checks if the Hawl (354 days) has been satisfied.
+    /// Checks if the Hawl (1 Lunar Year) has been satisfied.
+    ///
+    /// Uses `icu_calendar` for precise Hijri conversion.
     ///
     /// # Returns
-    /// - `true` if `acquisition_date` is set AND >= 354 days have passed.
+    /// - `true` if `acquisition_date` is set AND >= 1 Hijri year has passed.
     /// - `false` otherwise.
     pub fn is_satisfied(&self) -> bool {
         match self.acquisition_date {
-            Some(start_date) => self.days_elapsed(start_date) >= 354,
+            Some(start_date) => {
+                // Try precise calculation first
+                if let Ok(satisfied) = self.is_satisfied_precise(start_date) {
+                    satisfied
+                } else {
+                    // Fallback to approximation if conversion fails
+                    self.days_elapsed(start_date) >= 354
+                }
+            },
             None => false,
         }
+    }
+
+    fn is_satisfied_precise(&self, start: NaiveDate) -> Result<bool, &'static str> {
+        let now = self.calculation_date;
+
+        // 1. Convert Chrono NaiveDate to ICU Date<Iso>
+        let start_iso = Date::try_new_iso_date(start.year(), start.month() as u8, start.day() as u8)
+            .map_err(|_| "Invalid start date")?;
+        let now_iso = Date::try_new_iso_date(now.year(), now.month() as u8, now.day() as u8)
+            .map_err(|_| "Invalid calculation date")?;
+
+        // 2. Convert to Hijri (Islamic Civil)
+        let cal = IslamicCivil::new();
+        let start_hijri = start_iso.to_calendar(cal.clone());
+        let now_hijri = now_iso.to_calendar(cal);
+
+        // 3. Compare dates
+        let passed_years = now_hijri.year().number - start_hijri.year().number;
+        
+        if passed_years > 1 {
+            return Ok(true);
+        }
+        if passed_years == 1 {
+            // Compare month and day
+            if now_hijri.month().ordinal > start_hijri.month().ordinal {
+                return Ok(true);
+            }
+            if now_hijri.month().ordinal == start_hijri.month().ordinal 
+               && now_hijri.day_of_month().0 >= start_hijri.day_of_month().0 {
+                return Ok(true);
+            }
+        }
+        
+        Ok(false)
     }
 
     /// Returns the number of days elapsed between acquisition and calculation.
@@ -112,5 +157,21 @@ mod tests {
     fn test_default_behavior() {
         let tracker = HawlTracker::default();
         assert!(!tracker.is_satisfied()); // No acquisition date
+    }
+
+    #[test]
+    fn test_precise_hijri_hawl() {
+        // 1 Ramadan 1444 is approx March 23, 2023
+        // 1 Ramadan 1445 is approx March 11, 2024
+        
+        let start = NaiveDate::from_ymd_opt(2023, 3, 23).unwrap();
+        let end = NaiveDate::from_ymd_opt(2024, 3, 11).unwrap();
+        
+        let tracker = HawlTracker::new(end).acquired_on(start);
+        assert!(tracker.is_satisfied(), "Should be satisfied exactly on 1 Ramadan 1445");
+        
+        let day_before = end.pred_opt().unwrap();
+        let tracker_early = HawlTracker::new(day_before).acquired_on(start);
+        assert!(!tracker_early.is_satisfied(), "Should NOT be satisfied one day before 1 Ramadan 1445");
     }
 }

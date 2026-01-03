@@ -1,20 +1,27 @@
 //! # Zakat Test Generator
 //!
-//! This binary generates the golden data JSON file (`zakat_suite.json`)
-//! containing test inputs and Rust-calculated expected outputs.
+//! This binary generates:
+//! 1. The golden data JSON file (`zakat_suite.json`) for runtime compliance testing
+//! 2. Native Python test file (`test_generated_compliance.py`) for static testing
+//! 3. Native Dart test file (`generated_compliance_test.dart`) for static testing
 //!
-//! All polyglot bindings (Python, Dart, TypeScript) run against this JSON
-//! to ensure they match the Rust core exactly.
+//! All polyglot bindings (Python, Dart, TypeScript) run against these to ensure
+//! they match the Rust core exactly.
 //!
 //! ## Usage
 //! ```sh
 //! cargo run -p zakat-test-gen
 //! ```
 //!
-//! This will generate `tests/fixtures/zakat_suite.json`.
+//! This will generate:
+//! - `tests/fixtures/zakat_suite.json` (JSON golden data)
+//! - `tests/py/test_generated_compliance.py` (Native Python tests)
+//! - `zakat_dart/test/generated_compliance_test.dart` (Native Dart tests)
 
-mod schema;
+mod gen_dart;
+mod gen_python;
 mod scenarios;
+mod schema;
 
 use schema::{ComplianceSuite, SuiteMeta};
 use std::fs;
@@ -81,8 +88,39 @@ fn main() {
 
     println!("✅ Generated: {}", output_path.display());
     println!("   File size: {} bytes", json.len());
+
+    // ========================================================================
+    // Generate Native Python Tests
+    // ========================================================================
+    println!("\n🐍 Generating native Python test file...");
+    let python_output_path = Path::new("tests/py/test_generated_compliance.py");
+    match gen_python::generate_python_tests(&suite.cases, python_output_path) {
+        Ok(()) => {
+            println!("✅ Generated: {}", python_output_path.display());
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to generate Python tests: {}", e);
+        }
+    }
+
+    // ========================================================================
+    // Generate Native Dart Tests
+    // ========================================================================
+    println!("\n🎯 Generating native Dart test file...");
+    let dart_output_path = Path::new("zakat_dart/test/generated_compliance_test.dart");
+    match gen_dart::generate_dart_tests(&suite.cases, dart_output_path) {
+        Ok(()) => {
+            println!("✅ Generated: {}", dart_output_path.display());
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to generate Dart tests: {}", e);
+        }
+    }
+
     println!("\n🎉 Done! Run polyglot tests with:");
-    println!("   • Python: pytest tests/py/test_compliance.py");
-    println!("   • Dart:   cd zakat_dart && flutter test");
-    println!("   • TS:     npm test (in pkg/)");
+    println!("   • Python (JSON):     pytest tests/py/test_compliance.py");
+    println!("   • Python (Native):   pytest tests/py/test_generated_compliance.py");
+    println!("   • Dart (JSON):       cd zakat_dart && flutter test test/compliance_test.dart");
+    println!("   • Dart (Native):     cd zakat_dart && flutter test test/generated_compliance_test.dart");
+    println!("   • TS:                npm test (in pkg/)");
 }

@@ -33,3 +33,10 @@ local.properties
 # All files in lib/src/rust/ are generated (except api/*.rs source files)
 zakat_dart/lib/src/ffi/
 zakat_dart/rust/src/frb_generated.rs
+
+# ============================================
+# Generated Test Files (run cargo run -p zakat-test-gen to regenerate)
+# ============================================
+tests/fixtures/zakat_suite.json
+tests/py/test_generated_compliance.py
+zakat_dart/test/generated_compliance_test.dart

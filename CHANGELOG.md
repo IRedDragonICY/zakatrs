@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.1.1] - 2026-01-04
+
+### Fixed
+- **Pub.dev Compliance**: Fixed all pub.dev publishing requirements for `zakat_dart`:
+  - Added missing `example/main.dart` with Business and Gold/Silver calculation demos
+  - Added version 1.1.1 entry to CHANGELOG to match pubspec.yaml
+  - Fixed `compliance_test.dart` to gracefully skip when fixture files are missing
+- **Git Tracking**: Un-ignored FFI generated files (`lib/src/ffi/`) for proper pub.dev verification
+
+### Changed
+- **XTask**: Bumped all workspace crate versions to 1.1.1
+
+---
+
 ## [1.1.0] - 2026-01-03
 
 ### Quality of Life Release

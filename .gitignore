@@ -31,8 +31,9 @@ local.properties
 
 # Flutter Rust Bridge generated files
 # All files in lib/src/rust/ are generated (except api/*.rs source files)
-zakat_dart/lib/src/ffi/
-zakat_dart/rust/src/frb_generated.rs
+# NOTE: These files need to be tracked for pub.dev publishing & flutter analyze
+# zakat_dart/lib/src/ffi/
+# zakat_dart/rust/src/frb_generated.rs
 
 # ============================================
 # Generated Test Files (run cargo run -p zakat-test-gen to regenerate)

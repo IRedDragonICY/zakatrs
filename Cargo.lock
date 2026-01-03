@@ -5024,7 +5024,7 @@ dependencies = [
 
 [[package]]
 name = "zakat"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "chrono",
  "console_error_panic_hook",
@@ -5050,7 +5050,7 @@ dependencies = [
 
 [[package]]
 name = "zakat-cli"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "chrono",
  "clap",
@@ -5070,7 +5070,7 @@ dependencies = [
 
 [[package]]
 name = "zakat-core"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5097,7 +5097,7 @@ dependencies = [
 
 [[package]]
 name = "zakat-i18n"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "fixed_decimal",
  "fluent",
@@ -5117,7 +5117,7 @@ dependencies = [
 
 [[package]]
 name = "zakat-ledger"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5135,7 +5135,7 @@ dependencies = [
 
 [[package]]
 name = "zakat-providers"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "async-trait",
  "gloo-net",
@@ -5154,7 +5154,7 @@ dependencies = [
 
 [[package]]
 name = "zakat-sqlite"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "async-trait",
  "chrono",
@@ -5173,7 +5173,7 @@ dependencies = [
 
 [[package]]
 name = "zakat-test-gen"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "chrono",
  "rust_decimal",

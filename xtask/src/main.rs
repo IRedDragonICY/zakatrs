@@ -118,16 +118,53 @@ fn run_cmd(cmd: &str, args: &[&str]) -> Result<()> {
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
-        .with_context(|| format!("Failed to execute: {} {}", cmd, args.join(" ")))?;
+        .with_context(|| format!("Failed to start command: {} {}", cmd, args.join(" ")))?;
 
     if !status.success() {
-        bail!("Command failed with exit code: {:?}", status.code());
+        bail!(
+            "Command '{}' failed with exit code: {}\n    See output above for details.",
+            cmd,
+            status.code().map(|c| c.to_string()).unwrap_or_else(|| "unknown".to_string())
+        );
     }
     Ok(())
 }
 
-/// Run a command in a specific directory
+/// Run a command in a specific directory with output capture for better error messages
 fn run_cmd_in_dir(dir: &Path, cmd: &str, args: &[&str]) -> Result<()> {
+    println!("  → [{}] {} {}", dir.display(), cmd, args.join(" "));
+    
+    let output = Command::new(cmd)
+        .args(args)
+        .current_dir(dir)
+        .stdin(Stdio::inherit())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .with_context(|| format!("Failed to start command: {} {}", cmd, args.join(" ")))?;
+
+    // Always print stdout
+    if !output.stdout.is_empty() {
+        print!("{}", String::from_utf8_lossy(&output.stdout));
+    }
+    
+    // Always print stderr
+    if !output.stderr.is_empty() {
+        eprint!("{}", String::from_utf8_lossy(&output.stderr));
+    }
+
+    if !output.status.success() {
+        bail!(
+            "Command '{}' failed with exit code: {}",
+            cmd,
+            output.status.code().map(|c| c.to_string()).unwrap_or_else(|| "unknown".to_string())
+        );
+    }
+    Ok(())
+}
+
+/// Run a command in a specific directory with live output (for interactive commands)
+fn run_cmd_in_dir_interactive(dir: &Path, cmd: &str, args: &[&str]) -> Result<()> {
     println!("  → [{}] {} {}", dir.display(), cmd, args.join(" "));
     
     let status = Command::new(cmd)
@@ -137,10 +174,14 @@ fn run_cmd_in_dir(dir: &Path, cmd: &str, args: &[&str]) -> Result<()> {
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
-        .with_context(|| format!("Failed to execute: {} {} in {}", cmd, args.join(" "), dir.display()))?;
+        .with_context(|| format!("Failed to start command: {} {}", cmd, args.join(" ")))?;
 
     if !status.success() {
-        bail!("Command failed with exit code: {:?}", status.code());
+        bail!(
+            "Command '{}' failed with exit code: {}\n    See output above for details.",
+            cmd,
+            status.code().map(|c| c.to_string()).unwrap_or_else(|| "unknown".to_string())
+        );
     }
     Ok(())
 }
@@ -907,10 +948,11 @@ fn publish_npm() -> Result<()> {
         bail!("pkg/ directory not found. Run 'cargo xtask build-all' first.");
     }
     
+    // Use interactive mode for browser-based authentication
     let result = if dry_run {
-        run_cmd_in_dir(&pkg_dir, "npm", &["publish", "--access", "public", "--dry-run"])
+        run_cmd_in_dir_interactive(&pkg_dir, "npm", &["publish", "--access", "public", "--dry-run"])
     } else {
-        run_cmd_in_dir(&pkg_dir, "npm", &["publish", "--access", "public"])
+        run_cmd_in_dir_interactive(&pkg_dir, "npm", &["publish", "--access", "public"])
     };
     
     match result {
@@ -941,10 +983,11 @@ fn publish_jsr() -> Result<()> {
         bail!("pkg/ directory not found. Run 'cargo xtask build-all' first.");
     }
     
+    // Use interactive mode for browser-based authentication
     let result = if dry_run {
-        run_cmd_in_dir(&pkg_dir, "npx", &["jsr", "publish", "--dry-run"])
+        run_cmd_in_dir_interactive(&pkg_dir, "npx", &["jsr", "publish", "--dry-run"])
     } else {
-        run_cmd_in_dir(&pkg_dir, "npx", &["jsr", "publish"])
+        run_cmd_in_dir_interactive(&pkg_dir, "npx", &["jsr", "publish"])
     };
     
     match result {
@@ -975,10 +1018,11 @@ fn publish_dart() -> Result<()> {
         bail!("zakat_dart/ directory not found.");
     }
     
+    // Use interactive mode for browser-based authentication
     let result = if dry_run {
-        run_cmd_in_dir(&dart_dir, "dart", &["pub", "publish", "--dry-run"])
+        run_cmd_in_dir_interactive(&dart_dir, "dart", &["pub", "publish", "--dry-run"])
     } else {
-        run_cmd_in_dir(&dart_dir, "dart", &["pub", "publish", "--force"])
+        run_cmd_in_dir_interactive(&dart_dir, "dart", &["pub", "publish", "--force"])
     };
     
     match result {

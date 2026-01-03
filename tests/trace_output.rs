@@ -10,12 +10,12 @@ fn test_trace_serialization() {
 
     let json = serde_json::to_string(&trace).unwrap();
     
-    // Verify that the Operation enum variants are serialized as strings.
+    // Verify that the Operation enum variants are serialized as camelCase strings.
     
     println!("Serialized JSON: {}", json);
     
-    assert!(json.contains(r#""operation":"Initial""#));
-    assert!(json.contains(r#""operation":"Add""#));
-    assert!(json.contains(r#""operation":"Rate""#));
+    assert!(json.contains(r#""operation":"initial""#)); // camelCase due to serde rename_all
+    assert!(json.contains(r#""operation":"add""#));
+    assert!(json.contains(r#""operation":"rate""#));
     assert!(json.contains(r#""amount":"100""#));
 }

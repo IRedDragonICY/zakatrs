@@ -1,7 +1,7 @@
 [package]
 name = "zakat"
 description = "A type-safe, comprehensive, and Fiqh-compliant Zakat calculation library. Supports Gold, Silver, Business, Agriculture, Livestock, Professional Income, and Modern Assets (Crypto/Stocks)."
-readme = "../README.md"
+readme = "README.md"
 keywords = ["zakat", "islamic-finance", "fiqh", "finance", "halal"]
 categories = ["algorithms", "mathematics", "science"]
 version.workspace = true

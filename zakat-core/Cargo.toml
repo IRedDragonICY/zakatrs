@@ -1,7 +1,7 @@
 [package]
 name = "zakat-core"
 description = "Core mathematical logic, data structures, Fiqh rules, and input validation for Zakat calculations."
-readme = "../README.md"
+readme = "README.md"
 keywords = ["zakat", "islamic-finance", "fiqh", "finance", "halal"]
 categories = ["algorithms", "mathematics", "science"]
 version.workspace = true

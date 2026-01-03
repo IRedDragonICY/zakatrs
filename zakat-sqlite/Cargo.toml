@@ -1,7 +1,7 @@
 [package]
 name = "zakat-sqlite"
 description = "SQLite persistence layer for Zakat ledger and event storage."
-readme = "../README.md"
+readme = "README.md"
 keywords = ["zakat", "sqlite", "persistence", "database", "async"]
 categories = ["database"]
 version.workspace = true

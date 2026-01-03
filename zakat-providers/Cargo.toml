@@ -1,7 +1,7 @@
 [package]
 name = "zakat-providers"
 description = "Live price fetching providers for Zakat calculations (Binance, etc.)."
-readme = "../README.md"
+readme = "README.md"
 keywords = ["zakat", "pricing", "binance", "async", "api"]
 categories = ["asynchronous", "web-programming"]
 version.workspace = true

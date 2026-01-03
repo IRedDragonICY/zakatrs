@@ -114,6 +114,7 @@ fn run_cmd(cmd: &str, args: &[&str]) -> Result<()> {
     let status = Command::new(cmd)
         .args(args)
         .current_dir(project_root()?)
+        .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
@@ -132,6 +133,7 @@ fn run_cmd_in_dir(dir: &Path, cmd: &str, args: &[&str]) -> Result<()> {
     let status = Command::new(cmd)
         .args(args)
         .current_dir(dir)
+        .stdin(Stdio::inherit())
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .status()
@@ -619,12 +621,6 @@ fn publish_all() -> Result<()> {
                     }
                 }
             }
-            
-            // Wait between crates for crates.io index to update (except dry-run)
-            if !dry_run && i < WORKSPACE_CRATES.len() - 1 {
-                println!("    ⏳ Waiting 30s for crates.io index to update...");
-                std::thread::sleep(std::time::Duration::from_secs(30));
-            }
         }
     }
 
@@ -838,12 +834,6 @@ fn publish_crates() -> Result<()> {
                     }
                 }
             }
-        }
-        
-        // Wait between crates for crates.io index to update (except dry-run)
-        if !dry_run && i < WORKSPACE_CRATES.len() - 1 {
-            println!("    ⏳ Waiting 30s for crates.io index to update...");
-            std::thread::sleep(std::time::Duration::from_secs(30));
         }
     }
 

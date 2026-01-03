@@ -219,6 +219,88 @@ fn run_cmd_in_dir_interactive(dir: &Path, cmd: &str, args: &[&str]) -> Result<()
     Ok(())
 }
 
+/// Run a command with retry logic for transient failures (502, 503, 429, etc.)
+/// Useful for network-bound operations like cargo publish
+fn run_cmd_in_dir_with_retry(dir: &Path, cmd: &str, args: &[&str], max_retries: u32) -> Result<()> {
+    use std::thread;
+    use std::time::Duration;
+    
+    let retry_delays = [5, 15, 30]; // seconds between retries
+    
+    for attempt in 0..=max_retries {
+        if attempt > 0 {
+            let delay = retry_delays.get((attempt - 1) as usize).copied().unwrap_or(30);
+            println!("    ⏳ Retry {}/{} in {} seconds...", attempt, max_retries, delay);
+            thread::sleep(Duration::from_secs(delay));
+        }
+        
+        println!("  → [{}] {} {}", dir.display(), cmd, args.join(" "));
+        
+        #[cfg(windows)]
+        let output = Command::new("cmd")
+            .args(["/C", cmd])
+            .args(args)
+            .current_dir(dir)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .with_context(|| format!("Failed to start command: {} {}", cmd, args.join(" ")))?;
+        
+        #[cfg(not(windows))]
+        let output = Command::new(cmd)
+            .args(args)
+            .current_dir(dir)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .output()
+            .with_context(|| format!("Failed to start command: {} {}", cmd, args.join(" ")))?;
+        
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        
+        // Always print output
+        if !output.stdout.is_empty() {
+            print!("{}", stdout);
+        }
+        if !output.stderr.is_empty() {
+            eprint!("{}", stderr);
+        }
+        
+        if output.status.success() {
+            return Ok(());
+        }
+        
+        // Check if error is retryable (transient network errors)
+        let combined_output = format!("{}{}", stdout, stderr);
+        let is_retryable = combined_output.contains("502")
+            || combined_output.contains("503")
+            || combined_output.contains("429")
+            || combined_output.contains("Bad Gateway")
+            || combined_output.contains("Service Unavailable")
+            || combined_output.contains("rate limit")
+            || combined_output.contains("timeout")
+            || combined_output.contains("connection reset")
+            || combined_output.contains("CloudFront");
+        
+        if is_retryable && attempt < max_retries {
+            println!("    ⚠️  Transient error detected (attempt {}/{})", attempt + 1, max_retries + 1);
+            continue;
+        }
+        
+        // Non-retryable error or max retries exceeded
+        bail!(
+            "Command '{}' failed with exit code: {} (after {} attempts)",
+            cmd,
+            output.status.code().map(|c| c.to_string()).unwrap_or_else(|| "unknown".to_string()),
+            attempt + 1
+        );
+    }
+    
+    unreachable!()
+}
+
 /// Check if a command exists in PATH
 /// On Windows, we need to use cmd /C or check with `where`
 fn command_exists(cmd: &str) -> bool {
@@ -827,7 +909,8 @@ fn publish_all(specific_target: Option<&str>) -> Result<()> {
                 let result = if dry_run {
                     run_cmd_in_dir(&crate_dir, "cargo", &["publish", "--dry-run"])
                 } else {
-                    run_cmd_in_dir(&crate_dir, "cargo", &["publish"])
+                    // Use retry for actual publish (transient 502/503/429 errors)
+                    run_cmd_in_dir_with_retry(&crate_dir, "cargo", &["publish"], 3)
                 };
                 
                 match result {

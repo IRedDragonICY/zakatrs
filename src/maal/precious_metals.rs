@@ -24,7 +24,8 @@ use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, strum::Display, strum::EnumString)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, strum::Display, strum::EnumString, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub enum JewelryUsage {
     #[default]
     Investment,    // Always Zakatable

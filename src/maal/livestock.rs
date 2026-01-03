@@ -14,21 +14,24 @@ use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub enum LivestockType {
     Camel,
     Cow,
     Sheep, // Includes Goats
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub enum GrazingMethod {
     #[default]
     Saimah,   // Naturally grazed for majority of the year
     Maalufah, // Fed/Fodder provided
 }
 
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct LivestockPrices {
     pub sheep_price: Decimal,
     pub cow_price: Decimal, // For Tabi/Musinnah avg or simplified
@@ -72,7 +75,8 @@ impl LivestockPrices {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct LivestockAssets {
     pub count: u32,
     pub animal_type: Option<LivestockType>,

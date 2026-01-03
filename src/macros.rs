@@ -57,6 +57,8 @@ macro_rules! zakat_asset {
         }
     ) => {
         $(#[$meta])*
+        #[derive(schemars::JsonSchema)]
+        #[serde(rename_all = "camelCase")]
         $vis struct $name {
             // User defined fields
             $(
@@ -140,6 +142,12 @@ macro_rules! zakat_asset {
             /// Returns the optional label of the asset.
             /// Returns the optional label of the asset.
             pub fn get_label(&self) -> Option<String> { self.label.clone() }
+            
+            /// Returns the JSON Schema for this asset type.
+            /// Useful for frontend validation and type generation.
+            pub fn get_schema() -> schemars::schema::RootSchema {
+                schemars::schema_for!($name)
+            }
         }
 
         impl $crate::traits::TemporalAsset for $name {
@@ -481,7 +489,7 @@ macro_rules! zakat_ffi_export {
                          // User fields
                          $(
                              $field: <$ty as FromFfiString>::from_ffi_string(&self.$field)
-                                 .map_err(|e| crate::types::ZakatError::InvalidInput(Box::new(crate::types::InvalidInputDetails {
+                                 .map_err(|_e| crate::types::ZakatError::InvalidInput(Box::new(crate::types::InvalidInputDetails {
                                     field: stringify!($field).to_string(),
                                     value: self.$field.clone(),
                                     reason_key: "error-parse".to_string(),
@@ -492,7 +500,7 @@ macro_rules! zakat_ffi_export {
                          )*
                          // Common fields
                          liabilities_due_now: <rust_decimal::Decimal as FromFfiString>::from_ffi_string(&self.liabilities_due_now)
-                             .map_err(|e| crate::types::ZakatError::InvalidInput(Box::new(crate::types::InvalidInputDetails{
+                             .map_err(|_e| crate::types::ZakatError::InvalidInput(Box::new(crate::types::InvalidInputDetails{
                                 field: "liabilities".to_string(),
                                 value: self.liabilities_due_now.clone(),
                                 reason_key: "error-parse".to_string(),

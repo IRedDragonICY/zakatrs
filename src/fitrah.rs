@@ -6,7 +6,8 @@ use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::config::ZakatConfig;
 use crate::inputs::IntoZakatDecimal;
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct FitrahCalculator {
     pub person_count: u32,
     pub price_per_unit: Decimal,

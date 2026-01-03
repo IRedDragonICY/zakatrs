@@ -15,7 +15,8 @@ use rust_decimal::Decimal;
 use uuid::Uuid;
 
 /// Generic asset type for user-defined assets.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct CustomAsset {
     pub id: Uuid,
     pub label: String,
@@ -93,8 +94,8 @@ impl CalculateZakat for CustomAsset {
 
 /// A wrapper enum for all zakatable asset types.
 /// This enables serialization and uniform handling in a portfolio.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(tag = "type", rename_all = "camelCase")]
 pub enum PortfolioItem {
     Business(BusinessZakat),
     Income(IncomeZakatCalculator),

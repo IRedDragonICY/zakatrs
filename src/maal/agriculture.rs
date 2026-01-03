@@ -18,7 +18,8 @@ use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub enum IrrigationMethod {
     #[default]
     Rain, // Natural, 10%
@@ -26,7 +27,8 @@ pub enum IrrigationMethod {
     Mixed, // Both, 7.5%
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub struct AgricultureAssets {
     pub harvest_weight_kg: Decimal,
     pub price_per_kg: Decimal,

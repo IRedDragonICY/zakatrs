@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::str::FromStr;
 use crate::prelude::*;
 use rust_decimal::Decimal;
-use rust_decimal::prelude::ToPrimitive;
+
 
 /// UniFFI-compatible error type for Kotlin bindings.
 #[derive(Debug, uniffi::Error)]

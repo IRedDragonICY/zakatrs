@@ -15,7 +15,8 @@ use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, strum::Display, strum::EnumString)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, strum::Display, strum::EnumString, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
 pub enum MiningType {
     /// Buried Treasure / Ancient Wealth found.
     Rikaz,

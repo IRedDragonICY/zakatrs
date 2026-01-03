@@ -6,7 +6,9 @@ use tracing::warn;
 /// Represents the age category of livestock for Zakat purposes.
 /// 
 /// These categories are based on the Hadith specification for camel and cattle ages.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub enum LivestockAge {
     /// Bint Makhad - 1-year female camel (just weaned)
     BintMakhad,
@@ -25,7 +27,9 @@ pub enum LivestockAge {
 }
 
 /// Represents the kind of livestock for Zakat.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub enum LivestockKind {
     Sheep,
     Goat,
@@ -37,7 +41,9 @@ pub enum LivestockKind {
 /// 
 /// This struct enables frontends to translate livestock descriptions dynamically
 /// instead of receiving pre-translated strings.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub struct LivestockDueItem {
     /// Number of animals due
     pub count: u32,
@@ -75,7 +81,9 @@ impl LivestockDueItem {
 /// - **Monetary**: The default payment type, representing a currency value.
 /// - **Livestock**: In-kind payment of specific animals with structured data for i18n.
 ///   Used when Zakat is due as heads of livestock rather than cash.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(tag = "type", content = "content", rename_all = "camelCase")]
 pub enum PaymentPayload {
     /// Currency-based Zakat payment (default for most wealth types).
     Monetary(Decimal),
@@ -125,7 +133,9 @@ impl PaymentPayload {
 
 
 /// Represents the semantic operation performed in a calculation step.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub enum Operation {
     Initial,
     Add,
@@ -159,7 +169,9 @@ impl std::fmt::Display for Operation {
 ///
 /// This struct provides transparency into how the final Zakat amount was derived,
 /// enabling users to understand and verify each step of the calculation.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub struct CalculationStep {
     /// The Fluent ID (e.g., "step-net-assets").
     pub key: String,
@@ -261,7 +273,8 @@ impl CalculationStep {
 }
 
 /// A collection of calculation steps that can be displayed or serialized.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[typeshare::typeshare]
 pub struct CalculationTrace(pub Vec<CalculationStep>);
 
 impl std::ops::Deref for CalculationTrace {
@@ -339,7 +352,9 @@ impl std::fmt::Display for CalculationTrace {
 }
 
 /// Represents the detailed breakdown of the Zakat calculation.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub struct ZakatDetails {
     /// Total assets subject to Zakat calculation.
     pub total_assets: Decimal,
@@ -371,7 +386,9 @@ pub struct ZakatDetails {
 ///
 /// This struct allows frontend applications (e.g., React, Vue) to render their
 /// own UI without parsing pre-formatted strings.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
 pub struct ZakatExplanation {
     /// Label of the asset (e.g., "Main Store", "Gold Necklace").
     pub label: String,
@@ -1044,7 +1061,9 @@ impl ZakatError {
 
 
 /// Helper enum to categorize wealth types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, strum::Display, strum::EnumString)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, strum::Display, strum::EnumString, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(tag = "type", content = "content", rename_all = "camelCase")]
 pub enum WealthType {
     Fitrah,
     Gold,
@@ -1209,7 +1228,7 @@ impl From<ZakatError> for FfiZakatError {
 }
 
 // WASM-specific error conversion
-#[cfg(feature = "wasm")]
+#[cfg(any(feature = "wasm", target_arch = "wasm32"))]
 impl From<FfiZakatError> for wasm_bindgen::JsValue {
     fn from(err: FfiZakatError) -> Self {
         serde_wasm_bindgen::to_value(&err)
@@ -1218,7 +1237,7 @@ impl From<FfiZakatError> for wasm_bindgen::JsValue {
 }
 
 // Helper to convert ZakatError directly to JsValue for WASM
-#[cfg(feature = "wasm")]
+#[cfg(any(feature = "wasm", target_arch = "wasm32"))]
 impl From<ZakatError> for wasm_bindgen::JsValue {
     fn from(err: ZakatError) -> Self {
         let ffi_err: FfiZakatError = err.into();

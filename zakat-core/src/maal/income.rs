@@ -9,12 +9,13 @@
 //! - **Net**: Deduct basic needs (*Hajah Asliyyah*) and debts before calculating surplus (Lenient).
 
 use rust_decimal::Decimal;
-use crate::types::{ZakatDetails, ZakatError, ErrorDetails, InvalidInputDetails};
+use crate::types::{ZakatDetails, ZakatError, ErrorDetails};
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
+use crate::validation::Validator;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, strum::Display, strum::EnumString, schemars::JsonSchema)]
@@ -121,16 +122,10 @@ impl CalculateZakat for IncomeZakatCalculator {
         let config_cow = config.resolve_config();
         let config = config_cow.as_ref();
 
-        if self.income < Decimal::ZERO || self.expenses < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
-                field: "income_expenses".to_string(),
-                value: "negative".to_string(),
-                reason_key: "error-negative-value".to_string(),
-                args: None,
-                source_label: self.label.clone(),
-                asset_id: None,
-            })));
-        }
+        Validator::ensure_non_negative(&[
+            ("income", self.income),
+            ("expenses", self.expenses)
+        ], self.label.clone())?;
 
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(

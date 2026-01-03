@@ -9,10 +9,11 @@
 //! - **Debts**: Deducting `liabilities_due_now` aligns with the principle of *Dayn al-Hal* (immediate debt) preventing Zakat, as supported by AAOIFI Standard 35.
 
 use rust_decimal::Decimal;
-use crate::types::{ZakatDetails, ZakatError, ErrorDetails, InvalidInputDetails};
+use crate::types::{ZakatDetails, ZakatError, ErrorDetails};
 use crate::math::ZakatDecimal;
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
+use crate::validation::Validator;
 
 use crate::inputs::IntoZakatDecimal;
 use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
@@ -126,26 +127,12 @@ impl CalculateZakat for BusinessZakat {
         let config = config_cow.as_ref();
 
         // Validation moved here
-        if self.cash_on_hand < Decimal::ZERO || self.inventory_value < Decimal::ZERO || self.receivables < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
-                field: "business_assets".to_string(),
-                value: "negative".to_string(),
-                reason_key: "error-negative-value".to_string(),
-                args: None,
-                source_label: self.label.clone(),
-                asset_id: None,
-            })));
-        }
-        if self.liabilities_due_now < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
-                field: "liabilities".to_string(),
-                value: "negative".to_string(),
-                reason_key: "error-negative-value".to_string(),
-                args: None,
-                source_label: self.label.clone(),
-                asset_id: None,
-            })));
-        }
+        Validator::ensure_non_negative(&[
+            ("business_assets", self.cash_on_hand),
+            ("business_assets", self.inventory_value),
+            ("business_assets", self.receivables),
+            ("liabilities", self.liabilities_due_now),
+        ], self.label.clone())?;
 
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(

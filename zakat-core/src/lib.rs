@@ -20,6 +20,7 @@ pub mod fitrah;
 pub mod portfolio;
 pub mod assets;
 pub mod hawl;
+pub mod validation;
 
 pub mod prelude;
 

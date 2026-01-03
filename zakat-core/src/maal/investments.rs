@@ -9,12 +9,13 @@
 //! - **IIFA Resolutions**: Cryptocurrencies recognized as wealth (*Mal*) are subject to Zakat if they meet conditions of value and possession.
 
 use rust_decimal::Decimal;
-use crate::types::{ZakatDetails, ZakatError, ErrorDetails, InvalidInputDetails};
+use crate::types::{ZakatDetails, ZakatError, ErrorDetails};
 use serde::{Serialize, Deserialize};
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
 use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
+use crate::validation::Validator;
 
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, strum::Display, strum::EnumString, schemars::JsonSchema)]
@@ -111,26 +112,10 @@ impl CalculateZakat for InvestmentAssets {
         let config = config_cow.as_ref();
 
         // Specific input validation
-        if self.value < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
-                field: "market_value".to_string(),
-                value: "negative".to_string(),
-                reason_key: "error-negative-value".to_string(),
-                args: None,
-                source_label: self.label.clone(),
-                asset_id: None,
-            })));
-        }
-        if self.liabilities_due_now < Decimal::ZERO {
-             return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
-                field: "debt".to_string(),
-                value: "negative".to_string(),
-                reason_key: "error-negative-value".to_string(),
-                args: None,
-                source_label: self.label.clone(),
-                asset_id: None,
-            })));
-        }
+        Validator::ensure_non_negative(&[
+            ("market_value", self.value),
+            ("debt", self.liabilities_due_now)
+        ], self.label.clone())?;
 
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(

@@ -19,6 +19,7 @@ use crate::types::{ZakatDetails, ZakatError, WealthType, ErrorDetails, InvalidIn
 use crate::traits::{CalculateZakat, ZakatConfigArgument};
 use crate::utils::WeightUnit;
 use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
+use crate::validation::Validator;
 
 use crate::inputs::IntoZakatDecimal;
 use crate::math::ZakatDecimal;
@@ -168,28 +169,12 @@ impl CalculateZakat for PreciousMetals {
         let config = config_cow.as_ref();
 
         // 1. Validate metal type
-        let metal_type = self.metal_type.clone().ok_or_else(|| 
-            ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
-                field: "metal_type".to_string(),
-                value: "None".to_string(),
-                reason_key: "error-type-required".to_string(),
-                args: None,
-                source_label: self.label.clone(),
-                asset_id: None,
-            }))
-        )?;
+        let metal_type = Validator::require(&self.metal_type, "metal_type", self.label.clone())?.clone();
 
         // 2. Validate weight
-        if self.weight_grams < Decimal::ZERO {
-            return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
-                field: "weight".to_string(),
-                value: "negative".to_string(),
-                reason_key: "error-negative-value".to_string(),
-                args: None,
-                source_label: self.label.clone(),
-                asset_id: None,
-            })));
-        }
+        Validator::ensure_non_negative(&[
+            ("weight", self.weight_grams)
+        ], self.label.clone())?;
 
         // 3. Validate purity range based on metal type
         match metal_type {

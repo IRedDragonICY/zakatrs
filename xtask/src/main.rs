@@ -34,12 +34,12 @@ fn main() -> Result<()> {
     match task.as_str() {
         "build-all" => build_all()?,
         "sync-versions" => sync_versions()?,
-        "publish-all" => publish_all()?,
-        "publish-crates" => publish_crates()?,
-        "publish-pypi" => publish_pypi()?,
-        "publish-npm" => publish_npm()?,
-        "publish-jsr" => publish_jsr()?,
-        "publish-dart" => publish_dart()?,
+        "publish-all" => publish_all(None)?,
+        "publish-crates" => publish_all(Some("crates"))?,
+        "publish-pypi" => publish_all(Some("pypi"))?,
+        "publish-npm" => publish_all(Some("npm"))?,
+        "publish-jsr" => publish_all(Some("jsr"))?,
+        "publish-dart" => publish_all(Some("dart"))?,
         "test" => run_tests()?,
         "test-all" => run_all_tests()?,
         "gen-test-suite" => generate_test_suite()?,
@@ -646,40 +646,142 @@ const WORKSPACE_CRATES: &[&str] = &[
     "zakat",           // Facade - depends on all above
 ];
 
-fn publish_all() -> Result<()> {
+struct RegistryTarget<'a> {
+    id: &'a str,
+    name: &'a str,
+    skip_flag: &'a str,
+    path_relative: &'a str,
+    cmd: &'a str,
+    args_publish: Vec<&'a str>,
+    args_dry_run: Vec<&'a str>,
+    is_interactive: bool,
+}
+
+fn get_registry_targets() -> Vec<RegistryTarget<'static>> {
+    vec![
+        RegistryTarget {
+            id: "crates",
+            name: "Crates.io",
+            skip_flag: "--skip-crates",
+            path_relative: ".",
+            cmd: "cargo",
+            args_publish: vec!["publish"],
+            args_dry_run: vec!["publish", "--dry-run"],
+            is_interactive: false,
+        },
+        RegistryTarget {
+            id: "pypi",
+            name: "PyPI",
+            skip_flag: "--skip-pypi",
+            path_relative: ".",
+            cmd: "maturin",
+            args_publish: vec!["publish"],
+            args_dry_run: vec!["build", "--release"],
+            is_interactive: false,
+        },
+        RegistryTarget {
+            id: "npm",
+            name: "NPM",
+            skip_flag: "--skip-npm",
+            path_relative: "pkg",
+            cmd: "npm",
+            args_publish: vec!["publish", "--access", "public"],
+            args_dry_run: vec!["publish", "--access", "public", "--dry-run"],
+            is_interactive: true,
+        },
+        RegistryTarget {
+            id: "jsr",
+            name: "JSR",
+            skip_flag: "--skip-jsr",
+            path_relative: "pkg",
+            cmd: "npx",
+            args_publish: vec!["jsr", "publish"],
+            args_dry_run: vec!["jsr", "publish", "--dry-run"],
+            is_interactive: true,
+        },
+        RegistryTarget {
+            id: "dart",
+            name: "Pub.dev",
+            skip_flag: "--skip-dart",
+            path_relative: "zakat_dart",
+            cmd: "dart",
+            args_publish: vec!["pub", "publish", "--force"],
+            args_dry_run: vec!["pub", "publish", "--dry-run"],
+            is_interactive: true,
+        },
+    ]
+}
+
+fn publish_all(specific_target: Option<&str>) -> Result<()> {
     let args: Vec<String> = env::args().collect();
     let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
-    let skip_crates = args.iter().any(|a| a == "--skip-crates");
-    let skip_pypi = args.iter().any(|a| a == "--skip-pypi");
-    let skip_npm = args.iter().any(|a| a == "--skip-npm");
-    let skip_jsr = args.iter().any(|a| a == "--skip-jsr");
-    let skip_dart = args.iter().any(|a| a == "--skip-dart");
     
     let root = project_root()?;
     let version = read_cargo_version()?;
     
-    println!("\n🚀 ZakatRS Master Publish v{}", version);
+    let targets = get_registry_targets();
+    
+    // Filter targets
+    let active_targets: Vec<&RegistryTarget> = targets.iter().filter(|t| {
+        if let Some(specific) = specific_target {
+            return t.id == specific;
+        }
+        !args.iter().any(|a| a == t.skip_flag)
+    }).collect();
+
+    if active_targets.is_empty() {
+        println!("⚠️  No targets selected for publishing.");
+        return Ok(());
+    }
+
+    // Header
+    if specific_target.is_some() {
+        let target = active_targets[0];
+        println!("\n🚀 Publishing to {} v{}", target.name, version);
+    } else {
+        println!("\n🚀 ZakatRS Master Publish v{}", version);
+    }
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     
     if dry_run {
         println!("🔍 DRY RUN MODE - No actual publishing will occur\n");
     }
     
-    println!("📋 Publish targets:");
-    println!("   • Crates.io: {} crates {}", WORKSPACE_CRATES.len(), if skip_crates { "(SKIPPED)" } else { "" });
-    println!("   • PyPI: zakatrs {}", if skip_pypi { "(SKIPPED)" } else { "" });
-    println!("   • NPM: @islamic/zakat {}", if skip_npm { "(SKIPPED)" } else { "" });
-    println!("   • JSR: @islam/zakat {}", if skip_jsr { "(SKIPPED)" } else { "" });
-    println!("   • pub.dev: zakat {}", if skip_dart { "(SKIPPED)" } else { "" });
-    println!();
-    
-    if !dry_run {
-        println!("⚠️  Prerequisites:");
-        println!("   1. Version bumped in Cargo.toml");
-        println!("   2. 'cargo xtask build-all' completed successfully");
-        println!("   3. Logged in to: cargo, pypi, npm, jsr, dart pub");
+    if specific_target.is_none() {
+        println!("📋 Publish targets:");
+        for t in &targets {
+             let skipped = !active_targets.iter().any(|at| at.id == t.id);
+             let status = if skipped { "(SKIPPED)" } else { "" };
+             if t.id == "crates" {
+                 println!("   • {}: {} crates {}", t.name, WORKSPACE_CRATES.len(), status);
+             } else if t.id == "pypi" {
+                 println!("   • {}: zakatrs {}", t.name, status);
+             } else if t.id == "npm" {
+                 println!("   • {}: @islamic/zakat {}", t.name, status);
+             } else if t.id == "jsr" {
+                 println!("   • {}: @islam/zakat {}", t.name, status);
+             } else if t.id == "dart" {
+                 println!("   • {}: zakat {}", t.name, status);
+             }
+        }
         println!();
         
+        if !dry_run {
+            println!("⚠️  Prerequisites:");
+            println!("   1. Version bumped in Cargo.toml");
+            println!("   2. 'cargo xtask build-all' completed successfully");
+            println!("   3. Logged in to: cargo, pypi, npm, jsr, dart pub");
+            println!();
+        }
+    } else if !dry_run && active_targets[0].id == "crates" {
+         println!("📋 Publishing {} crates in dependency order:", WORKSPACE_CRATES.len());
+         for crate_name in WORKSPACE_CRATES {
+             println!("   • {}", crate_name);
+         }
+         println!();
+    }
+
+    if !dry_run {
         print!("Proceed with publishing? (y/n) ");
         io::stdout().flush()?;
         
@@ -695,154 +797,111 @@ fn publish_all() -> Result<()> {
     let mut success_count = 0;
     let mut fail_count = 0;
 
-    // 1. Rust (Crates.io) - Publish each crate in dependency order
-    if !skip_crates {
-        println!("\n🦀 Publishing to Crates.io ({} crates)...", WORKSPACE_CRATES.len());
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    for target in active_targets {
+        let emoji = match target.id {
+            "crates" => "🦀",
+            "pypi" => "🐍",
+            "npm" => "📦",
+            "jsr" => "🦕",
+            "dart" => "💙",
+            _ => "🚀",
+        };
         
-        for (i, crate_name) in WORKSPACE_CRATES.iter().enumerate() {
-            println!("\n  [{}/{}] Publishing {}...", i + 1, WORKSPACE_CRATES.len(), crate_name);
+        println!("\n{} Publishing to {}...", emoji, target.name);
+        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        if target.id == "crates" {
+             for (i, crate_name) in WORKSPACE_CRATES.iter().enumerate() {
+                println!("\n  [{}/{}] Publishing {}...", i + 1, WORKSPACE_CRATES.len(), crate_name);
+                let crate_dir = root.join(crate_name);
+                if !crate_dir.exists() {
+                    println!("    ⚠️  Directory not found: {}", crate_dir.display());
+                    fail_count += 1;
+                    continue;
+                }
+                
+                let result = if dry_run {
+                    run_cmd_in_dir(&crate_dir, "cargo", &["publish", "--dry-run"])
+                } else {
+                    run_cmd_in_dir(&crate_dir, "cargo", &["publish"])
+                };
+                
+                match result {
+                    Ok(_) => {
+                        println!("    ✅ {} published successfully!", crate_name);
+                        success_count += 1;
+                    }
+                    Err(e) => {
+                        println!("    ❌ Failed to publish {}: {}", crate_name, e);
+                        fail_count += 1;
+                        if !dry_run {
+                             print!("    Continue with remaining crates? (y/n) ");
+                             io::stdout().flush()?;
+                             let mut input = String::new();
+                             io::stdin().read_line(&mut input)?;
+                             if input.trim().to_lowercase() != "y" {
+                                 bail!("Publishing aborted by user after {} failure", crate_name);
+                             }
+                        }
+                    }
+                }
+             }
+        } else if target.id == "pypi" {
+            let zakat_crate = root.join("zakat");
+            let manifest_arg = format!("-m={}", zakat_crate.join("Cargo.toml").display());
             
-            let crate_dir = root.join(crate_name);
-            if !crate_dir.exists() {
-                println!("    ⚠️  Directory not found: {}", crate_dir.display());
-                fail_count += 1;
-                continue;
-            }
-            
-            let result = if dry_run {
-                run_cmd_in_dir(&crate_dir, "cargo", &["publish", "--dry-run"])
+            let args = if dry_run { target.args_dry_run.clone() } else { target.args_publish.clone() };
+            let args_strings: Vec<String> = args.iter().map(|s| s.to_string()).collect();
+            let mut final_args: Vec<&str> = args_strings.iter().map(|s| s.as_str()).collect();
+            final_args.push(&manifest_arg);
+
+            let result = if command_exists("maturin") {
+                run_cmd("maturin", &final_args)
             } else {
-                run_cmd_in_dir(&crate_dir, "cargo", &["publish"])
+                let mut python_args = vec!["-m", "maturin"];
+                python_args.extend(final_args);
+                run_cmd("python", &python_args)
             };
             
             match result {
                 Ok(_) => {
-                    println!("    ✅ {} published successfully!", crate_name);
+                    println!("  ✅ {} {} successful!", target.name, if dry_run { "dry-run" } else { "publish" });
                     success_count += 1;
                 }
                 Err(e) => {
-                    println!("    ❌ Failed to publish {}: {}", crate_name, e);
+                    println!("  ❌ {} failed: {}", target.name, e);
                     fail_count += 1;
-                    
-                    if !dry_run {
-                        print!("    Continue with remaining crates? (y/n) ");
-                        io::stdout().flush()?;
-                        let mut input = String::new();
-                        io::stdin().read_line(&mut input)?;
-                        if input.trim().to_lowercase() != "y" {
-                            bail!("Publishing aborted by user after {} failure", crate_name);
-                        }
-                    }
+                }
+            }
+        } else {
+            let dir = root.join(target.path_relative);
+            if !dir.exists() {
+                 println!("    ⚠️  Directory not found: {}", dir.display());
+                 fail_count += 1;
+                 continue;
+            }
+            
+            let args = if dry_run { &target.args_dry_run } else { &target.args_publish };
+            
+            let result = if target.is_interactive {
+                run_cmd_in_dir_interactive(&dir, target.cmd, args)
+            } else {
+                run_cmd_in_dir(&dir, target.cmd, args)
+            };
+            
+            match result {
+                Ok(_) => {
+                    println!("  ✅ {} {} successful!", target.name, if dry_run { "dry-run" } else { "publish" });
+                    success_count += 1;
+                }
+                Err(e) => {
+                    println!("  ❌ {} failed: {}", target.name, e);
+                    fail_count += 1;
                 }
             }
         }
     }
 
-    // 2. Python (PyPI)
-    if !skip_pypi {
-        println!("\n🐍 Publishing to PyPI...");
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        
-        let zakat_crate = root.join("zakat");
-        let manifest_arg = format!("-m={}", zakat_crate.join("Cargo.toml").display());
-        
-        let result = if dry_run {
-            if command_exists("maturin") {
-                run_cmd("maturin", &["build", "--release", &manifest_arg])
-            } else {
-                run_cmd("python", &["-m", "maturin", "build", "--release", &manifest_arg])
-            }
-        } else {
-            if command_exists("maturin") {
-                run_cmd("maturin", &["publish", &manifest_arg])
-            } else {
-                run_cmd("python", &["-m", "maturin", "publish", &manifest_arg])
-            }
-        };
-        
-        match result {
-            Ok(_) => {
-                println!("  ✅ PyPI {} successful!", if dry_run { "dry-run" } else { "publish" });
-                success_count += 1;
-            }
-            Err(e) => {
-                println!("  ❌ PyPI failed: {}", e);
-                fail_count += 1;
-            }
-        }
-    }
-
-    // 3. NPM
-    if !skip_npm {
-        println!("\n📦 Publishing to NPM...");
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        
-        let result = if dry_run {
-            run_cmd_in_dir(&root.join("pkg"), "npm", &["publish", "--access", "public", "--dry-run"])
-        } else {
-            run_cmd_in_dir(&root.join("pkg"), "npm", &["publish", "--access", "public"])
-        };
-        
-        match result {
-            Ok(_) => {
-                println!("  ✅ NPM {} successful!", if dry_run { "dry-run" } else { "publish" });
-                success_count += 1;
-            }
-            Err(e) => {
-                println!("  ❌ NPM failed: {}", e);
-                fail_count += 1;
-            }
-        }
-    }
-
-    // 4. JSR
-    if !skip_jsr {
-        println!("\n🦕 Publishing to JSR...");
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        
-        let result = if dry_run {
-            run_cmd_in_dir(&root.join("pkg"), "npx", &["jsr", "publish", "--dry-run"])
-        } else {
-            run_cmd_in_dir(&root.join("pkg"), "npx", &["jsr", "publish"])
-        };
-        
-        match result {
-            Ok(_) => {
-                println!("  ✅ JSR {} successful!", if dry_run { "dry-run" } else { "publish" });
-                success_count += 1;
-            }
-            Err(e) => {
-                println!("  ❌ JSR failed: {}", e);
-                fail_count += 1;
-            }
-        }
-    }
-
-    // 5. Dart (Pub.dev)
-    if !skip_dart {
-        println!("\n💙 Publishing to Pub.dev...");
-        println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        
-        let result = if dry_run {
-            run_cmd_in_dir(&root.join("zakat_dart"), "dart", &["pub", "publish", "--dry-run"])
-        } else {
-            run_cmd_in_dir(&root.join("zakat_dart"), "dart", &["pub", "publish", "--force"])
-        };
-        
-        match result {
-            Ok(_) => {
-                println!("  ✅ Pub.dev {} successful!", if dry_run { "dry-run" } else { "publish" });
-                success_count += 1;
-            }
-            Err(e) => {
-                println!("  ❌ Pub.dev failed: {}", e);
-                fail_count += 1;
-            }
-        }
-    }
-
-    // Summary
     println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     if fail_count == 0 {
         println!("✅✅✅ ALL PUBLISH OPERATIONS {}! ✅✅✅", if dry_run { "VALIDATED" } else { "COMPLETE" });
@@ -850,7 +909,7 @@ fn publish_all() -> Result<()> {
         println!("⚠️  Publish completed with {} success, {} failures", success_count, fail_count);
     }
     
-    if dry_run {
+    if dry_run && specific_target.is_none() {
         println!("\n💡 To actually publish, run without --dry-run:");
         println!("   cargo run -p xtask -- publish-all");
     }
@@ -873,239 +932,7 @@ fn run_tests() -> Result<()> {
     Ok(())
 }
 
-// =============================================================================
-// Individual Publish Tasks
-// =============================================================================
 
-/// Publish only to Crates.io
-fn publish_crates() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
-    
-    let root = project_root()?;
-    let version = read_cargo_version()?;
-    
-    println!("\n🦀 Publishing to Crates.io v{}", version);
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    
-    if dry_run {
-        println!("🔍 DRY RUN MODE - No actual publishing will occur\n");
-    }
-    
-    println!("📋 Publishing {} crates in dependency order:", WORKSPACE_CRATES.len());
-    for crate_name in WORKSPACE_CRATES {
-        println!("   • {}", crate_name);
-    }
-    println!();
-    
-    if !dry_run {
-        print!("Proceed with publishing? (y/n) ");
-        io::stdout().flush()?;
-        
-        let mut input = String::new();
-        io::stdin().read_line(&mut input)?;
-        
-        if input.trim().to_lowercase() != "y" {
-            println!("❌ Aborted.");
-            return Ok(());
-        }
-    }
-
-    let mut success_count = 0;
-    let mut fail_count = 0;
-    
-    for (i, crate_name) in WORKSPACE_CRATES.iter().enumerate() {
-        println!("\n  [{}/{}] Publishing {}...", i + 1, WORKSPACE_CRATES.len(), crate_name);
-        
-        let crate_dir = root.join(crate_name);
-        if !crate_dir.exists() {
-            println!("    ⚠️  Directory not found: {}", crate_dir.display());
-            fail_count += 1;
-            continue;
-        }
-        
-        let result = if dry_run {
-            run_cmd_in_dir(&crate_dir, "cargo", &["publish", "--dry-run"])
-        } else {
-            run_cmd_in_dir(&crate_dir, "cargo", &["publish"])
-        };
-        
-        match result {
-            Ok(_) => {
-                println!("    ✅ {} published successfully!", crate_name);
-                success_count += 1;
-            }
-            Err(e) => {
-                println!("    ❌ Failed to publish {}: {}", crate_name, e);
-                fail_count += 1;
-                
-                if !dry_run {
-                    print!("    Continue with remaining crates? (y/n) ");
-                    io::stdout().flush()?;
-                    let mut input = String::new();
-                    io::stdin().read_line(&mut input)?;
-                    if input.trim().to_lowercase() != "y" {
-                        bail!("Publishing aborted by user after {} failure", crate_name);
-                    }
-                }
-            }
-        }
-    }
-
-    println!("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    if fail_count == 0 {
-        println!("✅ Crates.io publish {}!", if dry_run { "validated" } else { "complete" });
-    } else {
-        println!("⚠️  {} success, {} failures", success_count, fail_count);
-    }
-    
-    Ok(())
-}
-
-/// Publish only to PyPI
-fn publish_pypi() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
-    
-    let root = project_root()?;
-    let version = read_cargo_version()?;
-    
-    println!("\n🐍 Publishing to PyPI v{}", version);
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    
-    if dry_run {
-        println!("🔍 DRY RUN MODE - Will only build, not publish\n");
-    }
-    
-    let zakat_crate = root.join("zakat");
-    let manifest_arg = format!("-m={}", zakat_crate.join("Cargo.toml").display());
-    
-    let result = if dry_run {
-        if command_exists("maturin") {
-            run_cmd("maturin", &["build", "--release", &manifest_arg])
-        } else {
-            run_cmd("python", &["-m", "maturin", "build", "--release", &manifest_arg])
-        }
-    } else {
-        if command_exists("maturin") {
-            run_cmd("maturin", &["publish", &manifest_arg])
-        } else {
-            run_cmd("python", &["-m", "maturin", "publish", &manifest_arg])
-        }
-    };
-    
-    match result {
-        Ok(_) => println!("\n✅ PyPI {} successful!", if dry_run { "dry-run" } else { "publish" }),
-        Err(e) => println!("\n❌ PyPI failed: {}", e),
-    }
-    
-    Ok(())
-}
-
-/// Publish only to NPM
-fn publish_npm() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
-    
-    let root = project_root()?;
-    let version = read_cargo_version()?;
-    
-    println!("\n📦 Publishing to NPM v{}", version);
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    
-    if dry_run {
-        println!("🔍 DRY RUN MODE - No actual publishing will occur\n");
-    }
-    
-    let pkg_dir = root.join("pkg");
-    if !pkg_dir.exists() {
-        bail!("pkg/ directory not found. Run 'cargo xtask build-all' first.");
-    }
-    
-    // Use interactive mode for browser-based authentication
-    let result = if dry_run {
-        run_cmd_in_dir_interactive(&pkg_dir, "npm", &["publish", "--access", "public", "--dry-run"])
-    } else {
-        run_cmd_in_dir_interactive(&pkg_dir, "npm", &["publish", "--access", "public"])
-    };
-    
-    match result {
-        Ok(_) => println!("\n✅ NPM {} successful!", if dry_run { "dry-run" } else { "publish" }),
-        Err(e) => println!("\n❌ NPM failed: {}", e),
-    }
-    
-    Ok(())
-}
-
-/// Publish only to JSR
-fn publish_jsr() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
-    
-    let root = project_root()?;
-    let version = read_cargo_version()?;
-    
-    println!("\n🦕 Publishing to JSR v{}", version);
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    
-    if dry_run {
-        println!("🔍 DRY RUN MODE - No actual publishing will occur\n");
-    }
-    
-    let pkg_dir = root.join("pkg");
-    if !pkg_dir.exists() {
-        bail!("pkg/ directory not found. Run 'cargo xtask build-all' first.");
-    }
-    
-    // Use interactive mode for browser-based authentication
-    let result = if dry_run {
-        run_cmd_in_dir_interactive(&pkg_dir, "npx", &["jsr", "publish", "--dry-run"])
-    } else {
-        run_cmd_in_dir_interactive(&pkg_dir, "npx", &["jsr", "publish"])
-    };
-    
-    match result {
-        Ok(_) => println!("\n✅ JSR {} successful!", if dry_run { "dry-run" } else { "publish" }),
-        Err(e) => println!("\n❌ JSR failed: {}", e),
-    }
-    
-    Ok(())
-}
-
-/// Publish only to Pub.dev (Dart)
-fn publish_dart() -> Result<()> {
-    let args: Vec<String> = env::args().collect();
-    let dry_run = args.iter().any(|a| a == "--dry-run" || a == "-n");
-    
-    let root = project_root()?;
-    let version = read_cargo_version()?;
-    
-    println!("\n💙 Publishing to Pub.dev v{}", version);
-    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    
-    if dry_run {
-        println!("🔍 DRY RUN MODE - No actual publishing will occur\n");
-    }
-    
-    let dart_dir = root.join("zakat_dart");
-    if !dart_dir.exists() {
-        bail!("zakat_dart/ directory not found.");
-    }
-    
-    // Use interactive mode for browser-based authentication
-    let result = if dry_run {
-        run_cmd_in_dir_interactive(&dart_dir, "dart", &["pub", "publish", "--dry-run"])
-    } else {
-        run_cmd_in_dir_interactive(&dart_dir, "dart", &["pub", "publish", "--force"])
-    };
-    
-    match result {
-        Ok(_) => println!("\n✅ Pub.dev {} successful!", if dry_run { "dry-run" } else { "publish" }),
-        Err(e) => println!("\n❌ Pub.dev failed: {}", e),
-    }
-    
-    Ok(())
-}
 
 // =============================================================================
 // Task: test-all (Full Compliance Suite)
@@ -1140,7 +967,6 @@ fn run_all_tests() -> Result<()> {
         }
         Err(e) => {
             println!("  ❌ Failed to generate test suite: {}", e);
-            fail_count += 1;
             bail!("Cannot continue without test suite.");
         }
     }

@@ -219,9 +219,18 @@ fn run_cmd_in_dir_interactive(dir: &Path, cmd: &str, args: &[&str]) -> Result<()
     Ok(())
 }
 
+/// Result of a publish attempt
+#[derive(Debug)]
+enum PublishResult {
+    Success,
+    AlreadyExists,
+    Failed(String),
+}
+
 /// Run a command with retry logic for transient failures (502, 503, 429, etc.)
 /// Useful for network-bound operations like cargo publish
-fn run_cmd_in_dir_with_retry(dir: &Path, cmd: &str, args: &[&str], max_retries: u32) -> Result<()> {
+/// Returns PublishResult to handle "already exists" gracefully
+fn run_cmd_in_dir_with_retry_publish(dir: &Path, cmd: &str, args: &[&str], max_retries: u32) -> PublishResult {
     use std::thread;
     use std::time::Duration;
     
@@ -237,25 +246,29 @@ fn run_cmd_in_dir_with_retry(dir: &Path, cmd: &str, args: &[&str], max_retries: 
         println!("  → [{}] {} {}", dir.display(), cmd, args.join(" "));
         
         #[cfg(windows)]
-        let output = Command::new("cmd")
+        let output = match Command::new("cmd")
             .args(["/C", cmd])
             .args(args)
             .current_dir(dir)
             .stdin(Stdio::inherit())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .output()
-            .with_context(|| format!("Failed to start command: {} {}", cmd, args.join(" ")))?;
+            .output() {
+                Ok(o) => o,
+                Err(e) => return PublishResult::Failed(format!("Failed to start command: {}", e)),
+            };
         
         #[cfg(not(windows))]
-        let output = Command::new(cmd)
+        let output = match Command::new(cmd)
             .args(args)
             .current_dir(dir)
             .stdin(Stdio::inherit())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .output()
-            .with_context(|| format!("Failed to start command: {} {}", cmd, args.join(" ")))?;
+            .output() {
+                Ok(o) => o,
+                Err(e) => return PublishResult::Failed(format!("Failed to start command: {}", e)),
+            };
         
         let stdout = String::from_utf8_lossy(&output.stdout);
         let stderr = String::from_utf8_lossy(&output.stderr);
@@ -269,11 +282,17 @@ fn run_cmd_in_dir_with_retry(dir: &Path, cmd: &str, args: &[&str], max_retries: 
         }
         
         if output.status.success() {
-            return Ok(());
+            return PublishResult::Success;
+        }
+        
+        let combined_output = format!("{}{}", stdout, stderr);
+        
+        // Check if crate already exists (not an error, just skip)
+        if combined_output.contains("already exists") {
+            return PublishResult::AlreadyExists;
         }
         
         // Check if error is retryable (transient network errors)
-        let combined_output = format!("{}{}", stdout, stderr);
         let is_retryable = combined_output.contains("502")
             || combined_output.contains("503")
             || combined_output.contains("429")
@@ -290,15 +309,15 @@ fn run_cmd_in_dir_with_retry(dir: &Path, cmd: &str, args: &[&str], max_retries: 
         }
         
         // Non-retryable error or max retries exceeded
-        bail!(
+        return PublishResult::Failed(format!(
             "Command '{}' failed with exit code: {} (after {} attempts)",
             cmd,
             output.status.code().map(|c| c.to_string()).unwrap_or_else(|| "unknown".to_string()),
             attempt + 1
-        );
+        ));
     }
     
-    unreachable!()
+    PublishResult::Failed("Max retries exceeded".to_string())
 }
 
 /// Check if a command exists in PATH
@@ -906,29 +925,38 @@ fn publish_all(specific_target: Option<&str>) -> Result<()> {
                     continue;
                 }
                 
-                let result = if dry_run {
-                    run_cmd_in_dir(&crate_dir, "cargo", &["publish", "--dry-run"])
-                } else {
-                    // Use retry for actual publish (transient 502/503/429 errors)
-                    run_cmd_in_dir_with_retry(&crate_dir, "cargo", &["publish"], 3)
-                };
-                
-                match result {
-                    Ok(_) => {
-                        println!("    ✅ {} published successfully!", crate_name);
-                        success_count += 1;
+                if dry_run {
+                    match run_cmd_in_dir(&crate_dir, "cargo", &["publish", "--dry-run"]) {
+                        Ok(_) => {
+                            println!("    ✅ {} dry-run passed!", crate_name);
+                            success_count += 1;
+                        }
+                        Err(e) => {
+                            println!("    ❌ {} dry-run failed: {}", crate_name, e);
+                            fail_count += 1;
+                        }
                     }
-                    Err(e) => {
-                        println!("    ❌ Failed to publish {}: {}", crate_name, e);
-                        fail_count += 1;
-                        if !dry_run {
-                             print!("    Continue with remaining crates? (y/n) ");
-                             io::stdout().flush()?;
-                             let mut input = String::new();
-                             io::stdin().read_line(&mut input)?;
-                             if input.trim().to_lowercase() != "y" {
-                                 bail!("Publishing aborted by user after {} failure", crate_name);
-                             }
+                } else {
+                    // Use retry with "already exists" detection
+                    match run_cmd_in_dir_with_retry_publish(&crate_dir, "cargo", &["publish"], 3) {
+                        PublishResult::Success => {
+                            println!("    ✅ {} published successfully!", crate_name);
+                            success_count += 1;
+                        }
+                        PublishResult::AlreadyExists => {
+                            println!("    ⏭️  {} already exists, skipping.", crate_name);
+                            success_count += 1; // Count as success since it's not a failure
+                        }
+                        PublishResult::Failed(e) => {
+                            println!("    ❌ Failed to publish {}: {}", crate_name, e);
+                            fail_count += 1;
+                            print!("    Continue with remaining crates? (y/n) ");
+                            io::stdout().flush()?;
+                            let mut input = String::new();
+                            io::stdin().read_line(&mut input)?;
+                            if input.trim().to_lowercase() != "y" {
+                                bail!("Publishing aborted by user after {} failure", crate_name);
+                            }
                         }
                     }
                 }

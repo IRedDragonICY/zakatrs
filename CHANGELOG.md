@@ -1,5 +1,62 @@
 # Changelog
 
+## [1.1.0] - 2026-01-03
+
+### Quality of Life Release
+
+This release introduces 5 high-impact "Quality of Life" features focused on developer experience and real-world usability.
+
+### Added
+
+- **Smart Fuzzy Dates (Hawl Tracking)**:
+  - New `FuzzyDate` enum with Islamic month variants: `Ramadan(year)`, `Muharram(year)`, `Shawwal(year)`, `DhulHijjah(year)`, `Unknown`
+  - New `AcquisitionDate` enum: `Exact(NaiveDate)` or `Approximate(FuzzyDate)`
+  - `HawlTracker::with_fuzzy_acquisition()` for approximate date handling
+  - `HawlTracker::from_acquisition_date()` accepts both exact and fuzzy dates
+  - Uses ICU Calendar for Hijri-to-Gregorian conversion
+  - **Fiqh Safety**: `Unknown` dates return `true` (Hawl satisfied) to err on side of caution
+
+- **Portfolio Snapshots (Audit Logs)**:
+  - New `PortfolioSnapshot` struct for serializable audit trails
+  - Contains: `timestamp`, `config_snapshot`, `inputs`, `result`, `metadata`
+  - `ZakatPortfolio::snapshot(&config, &result)` creates snapshots
+  - `PortfolioSnapshot::to_json()` and `from_json()` for persistence
+  - `.with_metadata(key, value)` builder for custom audit data
+
+- **Automatic Price Fallbacks**:
+  - New `BestEffortPriceProvider<P>` in `zakat-providers`
+  - Wraps any `PriceProvider` with static fallback prices
+  - Caches last known good prices (`last_known_good: Arc<RwLock<...>>`)
+  - Logs warnings when using fallback
+  - Supports both native (reqwest) and WASM (gloo-net) targets
+
+- **"Almost Payable" State (Sadaqah Recommendation)**:
+  - New `ZakatRecommendation` enum: `Obligatory`, `Recommended`, `None`
+  - Added `recommendation` field to `ZakatDetails`
+  - Returns `Recommended` when `net_assets >= 90% of Nisab` (encouraging voluntary Sadaqah)
+  - **Fiqh Safety**: Never marks as `Obligatory` unless strictly payable
+
+- **Interactive CLI Tool (`zakat-cli`)**:
+  - New binary crate: `cargo install zakat-cli` or `cargo run -p zakat-cli`
+  - Interactive prompts via `inquire` for asset entry
+  - Supports: Business, Gold, Silver, Cash, Investments, Agriculture
+  - Pretty-printed results with `tabled` and `colored`
+  - Live pricing with `BestEffortPriceProvider` fallback
+  - Snapshot saving for audit trails
+  - CLI flags: `--offline`, `--gold-price`, `--silver-price`, `--verbose`
+
+### Changed
+
+- **XTask**: Added `zakat-cli` to workspace crates list for publishing
+- **Prelude Exports**: Added `HawlTracker`, `AcquisitionDate`, `FuzzyDate`, `ZakatRecommendation`, `PortfolioSnapshot`
+
+### Technical
+
+- **78 Tests Passing**: All unit tests verified (67 zakat-core + 11 zakat-providers)
+- **Zero Breaking Changes**: All new features are additive
+
+---
+
 ## [1.0.1] - 2026-01-03
 
 ### Added

@@ -46,6 +46,7 @@ crate::zakat_ffi_export! {
     }
 }
 
+#[allow(deprecated)] // Uses deprecated `liabilities_due_now` for backward compat
 impl Default for MiningAssets {
     fn default() -> Self {
         let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
@@ -89,6 +90,7 @@ impl CalculateZakat for MiningAssets {
     fn get_label(&self) -> Option<String> { self.label.clone() }
     fn get_id(&self) -> uuid::Uuid { self.id }
 
+    #[allow(deprecated)] // Uses deprecated `liabilities_due_now` for backward compat
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         // Validate deferred input errors first
         self.validate()?;
@@ -136,7 +138,7 @@ impl CalculateZakat for MiningAssets {
 
                 let params = MonetaryCalcParams {
                     total_assets: self.value,
-                    liabilities: self.liabilities_due_now, // Uses macro field
+                    liabilities: self.total_liabilities(),
                     nisab_threshold: *nisab_threshold,
                     rate,
                     wealth_type: crate::types::WealthType::Mining,
@@ -166,7 +168,7 @@ mod tests {
         // Rikaz (Buried Treasure) is taxed at 20% on the gross value.
         // Debts and Hawl are not considered for Rikaz.
         
-        let res = mining.debt(500.0).hawl(false).calculate_zakat(&config).unwrap();
+        let res = mining.add_liability("Liabilities", 500.0).hawl(false).calculate_zakat(&config).unwrap();
         // Calculation: 1000 * 0.20 = 200. (Debt of 500 is ignored).
         
         assert!(res.is_payable);

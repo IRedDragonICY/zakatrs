@@ -186,12 +186,14 @@ impl ExpectedResult {
     }
 
     /// Adds a warning to the result.
+    #[allow(dead_code)] // Reserved for future test scenarios
     pub fn with_warning(mut self, warning: impl Into<String>) -> Self {
         self.warnings.push(warning.into());
         self
     }
 
     /// Adds an error message pattern.
+    #[allow(dead_code)] // Reserved for future test scenarios
     pub fn with_error_contains(mut self, pattern: impl Into<String>) -> Self {
         self.error_message_contains = Some(pattern.into());
         self
@@ -247,6 +249,7 @@ impl TestInput {
     }
 
     /// Sets a label.
+    #[allow(dead_code)] // Reserved for future test scenarios
     pub fn label(mut self, label: &str) -> Self {
         self.label = Some(label.to_string());
         self

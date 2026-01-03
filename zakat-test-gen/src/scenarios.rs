@@ -157,7 +157,7 @@ fn generate_business_case(
         .cash(cash)
         .inventory(inventory)
         .receivables(receivables)
-        .liabilities(liabilities)
+        .add_liability("Liabilities", liabilities)
         .hawl(input.hawl_satisfied);
 
     // Execute the calculation
@@ -298,7 +298,7 @@ fn generate_gold_case(
     let gold = PreciousMetals::gold(weight)
         .purity(purity)
         .usage(usage)
-        .debt(liabilities)
+        .add_liability("Liabilities", liabilities)
         .hawl(input.hawl_satisfied);
 
     let expected = match gold.calculate_zakat(&zakat_config) {
@@ -411,7 +411,7 @@ fn generate_silver_case(
     let silver = PreciousMetals::silver(weight)
         .purity(purity)
         .usage(usage)
-        .debt(liabilities)
+        .add_liability("Liabilities", liabilities)
         .hawl(input.hawl_satisfied);
 
     let expected = match silver.calculate_zakat(&zakat_config) {

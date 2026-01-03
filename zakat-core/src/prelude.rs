@@ -11,15 +11,18 @@
 // Core exports
 pub use crate::config::ZakatConfig;
 pub use crate::madhab::{Madhab, NisabStandard, ZakatStrategy, ZakatRules};
-pub use crate::portfolio::{ZakatPortfolio, PortfolioResult, PortfolioItemResult};
+pub use crate::portfolio::{ZakatPortfolio, PortfolioResult, PortfolioItemResult, PortfolioSnapshot};
 #[cfg(feature = "async")]
 pub use crate::portfolio::AsyncZakatPortfolio;
 
 pub use crate::traits::CalculateZakat;
 #[cfg(feature = "async")]
 pub use crate::traits::AsyncCalculateZakat;
-pub use crate::types::{WealthType, ZakatDetails, ZakatError};
+pub use crate::types::{WealthType, ZakatDetails, ZakatError, ZakatRecommendation};
 pub use crate::inputs::IntoZakatDecimal;
+
+// Hawl types (Feature 1: Fuzzy Dates)
+pub use crate::hawl::{HawlTracker, AcquisitionDate, FuzzyDate};
 
 // Re-export specific calculators and types
 pub use crate::maal::business::BusinessZakat;

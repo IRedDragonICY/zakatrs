@@ -75,6 +75,7 @@ pub fn calculate_monetary_asset(params: MonetaryCalcParams) -> Result<ZakatDetai
     ).with_label(params.label.unwrap_or_default());
     
     // Add any warnings from params to the result
+    #[allow(deprecated)] // Uses deprecated `warnings` field for backward compat
     result.warnings.extend(params.warnings);
     
     Ok(result)

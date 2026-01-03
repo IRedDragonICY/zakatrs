@@ -258,6 +258,173 @@ impl PriceProvider for FailoverPriceProvider {
     }
 }
 
+// =============================================================================
+// Feature 3: Best Effort Price Provider (Primary + Fallback)
+// =============================================================================
+
+/// A "best effort" price provider that uses a primary provider with a static fallback.
+///
+/// This provides the simplest possible resilient pricing:
+/// 1. Try the primary provider (e.g., live API).
+/// 2. If it fails, log a warning and return the fallback prices.
+/// 3. Only fail if BOTH providers fail.
+///
+/// # Use Case
+/// Perfect for production apps where you want live prices when available,
+/// but need guaranteed availability with user-defined fallback prices.
+///
+/// # Example
+/// ```rust,ignore
+/// use zakat_providers::pricing::{BestEffortPriceProvider, BinancePriceProvider, Prices};
+/// 
+/// // User provides their own fallback prices
+/// let fallback = Prices::new(85, 1)?;
+/// let provider = BestEffortPriceProvider::new(
+///     BinancePriceProvider::default(),
+///     fallback
+/// );
+/// 
+/// // Will use Binance if available, otherwise fallback to static prices
+/// let prices = provider.get_prices().await?;
+/// ```
+#[cfg(not(target_arch = "wasm32"))]
+pub struct BestEffortPriceProvider<P: PriceProvider> {
+    primary: P,
+    fallback: Prices,
+    /// Optional: Cache the last successfully fetched prices from primary
+    last_known_good: Arc<RwLock<Option<Prices>>>,
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl<P: PriceProvider> BestEffortPriceProvider<P> {
+    /// Creates a new BestEffortPriceProvider with a primary provider and static fallback.
+    pub fn new(primary: P, fallback: Prices) -> Self {
+        Self {
+            primary,
+            fallback,
+            last_known_good: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    /// Creates a BestEffortPriceProvider using the last known good prices as fallback.
+    /// 
+    /// If the primary provider has never succeeded, the static fallback is used.
+    pub fn with_cached_fallback(primary: P, initial_fallback: Prices) -> Self {
+        Self::new(primary, initial_fallback)
+    }
+
+    /// Returns the current fallback prices.
+    pub fn fallback_prices(&self) -> &Prices {
+        &self.fallback
+    }
+
+    /// Updates the fallback prices.
+    pub fn set_fallback(&mut self, prices: Prices) {
+        self.fallback = prices;
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[async_trait::async_trait]
+impl<P: PriceProvider + Send + Sync> PriceProvider for BestEffortPriceProvider<P> {
+    async fn get_prices(&self) -> Result<Prices, ZakatError> {
+        match self.primary.get_prices().await {
+            Ok(prices) => {
+                // Cache this as the last known good
+                if let Ok(mut guard) = self.last_known_good.write() {
+                    *guard = Some(prices.clone());
+                }
+                Ok(prices)
+            }
+            Err(e) => {
+                tracing::warn!(
+                    "Primary price provider '{}' failed: {}. Using fallback prices.",
+                    self.primary.name(),
+                    e
+                );
+                
+                // Try to use last known good prices first
+                if let Ok(guard) = self.last_known_good.read() {
+                    if let Some(cached) = &*guard {
+                        tracing::info!("Using last known good prices from cache");
+                        return Ok(cached.clone());
+                    }
+                }
+                
+                // Fall back to static prices
+                tracing::info!(
+                    "Using static fallback prices: Gold={}, Silver={}",
+                    self.fallback.gold_per_gram,
+                    self.fallback.silver_per_gram
+                );
+                Ok(self.fallback.clone())
+            }
+        }
+    }
+
+    fn name(&self) -> &str {
+        "BestEffortPriceProvider"
+    }
+}
+
+// WASM version of BestEffortPriceProvider
+#[cfg(target_arch = "wasm32")]
+pub struct BestEffortPriceProvider<P: PriceProvider> {
+    primary: P,
+    fallback: Prices,
+    last_known_good: Arc<RwLock<Option<Prices>>>,
+}
+
+#[cfg(target_arch = "wasm32")]
+impl<P: PriceProvider> BestEffortPriceProvider<P> {
+    /// Creates a new BestEffortPriceProvider with a primary provider and static fallback.
+    pub fn new(primary: P, fallback: Prices) -> Self {
+        Self {
+            primary,
+            fallback,
+            last_known_good: Arc::new(RwLock::new(None)),
+        }
+    }
+
+    /// Returns the current fallback prices.
+    pub fn fallback_prices(&self) -> &Prices {
+        &self.fallback
+    }
+
+    /// Updates the fallback prices.
+    pub fn set_fallback(&mut self, prices: Prices) {
+        self.fallback = prices;
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[async_trait::async_trait(?Send)]
+impl<P: PriceProvider> PriceProvider for BestEffortPriceProvider<P> {
+    async fn get_prices(&self) -> Result<Prices, ZakatError> {
+        match self.primary.get_prices().await {
+            Ok(prices) => {
+                if let Ok(mut guard) = self.last_known_good.write() {
+                    *guard = Some(prices.clone());
+                }
+                Ok(prices)
+            }
+            Err(_e) => {
+                // Try cached prices first
+                if let Ok(guard) = self.last_known_good.read() {
+                    if let Some(cached) = &*guard {
+                        return Ok(cached.clone());
+                    }
+                }
+                Ok(self.fallback.clone())
+            }
+        }
+    }
+
+    fn name(&self) -> &str {
+        "BestEffortPriceProvider"
+    }
+}
+
 // WASM version
 #[cfg(target_arch = "wasm32")]
 pub struct FailoverPriceProvider {
@@ -707,5 +874,55 @@ mod tests {
         let result = failover.get_prices().await;
         assert!(result.is_err());
         assert!(matches!(result, Err(ZakatError::ConfigurationError(_))));
+    }
+
+    // =============================================================================
+    // Best Effort Price Provider Tests (Feature 3)
+    // =============================================================================
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[tokio::test]
+    async fn test_best_effort_uses_primary_when_available() {
+        let primary = StaticPriceProvider::new(100, 2).unwrap().with_name("Primary");
+        let fallback = Prices::new(50, 1).unwrap();
+        
+        let provider = BestEffortPriceProvider::new(primary, fallback);
+        
+        let prices = provider.get_prices().await.unwrap();
+        assert_eq!(prices.gold_per_gram, dec!(100)); // Primary price
+        assert_eq!(prices.silver_per_gram, dec!(2));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[tokio::test]
+    async fn test_best_effort_uses_fallback_on_primary_failure() {
+        let failing = MockFailingProvider::new("FailingPrimary");
+        let fallback = Prices::new(75, 1).unwrap();
+        
+        let provider = BestEffortPriceProvider::new(failing, fallback);
+        
+        // Should succeed with fallback prices
+        let prices = provider.get_prices().await.unwrap();
+        assert_eq!(prices.gold_per_gram, dec!(75)); // Fallback price
+        assert_eq!(prices.silver_per_gram, dec!(1));
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[tokio::test]
+    async fn test_best_effort_caches_last_good_prices() {
+        // Use a provider that succeeds first, then we'll check cache behavior
+        let primary = StaticPriceProvider::new(120, 3).unwrap();
+        let fallback = Prices::new(50, 1).unwrap();
+        
+        let provider = BestEffortPriceProvider::new(primary, fallback);
+        
+        // First call should populate the cache
+        let prices1 = provider.get_prices().await.unwrap();
+        assert_eq!(prices1.gold_per_gram, dec!(120));
+        
+        // Cache should be populated
+        let guard = provider.last_known_good.read().unwrap();
+        assert!(guard.is_some());
+        assert_eq!(guard.as_ref().unwrap().gold_per_gram, dec!(120));
     }
 }

@@ -8,12 +8,133 @@ use rust_decimal::Decimal;
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
+use std::collections::HashMap;
+use chrono::{DateTime, Utc};
 
 use crate::traits::CalculateZakat;
 #[cfg(feature = "async")]
 use crate::traits::AsyncCalculateZakat;
 use crate::types::{ZakatDetails, ZakatError, ErrorDetails, InvalidInputDetails};
+use crate::assets::PortfolioItem;
 use tracing::{instrument, info, warn};
+
+// =============================================================================
+// Portfolio Snapshot (Feature 2: Audit Logs)
+// =============================================================================
+
+/// A point-in-time snapshot of a portfolio calculation for audit purposes.
+///
+/// This struct captures the exact state of a calculation including:
+/// - The configuration used (with prices at that moment).
+/// - All input assets.
+/// - The calculation result.
+/// - User-defined metadata (notes, tax year, etc.).
+///
+/// # Use Cases
+/// - Tax documentation and reporting.
+/// - Audit trails for compliance.
+/// - Historical record keeping.
+/// - Comparing calculations over time.
+///
+/// # Example
+/// ```rust,ignore
+/// let result = portfolio.calculate_total(&config);
+/// let snapshot = portfolio.snapshot(&config, &result)
+///     .with_metadata("tax_year", "2025")
+///     .with_metadata("prepared_by", "Ahmad");
+/// 
+/// // Serialize for storage
+/// let json = serde_json::to_string_pretty(&snapshot)?;
+/// ```
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PortfolioSnapshot {
+    /// Unique identifier for this snapshot.
+    pub id: Uuid,
+    /// UTC timestamp when the snapshot was created.
+    pub timestamp: DateTime<Utc>,
+    /// The configuration used for this calculation (including prices).
+    pub config_snapshot: crate::config::ZakatConfig,
+    /// The input assets at the time of calculation.
+    pub inputs: Vec<PortfolioItem>,
+    /// The calculation result.
+    pub result: PortfolioResult,
+    /// User-defined metadata (e.g., notes, tax year, preparer).
+    pub metadata: HashMap<String, String>,
+    /// Version of the snapshot format (for future compatibility).
+    pub version: String,
+}
+
+impl PortfolioSnapshot {
+    /// Creates a new snapshot with the current timestamp.
+    pub fn new(
+        config: &crate::config::ZakatConfig,
+        inputs: Vec<PortfolioItem>,
+        result: PortfolioResult,
+    ) -> Self {
+        Self {
+            id: Uuid::new_v4(),
+            timestamp: Utc::now(),
+            config_snapshot: config.clone(),
+            inputs,
+            result,
+            metadata: HashMap::new(),
+            version: "1.0.0".to_string(),
+        }
+    }
+
+    /// Adds a metadata entry to the snapshot.
+    pub fn with_metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
+        self.metadata.insert(key.into(), value.into());
+        self
+    }
+
+    /// Sets multiple metadata entries at once.
+    pub fn with_all_metadata(mut self, metadata: HashMap<String, String>) -> Self {
+        self.metadata.extend(metadata);
+        self
+    }
+
+    /// Returns the total Zakat due from this snapshot.
+    pub fn total_zakat_due(&self) -> Decimal {
+        self.result.total_zakat_due
+    }
+
+    /// Returns the total assets from this snapshot.
+    pub fn total_assets(&self) -> Decimal {
+        self.result.total_assets
+    }
+
+    /// Returns the snapshot as a pretty-printed JSON string.
+    pub fn to_json(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
+
+    /// Creates a snapshot from a JSON string.
+    pub fn from_json(json: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+
+    /// Returns a summary string for display.
+    pub fn summary(&self) -> String {
+        format!(
+            "Portfolio Snapshot ({})\n\
+             Date: {}\n\
+             Assets: {} items\n\
+             Total Zakat Due: {:.2}\n\
+             Status: {:?}",
+            self.id,
+            self.timestamp.format("%Y-%m-%d %H:%M:%S UTC"),
+            self.inputs.len(),
+            self.result.total_zakat_due,
+            self.result.status
+        )
+    }
+}
+
+// =============================================================================
+// Portfolio Item Result
+// =============================================================================
 
 /// Individual result for an asset in the portfolio.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -103,8 +224,6 @@ impl PortfolioResult {
         }
     }
 }
-
-use crate::assets::PortfolioItem;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ZakatPortfolio {
@@ -342,6 +461,24 @@ impl ZakatPortfolio {
         }
         
         aggregate_and_summarize(new_results, config)
+    }
+
+    /// Creates a snapshot of the current portfolio calculation for audit purposes.
+    ///
+    /// A snapshot captures the exact state of a calculation including:
+    /// - The configuration used (with prices at that moment).
+    /// - All input assets.
+    /// - The calculation result.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let result = portfolio.calculate_total(&config);
+    /// let snapshot = portfolio.snapshot(&config, &result)
+    ///     .with_metadata("tax_year", "2025")
+    ///     .with_metadata("notes", "End of Ramadan calculation");
+    /// ```
+    pub fn snapshot(&self, config: &crate::config::ZakatConfig, result: &PortfolioResult) -> PortfolioSnapshot {
+        PortfolioSnapshot::new(config, self.items.clone(), result.clone())
     }
 }
 

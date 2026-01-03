@@ -164,6 +164,7 @@ pub struct DartZakatResult {
 
 impl DartZakatResult {
     /// Create from core ZakatDetails.
+    #[allow(deprecated)] // Uses deprecated `warnings` field for backward compat
     pub(crate) fn from_core(details: zakat::types::ZakatDetails) -> Self {
         Self {
             zakat_due: FrbDecimal { value: details.zakat_due },

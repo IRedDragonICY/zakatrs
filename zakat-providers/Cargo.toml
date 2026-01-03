@@ -33,6 +33,9 @@ async-trait = { workspace = true }
 tokio = { workspace = true }
 reqwest = { workspace = true, optional = true }
 
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }
+
 # WASM dependencies
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 gloo-net = "0.6"

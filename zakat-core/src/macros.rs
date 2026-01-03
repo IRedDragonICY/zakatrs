@@ -59,6 +59,7 @@ macro_rules! zakat_asset {
         $(#[$meta])*
         #[derive(schemars::JsonSchema)]
         #[serde(rename_all = "camelCase")]
+        #[allow(deprecated)] // Internal usage of deprecated `liabilities_due_now` for backward compat
         $vis struct $name {
             // User defined fields
             $(
@@ -93,6 +94,7 @@ macro_rules! zakat_asset {
             
             /// Sets deductible debt (deprecated, use `add_liability` instead).
             #[deprecated(since = "1.1.0", note = "Use `add_liability()` for granular liability tracking")]
+            #[allow(deprecated)] // Internal usage of deprecated `liabilities_due_now`
             pub fn debt(mut self, val: impl $crate::inputs::IntoZakatDecimal) -> Self {
                 match val.into_zakat_decimal() {
                     Ok(v) => self.liabilities_due_now = v,
@@ -500,6 +502,7 @@ macro_rules! zakat_ffi_export {
                 pub id: String,
             }
 
+            #[allow(deprecated)] // Internal usage of deprecated `liabilities_due_now` for backward compat
             impl From<super::$name> for $name {
                 fn from(src: super::$name) -> Self {
                     Self {

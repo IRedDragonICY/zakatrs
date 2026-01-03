@@ -115,7 +115,7 @@ impl NativePortfolio {
             .cash(cash.value)
             .inventory(inventory.value)
             .receivables(receivables.value)
-            .liabilities(liabilities.value)
+            .add_liability("Liabilities", liabilities.value)
             .label(label)
             .hawl(true);
         

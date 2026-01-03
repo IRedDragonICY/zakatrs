@@ -645,6 +645,7 @@ const WORKSPACE_CRATES: &[&str] = &[
     "zakat-ledger",    // Depends on zakat-core
     "zakat-providers", // Depends on zakat-core
     "zakat-sqlite",    // Depends on zakat-core, zakat-ledger
+    "zakat-cli",       // Interactive CLI tool
     "zakat",           // Facade - depends on all above
 ];
 

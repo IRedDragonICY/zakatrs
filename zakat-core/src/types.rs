@@ -4,6 +4,57 @@ use std::collections::HashMap;
 use tracing::warn;
 
 // =============================================================================
+// Zakat Recommendation (Feature 4: "Almost Payable" State)
+// =============================================================================
+
+/// Represents the Zakat recommendation status for an asset.
+///
+/// This enum provides nuanced guidance beyond binary Payable/Exempt:
+/// - **Obligatory**: Zakat is mandatory (net assets ≥ Nisab, Hawl met).
+/// - **Recommended**: Voluntary Sadaqah is encouraged (near Nisab, 90-100%).
+/// - **None**: Far below Nisab threshold.
+///
+/// # Fiqh Principle
+/// While Zakat is strictly obligatory only when conditions are met,
+/// voluntary charity (Sadaqah) is always encouraged in Islam.
+/// This recommendation helps users consider giving even when not obligated.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
+pub enum ZakatRecommendation {
+    /// Zakat is obligatory (standard Zakat).
+    /// Net assets ≥ Nisab and Hawl is satisfied.
+    Obligatory,
+    /// Voluntary Sadaqah is recommended.
+    /// Net assets are between 90% and 100% of Nisab.
+    /// This is NOT obligatory but spiritually encouraged.
+    Recommended,
+    /// No recommendation - assets are far below Nisab.
+    #[default]
+    None,
+}
+
+impl ZakatRecommendation {
+    /// Returns a translation key for i18n support.
+    pub fn translation_key(&self) -> &'static str {
+        match self {
+            ZakatRecommendation::Obligatory => "recommendation-obligatory",
+            ZakatRecommendation::Recommended => "recommendation-sadaqah",
+            ZakatRecommendation::None => "recommendation-none",
+        }
+    }
+
+    /// Returns a human-readable description.
+    pub fn description(&self) -> &'static str {
+        match self {
+            ZakatRecommendation::Obligatory => "Zakat is obligatory",
+            ZakatRecommendation::Recommended => "Voluntary Sadaqah is recommended (near Nisab)",
+            ZakatRecommendation::None => "No Zakat due",
+        }
+    }
+}
+
+// =============================================================================
 // Liability Types (v1.1 Feature: Granular Liability Management)
 // =============================================================================
 
@@ -56,7 +107,7 @@ impl Liability {
 /// instead of hardcoded English strings.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[typeshare::typeshare]
-#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(tag = "type", content = "content", rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum WarningCode {
     /// Net assets were negative and clamped to zero.
     NegativeAssetsClamped,
@@ -550,6 +601,10 @@ pub struct ZakatDetails {
     /// Non-fatal warnings about the calculation (e.g., negative values clamped).
     #[deprecated(since = "1.1.0", note = "Use `structured_warnings` for i18n support")]
     pub warnings: Vec<String>,
+    /// Recommendation status (Feature 4: "Almost Payable" State).
+    /// Indicates if voluntary Sadaqah is recommended even when Zakat is not obligatory.
+    #[serde(default)]
+    pub recommendation: ZakatRecommendation,
 }
 
 /// Structured representation of a Zakat calculation for API consumers.
@@ -650,6 +705,9 @@ impl ZakatDetails {
             Decimal::ZERO
         };
 
+        // Feature 4: Calculate recommendation for "Almost Payable" state
+        let recommendation = Self::calculate_recommendation(is_payable, net_assets, nisab_threshold);
+
         // Build default calculation trace
         let mut trace = vec![
             CalculationStep::initial("step-total-assets", "Total Assets", total_assets),
@@ -668,6 +726,13 @@ impl ZakatDetails {
             trace.push(CalculationStep::result("status-due", "Zakat Due", zakat_due));
         } else {
             trace.push(CalculationStep::info("status-exempt", "Net Assets below Nisab - No Zakat Due"));
+            // Add recommendation info if applicable
+            if recommendation == ZakatRecommendation::Recommended {
+                trace.push(CalculationStep::info(
+                    "info-sadaqah-recommended",
+                    "Info: Wealth is near Nisab. Voluntary Sadaqah is recommended."
+                ));
+            }
         }
 
         ZakatDetails {
@@ -685,6 +750,32 @@ impl ZakatDetails {
             calculation_trace: CalculationTrace(trace),
             structured_warnings,
             warnings,
+            recommendation,
+        }
+    }
+
+    /// Calculates the recommendation status based on net assets and Nisab.
+    /// 
+    /// - If payable: `Obligatory`
+    /// - If net_assets >= 90% of Nisab but < 100%: `Recommended` (Sadaqah encouraged)
+    /// - Otherwise: `None`
+    fn calculate_recommendation(is_payable: bool, net_assets: Decimal, nisab_threshold: Decimal) -> ZakatRecommendation {
+        if is_payable {
+            return ZakatRecommendation::Obligatory;
+        }
+
+        if nisab_threshold <= Decimal::ZERO || net_assets <= Decimal::ZERO {
+            return ZakatRecommendation::None;
+        }
+
+        // Check if net_assets is >= 90% of Nisab
+        use rust_decimal_macros::dec;
+        let ninety_percent_nisab = nisab_threshold * dec!(0.9);
+        
+        if net_assets >= ninety_percent_nisab {
+            ZakatRecommendation::Recommended
+        } else {
+            ZakatRecommendation::None
         }
     }
 
@@ -719,6 +810,17 @@ impl ZakatDetails {
             Decimal::ZERO
         };
 
+        // Feature 4: Calculate recommendation
+        let recommendation = Self::calculate_recommendation(is_payable, net_assets, nisab_threshold);
+
+        // Add recommendation trace if applicable
+        if !is_payable && recommendation == ZakatRecommendation::Recommended {
+            trace.push(CalculationStep::info(
+                "info-sadaqah-recommended",
+                "Info: Wealth is near Nisab. Voluntary Sadaqah is recommended."
+            ));
+        }
+
         ZakatDetails {
             total_assets,
             liabilities_due_now,
@@ -734,6 +836,7 @@ impl ZakatDetails {
             calculation_trace: CalculationTrace(trace),
             structured_warnings,
             warnings,
+            recommendation,
         }
     }
 
@@ -759,6 +862,7 @@ impl ZakatDetails {
             calculation_trace: CalculationTrace(trace),
             structured_warnings: Vec::new(),
             warnings: Vec::new(),
+            recommendation: ZakatRecommendation::None,
         }
     }
 
@@ -800,6 +904,7 @@ impl ZakatDetails {
     /// Converts this ZakatDetails into a structured `ZakatExplanation`.
     ///
     /// This is preferred for API consumers who want to render their own UI.
+    #[allow(deprecated)] // Uses deprecated `warnings` field for backward compat
     pub fn to_explanation(&self, config: &crate::config::ZakatConfig) -> ZakatExplanation {
         let label = self.label.clone().unwrap_or_else(|| "Asset".to_string());
         let wealth_type = format!("{:?}", self.wealth_type);
@@ -1176,6 +1281,7 @@ pub struct FfiZakatDetails {
     pub warnings: Vec<String>,
 }
 
+#[allow(deprecated)] // Uses deprecated `liabilities_due_now` and `warnings` for backward compat
 impl From<ZakatDetails> for FfiZakatDetails {
     fn from(src: ZakatDetails) -> Self {
         Self {

@@ -1,7 +1,7 @@
-/// Auto-generated asset wrappers for Dart FFI.
-///
-/// Each asset type is exported using the `dart_export_asset!` macro,
-/// providing a consistent fluent builder API that matches the core Rust library.
+// Auto-generated asset wrappers for Dart FFI.
+//
+// Each asset type is exported using the `dart_export_asset!` macro,
+// providing a consistent fluent builder API that matches the core Rust library.
 
 
 

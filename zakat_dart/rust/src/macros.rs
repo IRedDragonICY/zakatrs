@@ -81,6 +81,7 @@ macro_rules! dart_export_asset {
             $($(
                 #[doc = concat!("Set the `", stringify!($dec_field), "` field.")]
                 #[flutter_rust_bridge::frb(sync)]
+                #[allow(deprecated)] // May call deprecated methods for backward compat
                 pub fn $dec_field(&mut self, value: $crate::api::types::FrbDecimal) {
                      let inner = std::mem::take(&mut self.inner);
                      self.inner = inner.$dec_field(value.value);

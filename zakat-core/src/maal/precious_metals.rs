@@ -55,6 +55,7 @@ crate::zakat_ffi_export! {
     }
 }
 
+#[allow(deprecated)] // Uses deprecated `liabilities_due_now` for backward compat
 impl Default for PreciousMetals {
     fn default() -> Self {
         let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
@@ -162,6 +163,7 @@ impl CalculateZakat for PreciousMetals {
     fn get_label(&self) -> Option<String> { self.label.clone() }
     fn get_id(&self) -> uuid::Uuid { self.id }
 
+    #[allow(deprecated)] // Uses deprecated `liabilities_due_now` for backward compat
     fn calculate_zakat<C: ZakatConfigArgument>(&self, config: C) -> Result<ZakatDetails, ZakatError> {
         // Validate deferred input errors first
         self.validate()?;
@@ -264,7 +266,7 @@ impl CalculateZakat for PreciousMetals {
 
         let params = MonetaryCalcParams {
             total_assets: *total_value,
-            liabilities: self.liabilities_due_now,
+            liabilities: self.total_liabilities(),
             nisab_threshold: *nisab_value,
             rate,
             wealth_type: metal_type,
@@ -376,7 +378,7 @@ mod tests {
         let metal = PreciousMetals::new()
             .weight(100.0)
             .metal_type(WealthType::Gold)
-            .debt(2000.0)
+            .add_liability("Liabilities", 2000.0)
             .hawl(true);
             
         let zakat = metal.calculate_zakat(&config).unwrap();

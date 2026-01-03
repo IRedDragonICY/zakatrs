@@ -47,6 +47,7 @@ crate::zakat_ffi_export! {
     }
 }
 
+#[allow(deprecated)] // Uses deprecated `liabilities_due_now` for backward compat
 impl Default for IncomeZakatCalculator {
     fn default() -> Self {
         let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
@@ -68,6 +69,7 @@ impl Default for IncomeZakatCalculator {
 impl IncomeZakatCalculator {
     // new() is provided by the macro
 
+    #[allow(deprecated)] // Uses deprecated `debt()` setter for backward compat
     pub fn from_amounts(
         income: impl IntoZakatDecimal,
         expenses: impl IntoZakatDecimal,

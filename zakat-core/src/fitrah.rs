@@ -109,6 +109,7 @@ impl CalculateZakat for FitrahCalculator {
             calculation_trace: crate::types::CalculationTrace(trace),
             warnings: Vec::new(),
             structured_warnings: Vec::new(),
+            recommendation: crate::types::ZakatRecommendation::Obligatory, // Fitrah is always obligatory
         })
     }
 

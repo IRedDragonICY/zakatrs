@@ -6,6 +6,7 @@ resolver = "2"
 members = [
     "zakat",
     "zakat-core",
+    "zakat-cli",
     "zakat-i18n",
     "zakat-ledger",
     "zakat-providers",
@@ -16,7 +17,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.0.1"
+version = "1.1.0"
 edition = "2024"
 license = "MIT"
 authors = ["Mohammad Farid Hendianto (IRedDragonICY)"]
@@ -24,11 +25,12 @@ repository = "https://github.com/IRedDragonICY/zakatrs"
 
 [workspace.dependencies]
 # Internal crates (path for local dev, version for crates.io)
-zakat-core = { version = "1.0.1", path = "zakat-core" }
-zakat-i18n = { version = "1.0.1", path = "zakat-i18n" }
-zakat-ledger = { version = "1.0.1", path = "zakat-ledger" }
-zakat-providers = { version = "1.0.1", path = "zakat-providers" }
-zakat-sqlite = { version = "1.0.1", path = "zakat-sqlite" }
+zakat-core = { version = "1.1.0", path = "zakat-core" }
+zakat-i18n = { version = "1.1.0", path = "zakat-i18n" }
+zakat-ledger = { version = "1.1.0", path = "zakat-ledger" }
+zakat-providers = { version = "1.1.0", path = "zakat-providers" }
+zakat-sqlite = { version = "1.1.0", path = "zakat-sqlite" }
+zakat-cli = { version = "1.1.0", path = "zakat-cli" }
 
 # Common dependencies
 rust_decimal = { version = "1.39", features = ["serde"] }

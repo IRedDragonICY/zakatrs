@@ -204,6 +204,11 @@ impl CalculateZakat for AgricultureAssets {
             calculation_trace: crate::types::CalculationTrace(trace),
             warnings: Vec::new(),
             structured_warnings: Vec::new(),
+            recommendation: if is_payable { 
+                crate::types::ZakatRecommendation::Obligatory 
+            } else { 
+                crate::types::ZakatRecommendation::None 
+            },
         })
     }
 

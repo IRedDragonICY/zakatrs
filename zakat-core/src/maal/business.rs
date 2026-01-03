@@ -37,6 +37,7 @@ crate::zakat_ffi_export! {
     }
 }
 
+#[allow(deprecated)] // Uses deprecated `liabilities_due_now` for backward compat
 impl Default for BusinessZakat {
     fn default() -> Self {
         let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
@@ -107,6 +108,7 @@ impl BusinessZakat {
     /// If the value cannot be converted to a valid decimal, the error is
     /// collected and will be returned by `validate()` or `calculate_zakat()`.
     #[deprecated(since = "1.1.0", note = "Use `add_liability()` for granular liability tracking")]
+    #[allow(deprecated)] // Internal usage of deprecated `liabilities_due_now`
     pub fn liabilities(mut self, liabilities: impl IntoZakatDecimal) -> Self {
         match liabilities.into_zakat_decimal() {
             Ok(v) => self.liabilities_due_now = v,

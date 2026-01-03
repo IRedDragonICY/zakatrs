@@ -1,0 +1,39 @@
+[package]
+name = "zakat-cli"
+description = "Interactive CLI tool for Zakat calculations and debugging."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "zakat-cli"
+path = "src/main.rs"
+
+[features]
+default = ["live-pricing"]
+live-pricing = ["zakat-providers/live-pricing"]
+
+[dependencies]
+# Internal crates
+zakat-core = { workspace = true, features = ["async"] }
+zakat-providers = { workspace = true }
+
+# CLI dependencies
+clap = { version = "4.5", features = ["derive"] }
+inquire = "0.7"
+tokio = { version = "1.48", features = ["full"] }
+
+# Common dependencies
+rust_decimal = { workspace = true }
+rust_decimal_macros = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+chrono = { workspace = true }
+
+# Pretty printing
+tabled = "0.18"
+colored = "3.0"

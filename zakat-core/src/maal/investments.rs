@@ -49,6 +49,7 @@ crate::zakat_ffi_export! {
     }
 }
 
+#[allow(deprecated)] // Uses deprecated `liabilities_due_now` for backward compat
 impl Default for InvestmentAssets {
     fn default() -> Self {
         let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();

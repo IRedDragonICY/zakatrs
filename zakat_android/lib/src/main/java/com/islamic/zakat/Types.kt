@@ -49,6 +49,64 @@ data class CalculationStep (
 /// A collection of calculation steps that can be displayed or serialized.
 typealias CalculationTrace = List<CalculationStep>
 
+/// Structured warning codes for localization support.
+/// 
+/// Frontends can use these codes to provide localized warning messages
+/// instead of hardcoded English strings.
+@Serializable
+sealed class WarningCode {
+	/// Net assets were negative and clamped to zero.
+	@Serializable
+	@SerialName("NEGATIVE_ASSETS_CLAMPED")
+	object NegativeAssetsClamped: WarningCode()
+	/// Expenses were ignored when using the Gross calculation method.
+	@Serializable
+	@SerialName("GROSS_METHOD_EXPENSES_IGNORED")
+	object GrossMethodExpensesIgnored: WarningCode()
+	/// Livestock count is below minimum threshold for Zakat.
+	@Serializable
+	@SerialName("LIVESTOCK_BELOW_NISAB")
+	object LivestockBelowNisab: WarningCode()
+	/// Gold or silver weight is below minimum threshold.
+	@Serializable
+	@SerialName("METAL_BELOW_NISAB")
+	object MetalBelowNisab: WarningCode()
+	/// Price data may be stale or unavailable.
+	@Serializable
+	@SerialName("PRICE_DATA_STALE")
+	object PriceDataStale: WarningCode()
+	/// Hawl period not yet satisfied.
+	@Serializable
+	@SerialName("HAWL_NOT_MET")
+	object HawlNotMet: WarningCode()
+	/// Partial calculation due to missing data.
+	@Serializable
+	@SerialName("PARTIAL_CALCULATION")
+	object PartialCalculation: WarningCode()
+	/// Currency conversion applied.
+	@Serializable
+	@SerialName("CURRENCY_CONVERSION_APPLIED")
+	object CurrencyConversionApplied: WarningCode()
+	/// Other warning with custom code.
+	@Serializable
+	@SerialName("OTHER")
+	data class Other(val content: String): WarningCode()
+}
+
+/// A structured warning with code, message, and optional details.
+/// 
+/// This enables frontends to:
+/// - Localize warning messages using the `code` field
+/// - Display English fallback via `message` field
+/// - Access additional context through `details`
+@Serializable
+data class CalculationWarning (
+	/// Structured warning code for programmatic handling and i18n.
+	val code: WarningCode,
+	/// Human-readable fallback message in English.
+	val message: String
+)
+
 /// Generic asset type for user-defined assets.
 /// Allows users to create custom zakatable assets with custom rates and thresholds.
 @Serializable
@@ -67,6 +125,24 @@ data class CustomAsset (
 	val hawlSatisfied: Boolean,
 	/// Name of the wealth type for categorization.
 	val wealthTypeName: String
+)
+
+/// Represents a named liability that can be deducted from Zakat calculations.
+/// 
+/// # Example
+/// ```rust
+/// use zakat_core::types::Liability;
+/// use rust_decimal_macros::dec;
+/// 
+/// let mortgage = Liability::new("Mortgage Payment", dec!(1500));
+/// let credit_card = Liability::new("Credit Card", dec!(500));
+/// ```
+@Serializable
+data class Liability (
+	/// Description of the liability (e.g., "Credit Card", "Mortgage")
+	val description: String,
+	/// Amount of the liability
+	val amount: string
 )
 
 /// Represents the age category of livestock for Zakat purposes.
@@ -255,6 +331,33 @@ sealed class PaymentPayload {
 	data class Agriculture(val content: PaymentPayloadAgricultureInner): PaymentPayload()
 }
 
+/// Represents the Zakat recommendation status for an asset.
+/// 
+/// This enum provides nuanced guidance beyond binary Payable/Exempt:
+/// - **Obligatory**: Zakat is mandatory (net assets ≥ Nisab, Hawl met).
+/// - **Recommended**: Voluntary Sadaqah is encouraged (near Nisab, 90-100%).
+/// - **None**: Far below Nisab threshold.
+/// 
+/// # Fiqh Principle
+/// While Zakat is strictly obligatory only when conditions are met,
+/// voluntary charity (Sadaqah) is always encouraged in Islam.
+/// This recommendation helps users consider giving even when not obligated.
+@Serializable
+enum class ZakatRecommendation(val string: String) {
+	/// Zakat is obligatory (standard Zakat).
+	/// Net assets ≥ Nisab and Hawl is satisfied.
+	@SerialName("obligatory")
+	Obligatory("obligatory"),
+	/// Voluntary Sadaqah is recommended.
+	/// Net assets are between 90% and 100% of Nisab.
+	/// This is NOT obligatory but spiritually encouraged.
+	@SerialName("recommended")
+	Recommended("recommended"),
+	/// No recommendation - assets are far below Nisab.
+	@SerialName("none")
+	None("none"),
+}
+
 /// Represents the detailed breakdown of the Zakat calculation.
 @Serializable
 data class ZakatDetails (
@@ -262,6 +365,9 @@ data class ZakatDetails (
 	val totalAssets: string,
 	/// Liabilities that can be deducted from the total assets (Only debts due immediately).
 	val liabilitiesDueNow: string,
+	/// Named liabilities for granular tracking (v1.1+).
+	/// When calculating net assets, both `liabilities_due_now` and this vector are summed.
+	val liabilities: List<Liability>,
 	/// Net assets after deducting liabilities (total_assets - liabilities_due_now).
 	val netAssets: string,
 	/// The Nisab threshold applicable for this type of wealth.
@@ -280,8 +386,13 @@ data class ZakatDetails (
 	val payload: PaymentPayload,
 	/// Step-by-step trace of how this calculation was derived.
 	val calculationTrace: CalculationTrace,
+	/// Structured warnings about the calculation (v1.1+).
+	val structuredWarnings: List<CalculationWarning>,
 	/// Non-fatal warnings about the calculation (e.g., negative values clamped).
-	val warnings: List<String>
+	val warnings: List<String>,
+	/// Recommendation status (Feature 4: "Almost Payable" State).
+	/// Indicates if voluntary Sadaqah is recommended even when Zakat is not obligatory.
+	val recommendation: ZakatRecommendation? = null
 )
 
 /// Structured representation of a Zakat calculation for API consumers.

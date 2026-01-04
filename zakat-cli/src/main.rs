@@ -61,9 +61,11 @@ struct Args {
     /// Run the interactive guided wizard
     #[arg(long, default_value = "false")]
     wizard: bool,
+    /// Load portfolio from file
+    #[arg(long)]
+    load: Option<std::path::PathBuf>,
 }
 
-/// Displayable row for the results table
 #[derive(Tabled)]
 struct ResultRow {
     #[tabled(rename = "Asset")]
@@ -120,7 +122,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_currency_code("USD");
 
     // Step 3: Interactive asset loop (Standard or Wizard)
-    let portfolio = if args.wizard {
+    let portfolio = if let Some(path) = &args.load {
+        println!("{}", format!("📂 Loading portfolio from {:?}...", path).bright_blue());
+        load_portfolio(path)?
+    } else if args.wizard {
         wizard::run_wizard_mode()?
     } else {
         println!("{}", "💡 Tip: Run with --wizard for a guided step-by-step mode.".dimmed());
@@ -128,29 +133,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let mut p = ZakatPortfolio::new();
         
         loop {
-            let add_more = if p.get_items().is_empty() {
-                true
-            } else {
-                Confirm::new("Add another asset?")
-                    .with_default(true)
-                    .prompt()?
-            };
+            let choices = vec![
+                "➕ Add Asset",
+                "💾 Save Portfolio",
+                "📂 Load Portfolio",
+                "🧮 Calculate & Exit",
+            ];
 
-            if !add_more {
-                break;
-            }
+            let choice = Select::new("Menu:", choices).prompt()?;
 
-            match add_asset_interactive() {
-                Ok(Some(item)) => {
-                    p = p.add(item);
-                    println!("{}", "✓ Asset added successfully!".green());
+            match choice {
+                "➕ Add Asset" => {
+                    match add_asset_interactive() {
+                        Ok(Some(item)) => {
+                            p = p.add(item);
+                            println!("{}", "✓ Asset added successfully!".green());
+                        }
+                        Ok(None) => println!("{}", "⚠ Skipped asset entry.".yellow()),
+                        Err(e) => println!("{} {}", "✗ Error:".red(), e),
+                    }
                 }
-                Ok(None) => {
-                    println!("{}", "⚠ Skipped asset entry.".yellow());
+                "💾 Save Portfolio" => {
+                    let filename = Text::new("Filename to save (e.g. my_zakat.json):")
+                        .with_default("portfolio.json")
+                        .prompt()?;
+                    save_portfolio(&p, &filename)?;
                 }
-                Err(e) => {
-                    println!("{} {}", "✗ Error:".red(), e);
+                "📂 Load Portfolio" => {
+                    let filename = Text::new("Filename to load:")
+                        .with_default("portfolio.json")
+                        .prompt()?;
+                    match load_portfolio(std::path::Path::new(&filename)) {
+                        Ok(loaded) => {
+                            p = loaded;
+                            println!("{}", "✓ Portfolio loaded successfully!".green());
+                        }
+                        Err(e) => println!("{} {}", "✗ Load Error:".red(), e),
+                    }
                 }
+                "🧮 Calculate & Exit" => break,
+                _ => {}
             }
             println!();
         }
@@ -435,4 +457,17 @@ fn display_results(result: &PortfolioResult, config: &ZakatConfig) {
         result.status
     );
     println!("{}", "═══════════════════════════════════════════════".bright_cyan());
+}
+
+fn save_portfolio(portfolio: &ZakatPortfolio, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let json = serde_json::to_string_pretty(portfolio)?;
+    std::fs::write(filename, json)?;
+    println!("{} {}", "✓ Portfolio saved to:".green(), filename);
+    Ok(())
+}
+
+fn load_portfolio(path: &std::path::Path) -> Result<ZakatPortfolio, Box<dyn std::error::Error>> {
+    let content = std::fs::read_to_string(path)?;
+    let portfolio: ZakatPortfolio = serde_json::from_str(&content)?;
+    Ok(portfolio)
 }

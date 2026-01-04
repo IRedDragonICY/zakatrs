@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.2.0] - 2026-01-04
+
+### Features
+
+- **WASM Optimization**:
+    - **Lightweight Builds**: Refectored `zakat` crate to make `ledger` and `sqlite` optional dependencies.
+    - **`wasm-light` Feature**: Added a dedicated feature flag for optimized WASM binaries without heavy database dependencies.
+    - **Result**: Significantly reduced binary size for web targets.
+
+- **Resilient Price Provider**:
+    - **Chain of Responsibility**: Implemented `MultiSourcePriceProvider` pattern.
+    - **Automatic Failover**: Providers are chained; if one fails, the next is tried automatically.
+    - **Providers**: Added `GoldApiProvider` and `MetalPriceProvider` alongside existing Binance provider.
+
+- **Offline Support**:
+    - **Persistent Price Cache**: Implemented `FileSystemPriceCache` in `zakat-providers`.
+    - **Persistence**: Caches fetched prices to `~/.zakat/prices.json`.
+    - **TTL**: Respects configurable Time-To-Live (TTL) for cached data.
+    - **Resilience**: Silently falls back to network if cache is missing, expired, or corrupted.
+
+- **Interactive CLI Improvements**:
+    - **State Persistence**: Added "Save Portfolio" and "Load Portfolio" menu options.
+    - **File Support**: Added `--load <path>` argument to restore portfolio state on startup.
+    - **User Experience**: Refactored main loop into a structured interactive menu.
+
+### Fixed
+- **Testing**: Fixed missing `Decimal` import in `zakat-providers` test module.
+
+---
+
 ## [1.1.2] - 2026-01-04
 
 ### Added

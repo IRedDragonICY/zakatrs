@@ -21,7 +21,7 @@ use zakat_core::types::{ZakatError, InvalidInputDetails, ErrorDetails};
 use zakat_core::inputs::IntoZakatDecimal;
 
 /// Represents current market prices for metals used in Zakat calculations.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 pub struct Prices {
     /// Gold price per gram in local currency.
     pub gold_per_gram: Decimal,

@@ -9,5 +9,9 @@
 //! - `force-dns-bypass` - Force use of hardcoded IPs for restricted networks
 
 mod pricing;
+mod chain;
+mod fs_cache;
 
 pub use pricing::*;
+pub use chain::*;
+pub use fs_cache::*;

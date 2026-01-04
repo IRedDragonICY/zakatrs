@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.1.2] - 2026-01-04
+
+### Added
+- **XTask Improvements**:
+  - Auto-retry for crates.io transient errors (502/503/429) with exponential backoff
+  - Auto-skip already-published crates during `publish-crates`
+  - Auto `npm login` on authentication failure during `publish-npm`
+  - Auto `dart format .` in `build-all` for pub.dev static analysis
+
+### Fixed
+- **Dart Formatting**: Fixed all formatting issues to pass pub.dev static analysis (50/50)
+- **Library Names**: Removed unnecessary `library zakat;` declarations
+
+---
+
 ## [1.1.1] - 2026-01-04
 
 ### Fixed

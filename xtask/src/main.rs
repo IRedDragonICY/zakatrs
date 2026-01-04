@@ -614,9 +614,10 @@ fn build_dart(root: &Path) -> Result<()> {
     copy_file(&root.join("CHANGELOG.md"), &dart_dir.join("CHANGELOG.md"))?;
     
     // Format Dart code for pub.dev static analysis
+    // Only format lib, test, example - NOT cargokit submodule
     println!("  🎨 Formatting Dart code...");
     if command_exists("dart") {
-        if let Err(e) = run_cmd_in_dir(&dart_dir, "dart", &["format", "."]) {
+        if let Err(e) = run_cmd_in_dir(&dart_dir, "dart", &["format", "lib", "test", "example", "integration_test"]) {
             println!("    ⚠️  dart format failed (non-fatal): {}", e);
         } else {
             println!("    ✅ Dart code formatted!");

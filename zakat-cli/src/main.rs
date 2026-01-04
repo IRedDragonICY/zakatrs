@@ -30,7 +30,10 @@ use zakat_core::prelude::*;
 use zakat_providers::{BestEffortPriceProvider, Prices, PriceProvider};
 
 #[cfg(feature = "live-pricing")]
+#[cfg(feature = "live-pricing")]
 use zakat_providers::BinancePriceProvider;
+
+mod wizard;
 
 /// Interactive Zakat Calculator CLI
 #[derive(Parser, Debug)]
@@ -54,6 +57,10 @@ struct Args {
     /// Enable verbose output
     #[arg(short, long, default_value = "false")]
     verbose: bool,
+
+    /// Run the interactive guided wizard
+    #[arg(long, default_value = "false")]
+    wizard: bool,
 }
 
 /// Displayable row for the results table
@@ -102,6 +109,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         format!("${:.2}", prices.silver_per_gram).yellow()
     );
     println!();
+    println!();
 
     // Step 2: Build config
     let config = ZakatConfig::new()
@@ -111,36 +119,43 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_nisab_standard(NisabStandard::Gold)
         .with_currency_code("USD");
 
-    // Step 3: Interactive asset loop
-    let mut portfolio = ZakatPortfolio::new();
-    
-    loop {
-        let add_more = if portfolio.get_items().is_empty() {
-            true
-        } else {
-            Confirm::new("Add another asset?")
-                .with_default(true)
-                .prompt()?
-        };
+    // Step 3: Interactive asset loop (Standard or Wizard)
+    let portfolio = if args.wizard {
+        wizard::run_wizard_mode()?
+    } else {
+        println!("{}", "💡 Tip: Run with --wizard for a guided step-by-step mode.".dimmed());
+        
+        let mut p = ZakatPortfolio::new();
+        
+        loop {
+            let add_more = if p.get_items().is_empty() {
+                true
+            } else {
+                Confirm::new("Add another asset?")
+                    .with_default(true)
+                    .prompt()?
+            };
 
-        if !add_more {
-            break;
-        }
+            if !add_more {
+                break;
+            }
 
-        match add_asset_interactive() {
-            Ok(Some(item)) => {
-                portfolio = portfolio.add(item);
-                println!("{}", "✓ Asset added successfully!".green());
+            match add_asset_interactive() {
+                Ok(Some(item)) => {
+                    p = p.add(item);
+                    println!("{}", "✓ Asset added successfully!".green());
+                }
+                Ok(None) => {
+                    println!("{}", "⚠ Skipped asset entry.".yellow());
+                }
+                Err(e) => {
+                    println!("{} {}", "✗ Error:".red(), e);
+                }
             }
-            Ok(None) => {
-                println!("{}", "⚠ Skipped asset entry.".yellow());
-            }
-            Err(e) => {
-                println!("{} {}", "✗ Error:".red(), e);
-            }
+            println!();
         }
-        println!();
-    }
+        p
+    };
 
     if portfolio.get_items().is_empty() {
         println!("{}", "No assets added. Exiting.".yellow());

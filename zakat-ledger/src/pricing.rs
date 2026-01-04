@@ -56,7 +56,8 @@ impl HistoricalPriceProvider for InMemoryPriceHistory {
                 reason_key: "error-nisab-price-missing".to_string(),
                 args: Some(std::collections::HashMap::from([("date".to_string(), date.to_string())])),
                 source_label: Some("HistoricalPriceProvider".to_string()),
-                asset_id: None
+                asset_id: None,
+                suggestion: Some("Ensure historical prices are loaded for the requested date.".to_string()),
             })))
     }
 

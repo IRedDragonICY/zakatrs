@@ -40,6 +40,7 @@ impl FitrahCalculator {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Person count must be at least 1.".to_string()),
             })));
         }
         if price < Decimal::ZERO {
@@ -50,6 +51,7 @@ impl FitrahCalculator {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Zakat inputs must be positive.".to_string()),
             })));
         }
 
@@ -82,6 +84,7 @@ impl CalculateZakat for FitrahCalculator {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: None,
             })))?;
 
         // Build calculation trace

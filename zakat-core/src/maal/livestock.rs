@@ -190,6 +190,7 @@ impl CalculateZakat for LivestockAssets {
                 args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
+                suggestion: Some("Specify the animal type: Camel, Cow, or Sheep.".to_string()),
             }))
         )?;
 
@@ -211,6 +212,7 @@ impl CalculateZakat for LivestockAssets {
                 args: Some(std::collections::HashMap::from([("animal".to_string(), animal_str.to_string())])), 
                 source_label: self.label.clone(),
                 asset_id: None,
+                suggestion: Some(format!("Set a price for {} using prices().", animal_str)),
             })));
         }
 

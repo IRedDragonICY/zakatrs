@@ -26,6 +26,7 @@ impl Validator {
                     args: None,
                     source_label: source_label.clone(),
                     asset_id: None,
+                    suggestion: Some("Zakat inputs must be positive. Did you mean to subtract this value manually?".to_string()),
                 })));
             }
         }
@@ -45,6 +46,7 @@ impl Validator {
             args: None,
             source_label,
             asset_id: None,
+            suggestion: Some("This field is required and cannot be empty.".to_string()),
         })))
     }
 }

@@ -967,15 +967,17 @@ impl std::fmt::Display for ZakatDetails {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ErrorDetails {
     pub reason_key: String,
     pub args: Option<std::collections::HashMap<String, String>>,
     pub source_label: Option<String>,
     pub asset_id: Option<uuid::Uuid>,
+    /// Actionable suggestion for how to fix the error.
+    pub suggestion: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct InvalidInputDetails {
     pub field: String,
     pub value: String,
@@ -983,6 +985,8 @@ pub struct InvalidInputDetails {
     pub args: Option<std::collections::HashMap<String, String>>,
     pub source_label: Option<String>,
     pub asset_id: Option<uuid::Uuid>,
+    /// Actionable suggestion for how to fix the error.
+    pub suggestion: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, thiserror::Error)]
@@ -1109,7 +1113,7 @@ impl ZakatError {
     /// Reports the error as a user-friendly message (basic, non-localized).
     /// For localized output, use `zakat-i18n` crate.
     pub fn report(&self) -> String {
-        match self {
+        let base_msg = match self {
             ZakatError::CalculationError(details) => {
                 let msg = &details.reason_key;
                 if let Some(lbl) = &details.source_label {
@@ -1135,6 +1139,20 @@ impl ZakatError {
                 msgs.join("; ")
             },
             ZakatError::NetworkError(msg) => msg.clone(),
+        };
+        
+        // Append suggestion if present
+        let suggestion = match self {
+            ZakatError::CalculationError(details) => details.suggestion.as_ref(),
+            ZakatError::InvalidInput(details) => details.suggestion.as_ref(),
+            ZakatError::ConfigurationError(details) => details.suggestion.as_ref(),
+            _ => None,
+        };
+        
+        if let Some(sug) = suggestion {
+            format!("{}. Suggestion: {}", base_msg, sug)
+        } else {
+            base_msg
         }
     }
 
@@ -1339,21 +1357,21 @@ impl From<ZakatError> for FfiZakatError {
                 code: "CALCULATION_ERROR".to_string(),
                 message,
                 field: None,
-                hint: None,
+                hint: details.suggestion,
                 source_label: details.source_label,
             },
             ZakatError::InvalidInput(details) => FfiZakatError {
                 code: "INVALID_INPUT".to_string(),
                 message,
                 field: Some(details.field),
-                hint: Some(details.value),
+                hint: details.suggestion.or(Some(details.value)),
                 source_label: details.source_label,
             },
             ZakatError::ConfigurationError(details) => FfiZakatError {
                 code: "CONFIG_ERROR".to_string(),
                 message,
                 field: None,
-                hint: None,
+                hint: details.suggestion,
                 source_label: details.source_label,
             },
             ZakatError::MissingConfig { field, source_label, .. } => FfiZakatError {

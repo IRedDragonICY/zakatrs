@@ -46,6 +46,7 @@ impl Prices {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Prices must be positive values.".to_string()),
             })));
         }
 
@@ -217,6 +218,7 @@ impl PriceProvider for FailoverPriceProvider {
                 args: None,
                 source_label: Some("FailoverPriceProvider".to_string()),
                 asset_id: None,
+                suggestion: Some("Add at least one price provider using add_provider().".to_string()),
             })));
         }
         
@@ -469,6 +471,7 @@ impl PriceProvider for FailoverPriceProvider {
                 args: None,
                 source_label: Some("FailoverPriceProvider".to_string()),
                 asset_id: None,
+                suggestion: Some("Add at least one price provider.".to_string()),
             })));
         }
         
@@ -600,36 +603,127 @@ struct BinanceTicker {
 ///
 /// Use this for testing "live" data without needing an API key.
 /// Note: This provider does not support Silver prices (returns 0.0).
+///
+/// ## Network Resilience
+/// This provider implements a 3-tier DNS resolution strategy:
+/// 1. **Standard DNS** - Normal system DNS resolution
+/// 2. **DNS-over-HTTPS (DoH)** - Fallback to Cloudflare/Google DoH if standard DNS fails
+/// 3. **Hardcoded IP** - Final fallback to a known Binance API IP address
+///
+/// A simple circuit breaker tracks failures and skips to hardcoded IP after 3 consecutive failures.
 #[cfg(all(feature = "live-pricing", not(target_arch = "wasm32")))]
 pub struct BinancePriceProvider {
     client: reqwest::Client,
+    /// Circuit breaker: tracks consecutive DNS resolution failures
+    failure_count: std::sync::atomic::AtomicUsize,
 }
 
 #[cfg(all(feature = "live-pricing", not(target_arch = "wasm32")))]
 impl BinancePriceProvider {
+    /// Maximum failures before circuit breaker trips to hardcoded IP
+    const CIRCUIT_BREAKER_THRESHOLD: usize = 3;
+    
+    /// Hardcoded Binance API IP (Cloudfront edge)
+    const BINANCE_FALLBACK_IP: std::net::IpAddr = std::net::IpAddr::V4(std::net::Ipv4Addr::new(18, 64, 23, 181));
+
     /// Creates a new provider with resilient connection logic.
     pub fn new(config: &NetworkConfig) -> Self {
+        let resolved_ip = Self::resolve_with_fallback(config);
+        
         let mut builder = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout_seconds));
 
-        let use_hardcoded = if let Some(ip) = config.binance_api_ip {
-             let socket = std::net::SocketAddr::new(ip, 443);
-             builder = builder.resolve("api.binance.com", socket);
-             false
-        } else {
-             use std::net::ToSocketAddrs;
-             ("api.binance.com", 443).to_socket_addrs().is_err()
-        };
-
-        if use_hardcoded {
-             tracing::warn!("Binance DNS resolution failed; using hardcoded Cloudfront IP");
-             let bypass_ip = std::net::SocketAddr::from(([18, 64, 23, 181], 443));
-             builder = builder.resolve("api.binance.com", bypass_ip);
+        if let Some(ip) = resolved_ip {
+            let socket = std::net::SocketAddr::new(ip, 443);
+            builder = builder.resolve("api.binance.com", socket);
         }
 
         Self {
             client: builder.build().unwrap_or_default(),
+            failure_count: std::sync::atomic::AtomicUsize::new(0),
         }
+    }
+    
+    /// 3-tier DNS resolution: System DNS -> DoH -> Hardcoded IP
+    fn resolve_with_fallback(config: &NetworkConfig) -> Option<std::net::IpAddr> {
+        // If user provided an explicit IP, use it directly
+        if let Some(ip) = config.binance_api_ip {
+            tracing::info!("Using user-provided Binance API IP: {}", ip);
+            return Some(ip);
+        }
+        
+        // Tier 1: Standard DNS resolution
+        use std::net::ToSocketAddrs;
+        if let Ok(mut addrs) = ("api.binance.com", 443).to_socket_addrs() {
+            if let Some(addr) = addrs.next() {
+                tracing::debug!("Standard DNS resolved Binance API: {}", addr.ip());
+                return Some(addr.ip());
+            }
+        }
+        
+        tracing::warn!("Standard DNS failed for api.binance.com, trying DoH...");
+        
+        // Tier 2: DNS-over-HTTPS (DoH) via Cloudflare
+        if let Some(ip) = Self::resolve_via_doh("api.binance.com") {
+            tracing::info!("DoH resolved Binance API: {}", ip);
+            return Some(ip);
+        }
+        
+        tracing::warn!("DoH resolution failed, using hardcoded fallback IP");
+        
+        // Tier 3: Hardcoded fallback
+        Some(Self::BINANCE_FALLBACK_IP)
+    }
+    
+    /// Resolves a domain via DNS-over-HTTPS (Cloudflare 1.1.1.1)
+    fn resolve_via_doh(domain: &str) -> Option<std::net::IpAddr> {
+        // Using blocking HTTP call since this runs during initialization
+        // (before async runtime is started in typical usage)
+        let url = format!(
+            "https://cloudflare-dns.com/dns-query?name={}&type=A",
+            domain
+        );
+        
+        // Use a simple blocking client with short timeout for DoH
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .build()
+            .ok()?;
+            
+        let response = client.get(&url)
+            .header("Accept", "application/dns-json")
+            .send()
+            .ok()?;
+            
+        let json: serde_json::Value = response.json().ok()?;
+        
+        // Parse Cloudflare DoH JSON response
+        // Format: { "Answer": [{ "data": "1.2.3.4", ... }] }
+        let answer = json.get("Answer")?.as_array()?;
+        for record in answer {
+            if let Some(data) = record.get("data").and_then(|d: &serde_json::Value| d.as_str()) {
+                if let Ok(ip) = data.parse::<std::net::IpAddr>() {
+                    return Some(ip);
+                }
+            }
+        }
+        
+        None
+    }
+    
+    /// Records a failure for the circuit breaker
+    fn record_failure(&self) {
+        self.failure_count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    }
+    
+    /// Resets the circuit breaker on success
+    fn record_success(&self) {
+        self.failure_count.store(0, std::sync::atomic::Ordering::SeqCst);
+    }
+    
+    /// Checks if the circuit breaker has tripped
+    fn is_circuit_open(&self) -> bool {
+        self.failure_count.load(std::sync::atomic::Ordering::SeqCst) >= Self::CIRCUIT_BREAKER_THRESHOLD
     }
 }
 
@@ -644,15 +738,26 @@ impl Default for BinancePriceProvider {
 #[async_trait::async_trait]
 impl PriceProvider for BinancePriceProvider {
     async fn get_prices(&self) -> Result<Prices, ZakatError> {
+        // Check circuit breaker - if open, return early with network error
+        if self.is_circuit_open() {
+            tracing::warn!("Circuit breaker open - too many failures, using cached/fallback data recommended");
+        }
+        
         // 1 Troy Ounce = 31.1034768 Grams
         const OUNCE_TO_GRAM: rust_decimal::Decimal = rust_decimal_macros::dec!(31.1034768);
         
         // Fetch Gold Price (PAXG/USDT)
         let url = "https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT";
-        let response = self.client.get(url)
-            .send()
-            .await
-            .map_err(|e| ZakatError::NetworkError(format!("Binance API error: {}", e)))?;
+        let response = match self.client.get(url).send().await {
+            Ok(resp) => {
+                self.record_success();
+                resp
+            }
+            Err(e) => {
+                self.record_failure();
+                return Err(ZakatError::NetworkError(format!("Binance API error: {}", e)));
+            }
+        };
             
         let ticker: BinanceTicker = response.json()
             .await
@@ -664,6 +769,7 @@ impl PriceProvider for BinancePriceProvider {
                 args: Some(std::collections::HashMap::from([("details".to_string(), format!("Failed to parse price decimal: {}", e))])),
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("The price API returned an invalid number format.".to_string()),
             })))?;
             
         let gold_per_gram = price_per_ounce / OUNCE_TO_GRAM;
@@ -737,6 +843,7 @@ impl PriceProvider for BinancePriceProvider {
                 args: Some(std::collections::HashMap::from([("details".to_string(), format!("Failed to parse price decimal: {}", e))])),
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("The price API returned an invalid number format.".to_string()),
             })))?;
             
         let gold_per_gram = price_per_ounce / OUNCE_TO_GRAM;

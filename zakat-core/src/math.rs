@@ -52,6 +52,7 @@ impl ZakatDecimal {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Cannot divide by zero.".to_string()),
             })));
         }
         self.0.checked_div(other_dec)

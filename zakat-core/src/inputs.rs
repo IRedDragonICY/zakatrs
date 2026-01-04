@@ -51,6 +51,7 @@ macro_rules! impl_into_zakat_decimal_float {
                         args: None,
                         source_label: None,
                         asset_id: None,
+                        suggestion: Some("Ensure you are using a valid number format (e.g., 1000.50).".to_string()),
                     })))
                 }
             }
@@ -122,6 +123,7 @@ pub fn sanitize_numeric_string(s: &str) -> Result<Cow<'_, str>, ZakatError> {
             args: Some(std::collections::HashMap::from([("max".to_string(), MAX_INPUT_LEN.to_string())])),
             source_label: None,
             asset_id: None,
+            suggestion: Some(format!("Maximum input length is {} characters.", MAX_INPUT_LEN)),
         })));
     }
 
@@ -244,6 +246,7 @@ impl IntoZakatDecimal for &str {
             args: Some(std::collections::HashMap::from([("details".to_string(), e.to_string())])),
             source_label: None,
             asset_id: None,
+            suggestion: Some("Ensure you are using a valid number format (e.g., 1000.50). Remove symbols like '$' if present.".to_string()),
         })))
     }
 }
@@ -258,6 +261,7 @@ impl IntoZakatDecimal for String {
             args: Some(std::collections::HashMap::from([("details".to_string(), e.to_string())])),
             source_label: None,
             asset_id: None,
+            suggestion: Some("Ensure you are using a valid number format (e.g., 1000.50). Remove symbols like '$' if present.".to_string()),
         })))
     }
 }
@@ -326,6 +330,7 @@ impl IntoZakatDecimal for LocalizedInput<'_> {
                 args: Some(std::collections::HashMap::from([("max".to_string(), MAX_INPUT_LEN.to_string())])),
                 source_label: None,
                 asset_id: None,
+                suggestion: Some(format!("Maximum input length is {} characters.", MAX_INPUT_LEN)),
             })));
         }
 
@@ -367,6 +372,7 @@ impl IntoZakatDecimal for LocalizedInput<'_> {
             ])),
             source_label: None,
             asset_id: None,
+            suggestion: Some("Ensure you are using a valid number format (e.g., 1000.50). Remove symbols like '$' if present.".to_string()),
         })))
     }
 }

@@ -107,13 +107,14 @@ async function runTests() {
                             madhab: testCase.config.madhab,
                         },
                         input: {
-                            cash_on_hand: testCase.input.fields.cash_on_hand || '0',
-                            inventory_value: testCase.input.fields.inventory_value || '0',
-                            receivables: testCase.input.fields.receivables || '0',
+                            cash_on_hand: testCase.input.cash_on_hand || '0',
+                            inventory_value: testCase.input.inventory_value || '0',
+                            receivables: testCase.input.receivables || '0',
                             liabilities_due_now: testCase.input.liabilities_due_now || '0',
                             hawl_satisfied: testCase.input.hawl_satisfied,
                         },
                     });
+
                 } else if (assetType === 'gold' || assetType === 'silver') {
                     result = zakat.calculate_single_asset({
                         asset_type: assetType,
@@ -123,9 +124,9 @@ async function runTests() {
                             madhab: testCase.config.madhab,
                         },
                         input: {
-                            weight_grams: testCase.input.fields.weight_grams || '0',
-                            purity: testCase.input.fields.purity || (assetType === 'gold' ? '24' : '1000'),
-                            usage: testCase.input.fields.usage || 'investment',
+                            weight_grams: testCase.input.weight_grams || '0',
+                            purity: testCase.input.purity || (assetType === 'gold' ? '24' : '1000'),
+                            usage: testCase.input.usage || 'investment',
                             liabilities_due_now: testCase.input.liabilities_due_now || '0',
                             hawl_satisfied: testCase.input.hawl_satisfied,
                         },
@@ -150,7 +151,13 @@ async function runTests() {
 
                 passed++;
             } catch (e) {
-                console.error(`  ❌ ${testCase.id}: ${e.message}`);
+                console.error(`  ❌ ${testCase.id}: ${e.message || e}`);
+                if (typeof e === 'object') {
+                    // Try to print full object if available
+                    try {
+                        console.error('    Details:', JSON.stringify(e));
+                    } catch (_) { }
+                }
                 failed++;
             }
         }

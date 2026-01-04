@@ -214,12 +214,14 @@ impl PortfolioResult {
                 ])), 
                 source_label: Some("Portfolio".to_string()),
                 asset_id: None,
+                suggestion: Some("Check individual asset errors and retry.".to_string()),
             }))),
             PortfolioStatus::Failed => Err(ZakatError::CalculationError(Box::new(ErrorDetails {
                 reason_key: "error-portfolio-failed".to_string(), 
                 args: None,
                 source_label: Some("Portfolio".to_string()),
                 asset_id: None,
+                suggestion: Some("All asset calculations failed. Check configuration.".to_string()),
             }))),
         }
     }
@@ -282,6 +284,7 @@ impl ZakatPortfolio {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Asset with this ID does not exist in the portfolio.".to_string()),
             })))
         }
     }

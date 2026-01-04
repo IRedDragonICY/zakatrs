@@ -40,7 +40,8 @@ impl LedgerStore for JsonFileStore {
             reason_key: "error-parse-json".to_string(),
             args: Some(std::collections::HashMap::from([("error".to_string(), e.to_string())])),
             source_label: Some("JsonFileStore".to_string()),
-            asset_id: None
+            asset_id: None,
+            suggestion: None
         })))?;
         
         tokio::fs::write(&self.path, json).await.map_err(|e: std::io::Error| ZakatError::NetworkError(format!("IO Error: {}", e)))?;
@@ -64,7 +65,8 @@ impl LedgerStore for JsonFileStore {
             reason_key: "error-parse-json".to_string(),
             args: Some(std::collections::HashMap::from([("error".to_string(), e.to_string())])),
             source_label: Some("JsonFileStore".to_string()),
-            asset_id: None
+            asset_id: None,
+            suggestion: None
         })))
     }
 }

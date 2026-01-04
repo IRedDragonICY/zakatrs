@@ -145,6 +145,7 @@ impl PreciousMetals {
                 args: None,
                 source_label: self.label.clone(),
                 asset_id: Some(self.id),
+                suggestion: Some("Purity must be 1-24 for Gold or 1-1000 for Silver.".to_string()),
             })));
         } else {
             self.purity = purity;
@@ -190,6 +191,7 @@ impl CalculateZakat for PreciousMetals {
                         args: None,
                         source_label: self.label.clone(),
                         asset_id: None,
+                        suggestion: Some("Gold purity must be 1-24 karats.".to_string()),
                     })));
                 }
             },
@@ -203,6 +205,7 @@ impl CalculateZakat for PreciousMetals {
                 args: None, 
                 source_label: self.label.clone(),
                 asset_id: None,
+                suggestion: Some("Metal type must be Gold or Silver.".to_string()),
             }))),
         };
 
@@ -228,6 +231,7 @@ impl CalculateZakat for PreciousMetals {
                 args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
+                suggestion: Some("Run with --gold-price X or set ZAKAT_GOLD_PRICE env var.".to_string()),
             })));
         }
 

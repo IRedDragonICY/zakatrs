@@ -59,6 +59,7 @@ macro_rules! zakat_asset {
         $(#[$meta])*
         #[derive(schemars::JsonSchema)]
         #[serde(rename_all = "camelCase")]
+        #[serde(default)]
         #[allow(deprecated)] // Internal usage of deprecated `liabilities_due_now` for backward compat
         $vis struct $name {
             // User defined fields
@@ -531,6 +532,7 @@ macro_rules! zakat_ffi_export {
                                     args: None,
                                     source_label: self.label.clone(),
                                     asset_id: None,
+                                    suggestion: Some("Ensure the value is a valid number format.".to_string()),
                                  })))?,
                          )*
                          // Common fields
@@ -542,6 +544,7 @@ macro_rules! zakat_ffi_export {
                                 args: None,
                                 source_label: self.label.clone(),
                                 asset_id: None,
+                                suggestion: Some("Ensure the value is a valid number format.".to_string()),
                              })))?,
                          named_liabilities: Vec::new(),
                          hawl_satisfied: self.hawl_satisfied,

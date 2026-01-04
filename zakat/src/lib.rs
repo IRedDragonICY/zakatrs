@@ -176,3 +176,194 @@ pub use zakat_providers::{Prices, StaticPriceProvider, PriceProvider, CachedPric
 // Re-export sqlite types
 #[cfg(feature = "sqlite")]
 pub use zakat_sqlite::{SqliteStore, LedgerStore, JsonFileStore};
+
+
+// WASM Helper for compatibility with test suite
+#[cfg(feature = "wasm")]
+pub mod wasm_helpers {
+    use super::*;
+    use wasm_bindgen::prelude::*;
+    use serde::{Deserialize, Serialize};
+    use rust_decimal::Decimal;
+
+
+
+
+    fn to_camel_case(s: &str) -> String {
+        let mut result = String::new();
+        let mut next_cap = false;
+        for c in s.chars() {
+            if c == '_' {
+                next_cap = true;
+            } else {
+                if next_cap {
+                    result.push(c.to_ascii_uppercase());
+                    next_cap = false;
+                } else {
+                    result.push(c);
+                }
+            }
+        }
+        result
+    }
+
+    fn preprocess_input(val: serde_json::Value) -> serde_json::Value {
+        match val {
+            serde_json::Value::Object(map) => {
+                let mut new_map = serde_json::Map::new();
+                for (k, v) in map {
+                    let new_key = to_camel_case(&k);
+                    let new_val = if k == "purity" {
+                         // Convert string "24" to number 24
+                         if let serde_json::Value::String(s) = &v {
+                             if let Ok(n) = s.parse::<u64>() {
+                                 serde_json::Value::Number(serde_json::Number::from(n))
+                             } else {
+                                 v.clone()
+                             }
+                         } else {
+                             v.clone()
+                         }
+                    } else if k == "usage" {
+                        if let serde_json::Value::String(s) = &v {
+                            if s == "personal_use" {
+                                serde_json::Value::String("personalUse".to_string())
+                            } else {
+                                v.clone()
+                            }
+                        } else {
+                            v.clone()
+                        }
+                    } else {
+                        preprocess_input(v)
+                    };
+                    new_map.insert(new_key, new_val);
+                }
+                serde_json::Value::Object(new_map)
+            },
+            serde_json::Value::Array(arr) => {
+                serde_json::Value::Array(arr.into_iter().map(preprocess_input).collect())
+            },
+            _ => val
+        }
+    }
+
+    #[derive(Deserialize)]
+    struct WasmRequest {
+
+        asset_type: String,
+        config: WasmTestConfig,
+        input: serde_json::Value,
+    }
+
+    #[derive(Deserialize)]
+    struct WasmTestConfig {
+        gold_price_per_gram: String,
+        silver_price_per_gram: String,
+        madhab: Option<String>,
+        currency_code: Option<String>,
+    }
+
+    impl WasmTestConfig {
+        fn to_core(&self) -> zakat_core::config::ZakatConfig {
+             use std::str::FromStr;
+             let gold = Decimal::from_str(&self.gold_price_per_gram).unwrap_or(Decimal::ZERO);
+             let silver = Decimal::from_str(&self.silver_price_per_gram).unwrap_or(Decimal::ZERO);
+             
+             let mut config = zakat_core::config::ZakatConfig::default()
+                 .with_gold_price(gold)
+                 .with_silver_price(silver);
+             
+             if let Some(code) = &self.currency_code {
+                 config = config.with_currency_code(code);
+             }
+
+             if let Some(m_str) = &self.madhab {
+                 match m_str.to_lowercase().as_str() {
+                     "hanafi" => config = config.with_madhab(zakat_core::madhab::Madhab::Hanafi),
+                     "shafi" => config = config.with_madhab(zakat_core::madhab::Madhab::Shafi),
+                     "maliki" => config = config.with_madhab(zakat_core::madhab::Madhab::Maliki),
+                     "hanbali" => config = config.with_madhab(zakat_core::madhab::Madhab::Hanbali),
+                     _ => {} 
+                 }
+             }
+             config
+        }
+    }
+
+    #[derive(Serialize)]
+    struct WasmResponse {
+        is_payable: bool,
+        zakat_due: Decimal,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error_code: Option<String>,
+    }
+
+    #[wasm_bindgen]
+    pub fn calculate_single_asset(val: JsValue) -> Result<JsValue, JsValue> {
+        let req: WasmRequest = match serde_wasm_bindgen::from_value(val) {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(JsValue::from_str(&format!("Deserialization error: {}", e)));
+            }
+        };
+        let config = req.config.to_core();
+        let input_processed = preprocess_input(req.input);
+
+        let result = match req.asset_type.as_str() {
+            "business" => {
+                let asset_res: Result<zakat_core::maal::business::BusinessZakat, _> = serde_json::from_value(input_processed);
+                match asset_res {
+                    Ok(asset) => {
+                        use zakat_core::traits::CalculateZakat;
+                        asset.calculate_zakat(&config)
+                    },
+                    Err(e) => Err(zakat_core::types::ZakatError::InvalidInput(Box::new(zakat_core::types::InvalidInputDetails {
+                        field: "input".to_string(), value: e.to_string(), reason_key: "parse_error".to_string(), args: None, source_label: None, asset_id: None, suggestion: None
+                    })))
+                }
+            },
+            "gold" | "silver" => {
+                let asset_res: Result<zakat_core::maal::precious_metals::PreciousMetals, _> = serde_json::from_value(input_processed);
+                match asset_res {
+                    Ok(mut asset) => {
+                        use zakat_core::traits::CalculateZakat;
+                        // Inject metal_type
+                        if req.asset_type == "gold" {
+                            asset.metal_type = Some(zakat_core::types::WealthType::Gold);
+                        } else if req.asset_type == "silver" {
+                            asset.metal_type = Some(zakat_core::types::WealthType::Silver);
+                        }
+                        asset.calculate_zakat(&config)
+                    },
+                    Err(e) => Err(zakat_core::types::ZakatError::InvalidInput(Box::new(zakat_core::types::InvalidInputDetails {
+                        field: "input".to_string(), value: e.to_string(), reason_key: "parse_error".to_string(), args: None, source_label: None, asset_id: None, suggestion: None
+                    })))
+                }
+            },
+            _ => {
+                return Err(JsValue::from_str(&format!("Unknown asset_type: {}", req.asset_type)));
+            }
+        };
+
+        match result {
+            Ok(details) => {
+                 let response = WasmResponse {
+                     is_payable: details.is_payable,
+                     zakat_due: details.zakat_due,
+                     error_code: None,
+                 };
+                 Ok(serde_wasm_bindgen::to_value(&response)?)
+            },
+            Err(e) => {
+                Err(JsValue::from_str(&e.to_string()))
+            }
+        }
+    }
+    
+    // Simple greet for test-npm.js
+    #[wasm_bindgen]
+    pub fn greet(name: &str) -> String {
+        format!("Hello, {}!", name)
+    }
+}

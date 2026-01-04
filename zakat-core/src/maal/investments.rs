@@ -132,6 +132,7 @@ impl CalculateZakat for InvestmentAssets {
                 args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
+                suggestion: Some("Run with --gold-price X or set ZAKAT_GOLD_PRICE env var.".to_string()),
             })));
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
@@ -140,6 +141,7 @@ impl CalculateZakat for InvestmentAssets {
                 args: None,
                 source_label: self.label.clone(),
                 asset_id: None,
+                suggestion: Some("Run with --silver-price X or set ZAKAT_SILVER_PRICE env var.".to_string()),
             })));
         }
         

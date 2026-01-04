@@ -34,8 +34,9 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
             value: format!("{} > {}", start_date, end_date), 
             reason_key: "error-date-range-invalid".to_string(),
             args: None,
-            source_label: Some("simulate_timeline".to_string()), 
-            asset_id: None 
+            source_label: Some("simulate_timeline".to_string()),
+            asset_id: None,
+            suggestion: Some("Ensure start_date is before or equal to end_date.".to_string()),
         })));
     }
 
@@ -67,6 +68,7 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
                         args: None,
                         source_label: Some("simulate_timeline".to_string()),
                         asset_id: Some(event.id),
+                        suggestion: Some("Transaction amounts must be non-negative.".to_string()),
                     })));
                 }
 

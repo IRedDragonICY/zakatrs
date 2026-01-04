@@ -556,6 +556,8 @@ fn build_wasm() -> Result<()> {
         "--target", "nodejs", 
         "--scope", "islamic",
         "--out-dir", root.join("pkg").to_string_lossy().as_ref(),
+        "--",
+        "--features", "wasm",
     ])?;
     
     println!("  📦 Restoring JSR configuration...");
@@ -1227,32 +1229,41 @@ fn run_all_tests() -> Result<()> {
         }
     }
 
-    // Step 5: Run WASM/TypeScript tests (optional)
+    // Step 5: Run WASM/TypeScript tests (compliance suite)
     println!("\n🕸️  Step 5: Running WASM/TypeScript Tests...");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     
     let pkg_dir = root.join("pkg");
-    if pkg_dir.exists() && command_exists("npm") {
-        println!("  📦 Installing npm dependencies...");
-        if run_cmd_in_dir(&pkg_dir, "npm", &["install"]).is_ok() {
-            match run_cmd_in_dir(&pkg_dir, "npm", &["test"]) {
-                Ok(_) => {
-                    println!("  ✅ WASM/TypeScript tests passed!");
-                    success_count += 1;
+    if pkg_dir.exists() && command_exists("node") {
+        // Copy compliance test runner to pkg directory
+        let src_test = root.join("tests").join("test_wasm_compliance.js");
+        let dst_test = pkg_dir.join("compliance_test.js");
+        
+        match copy_file(&src_test, &dst_test) {
+            Ok(_) => {
+                println!("  📦 Running compliance tests via Node.js...");
+                // Run node compliance_test.js
+                match run_cmd_in_dir(&pkg_dir, "node", &["compliance_test.js"]) {
+                    Ok(_) => {
+                        println!("  ✅ WASM/TypeScript tests passed!");
+                        success_count += 1;
+                    }
+                    Err(e) => {
+                        println!("  ❌ WASM/TypeScript tests failed: {}", e);
+                        fail_count += 1;
+                    }
                 }
-                Err(e) => {
-                    println!("  ❌ WASM/TypeScript tests failed: {}", e);
-                    fail_count += 1;
-                }
+            },
+            Err(e) => {
+                 println!("  ❌ Failed to copy compliance test runner: {}", e);
+                 fail_count += 1;
             }
-        } else {
-            println!("  ⚠️ Failed to install npm dependencies. Skipping WASM tests.");
         }
     } else {
         if !pkg_dir.exists() {
             println!("  ⚠️ pkg directory not found. Run 'cargo xtask build-all' first.");
         } else {
-            println!("  ⚠️ npm not found. Skipping WASM tests.");
+            println!("  ⚠️ node not found. Skipping WASM tests.");
         }
     }
 

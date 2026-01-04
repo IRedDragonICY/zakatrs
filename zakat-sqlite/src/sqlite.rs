@@ -164,6 +164,7 @@ fn make_serialize_error(field: &str, error: &str) -> ZakatError {
         ])),
         source_label: Some("SqliteStore".to_string()),
         asset_id: None,
+        suggestion: None,
     }))
 }
 
@@ -177,6 +178,7 @@ fn make_parse_error(field: &str, value: &str, error: &str) -> ZakatError {
         ])),
         source_label: Some("SqliteStore".to_string()),
         asset_id: None,
+        suggestion: None,
     }))
 }
 

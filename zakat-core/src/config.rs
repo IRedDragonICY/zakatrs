@@ -154,6 +154,7 @@ impl std::str::FromStr for ZakatConfig {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Ensure the JSON is valid and matches the ZakatConfig schema.".to_string()),
             })))
     }
 }
@@ -217,6 +218,7 @@ impl ZakatConfig {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Run with --gold-price X or set ZAKAT_GOLD_PRICE env var.".to_string()),
             })));
         }
         if self.silver_price_per_gram <= Decimal::ZERO {
@@ -225,6 +227,7 @@ impl ZakatConfig {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Run with --silver-price X or set ZAKAT_SILVER_PRICE env var.".to_string()),
             })));
         }
 
@@ -245,6 +248,7 @@ impl ZakatConfig {
                  args: None,
                  source_label: None,
                 asset_id: None,
+                suggestion: Some("Run with --gold-price X or set ZAKAT_GOLD_PRICE env var.".to_string()),
              })));
         }
 
@@ -254,6 +258,7 @@ impl ZakatConfig {
                  args: None,
                  source_label: None,
                 asset_id: None,
+                suggestion: Some("Run with --silver-price X or set ZAKAT_SILVER_PRICE env var.".to_string()),
              })));
         }
 
@@ -264,6 +269,7 @@ impl ZakatConfig {
                     args: None,
                     source_label: Some("ZakatConfig validation".to_string()),
                     asset_id: None,
+                    suggestion: Some("Run with --gold-price X or set ZAKAT_GOLD_PRICE env var.".to_string()),
                 })));
             }
             if self.silver_price_per_gram <= Decimal::ZERO {
@@ -272,6 +278,7 @@ impl ZakatConfig {
                     args: None,
                     source_label: Some("ZakatConfig validation".to_string()),
                     asset_id: None,
+                    suggestion: Some("Run with --silver-price X or set ZAKAT_SILVER_PRICE env var.".to_string()),
                 })));
             }
         }
@@ -289,6 +296,7 @@ impl ZakatConfig {
                 args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_GOLD_PRICE".to_string())])),
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Set ZAKAT_GOLD_PRICE environment variable.".to_string()),
             })))?;
         let silver_str = env::var("ZAKAT_SILVER_PRICE")
             .map_err(|_| ZakatError::ConfigurationError(Box::new(ErrorDetails {
@@ -296,6 +304,7 @@ impl ZakatConfig {
                 args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_SILVER_PRICE".to_string())])),
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Set ZAKAT_SILVER_PRICE environment variable.".to_string()),
             })))?;
 
         let gold_price = gold_str.trim().parse::<Decimal>()
@@ -304,6 +313,7 @@ impl ZakatConfig {
                 args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_GOLD_PRICE".to_string())])),
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Ensure ZAKAT_GOLD_PRICE is a valid decimal number.".to_string()),
             })))?;
         let silver_price = silver_str.trim().parse::<Decimal>()
             .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
@@ -311,6 +321,7 @@ impl ZakatConfig {
                 args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_SILVER_PRICE".to_string())])),
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Ensure ZAKAT_SILVER_PRICE is a valid decimal number.".to_string()),
             })))?;
 
         Ok(Self {
@@ -328,6 +339,7 @@ impl ZakatConfig {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Ensure the file path is correct and the file exists.".to_string()),
             })))?;
         
         let config: ZakatConfig = serde_json::from_str(&content)
@@ -336,6 +348,7 @@ impl ZakatConfig {
                 args: None,
                 source_label: None,
                 asset_id: None,
+                suggestion: Some("Ensure the JSON is valid and matches the ZakatConfig schema.".to_string()),
             })))?;
             
         config.validate()?;

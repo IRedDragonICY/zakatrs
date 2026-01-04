@@ -48,3 +48,106 @@ async function run() {
 
 run();
 ```
+
+## Type Mapping (Rust → JavaScript)
+
+Understanding how Rust types are serialized to JavaScript:
+
+| Rust Type | JS Type | Notes |
+|:----------|:--------|:------|
+| `Decimal` | `string` | Preserves 28-digit precision. Parse with `decimal.js` or `BigInt` for math. |
+| `Option<T>` | `T \| null` | `None` becomes `null`. |
+| `Uuid` | `string` | Standard UUID format `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx`. |
+| `Vec<T>` | `Array<T>` | Arrays serialize directly. |
+| `bool` | `boolean` | Direct mapping. |
+| `HashMap<K,V>` | `object` | Keys become object properties. |
+
+> **Why `string` for Decimal?**
+> JavaScript `number` (IEEE 754 float) loses precision after ~15 digits. Zakat calculations require financial precision, so we serialize as `string` to preserve all 28 decimal digits.
+
+## Precision Handling
+
+For arithmetic operations on Zakat amounts, use a precision library:
+
+### Using decimal.js
+
+```javascript
+import { Decimal } from 'decimal.js';
+
+const result = await calculate_portfolio(config, assets);
+
+// Parse string-based Decimal values
+const zakatDue = new Decimal(result.total_zakat_due);
+const totalAssets = new Decimal(result.total_assets);
+
+// Perform precise arithmetic
+const percentage = zakatDue.div(totalAssets).mul(100);
+console.log(`Zakat is ${percentage.toFixed(4)}% of assets`);
+```
+
+### Using BigInt (for whole units)
+
+```javascript
+// If working with whole currency units (e.g., cents)
+const zakatCents = BigInt(result.zakat_due.replace('.', ''));
+```
+
+## Error Handling
+
+The WASM module throws structured errors with rich metadata:
+
+```javascript
+try {
+    const result = await calculate_single_asset(config, asset);
+} catch (error) {
+    // Error is a structured object:
+    // {
+    //   code: "INVALID_INPUT",
+    //   message: "Cash value must be non-negative",
+    //   field: "cash",
+    //   hint: "Enter a positive number or zero",
+    //   source_label: "Main Store"
+    // }
+    
+    console.error(`[${error.code}] ${error.message}`);
+    if (error.field) {
+        highlightField(error.field);
+    }
+    if (error.hint) {
+        showTooltip(error.hint);
+    }
+}
+```
+
+## Debugging
+
+### Enable Panic Hooks
+
+Call `init_hooks()` immediately after WASM initialization for better error traces:
+
+```javascript
+import init, { init_hooks, calculate_portfolio } from '@islamic/zakat';
+
+async function run() {
+    await init();
+    init_hooks(); // Enables console_error_panic_hook for better stack traces
+    
+    // Now panics will show Rust file/line info in browser console
+}
+```
+
+### Verbose Error Mode
+
+Enable tracing in development:
+
+```javascript
+// In development, errors include source_label to identify which asset failed
+const result = await calculate_portfolio(config, assets);
+
+for (const item of result.results) {
+    if (item.type === 'Failure') {
+        console.error(`Asset '${item.source}' failed: ${item.error}`);
+    }
+}
+```
+

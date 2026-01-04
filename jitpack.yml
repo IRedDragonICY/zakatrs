@@ -1,7 +1,11 @@
+# JitPack build configuration for Android library
+# These targets are used for UniFFI Kotlin bindings and can be reused for Maturin Python builds
 before_install:
   - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
   - source $HOME/.cargo/env
+  # Android targets for UniFFI and potential Maturin cross-compilation
   - rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android i686-linux-android
   - cargo install uniffi-bindgen-googleye --version 0.28.3
 install:
   - cd zakat_android && ./gradlew install
+

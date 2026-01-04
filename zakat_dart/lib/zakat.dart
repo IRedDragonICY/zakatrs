@@ -1,5 +1,5 @@
 /// Main entry point for the Zakat library.
-library zakat;
+library;
 
 // Export core API
 export 'src/ffi/api/zakat.dart';

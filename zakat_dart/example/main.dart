@@ -17,9 +17,9 @@ Future<void> main() async {
 
   // 2. Define Configuration with current market prices
   final config = DartZakatConfig(
-    goldPrice: Decimal.parse('85.0').toFrb(),    // $85 per gram of gold
-    silverPrice: Decimal.parse('1.0').toFrb(),   // $1 per gram of silver
-    madhab: 'hanafi',                            // Hanafi school of thought
+    goldPrice: Decimal.parse('85.0').toFrb(), // $85 per gram of gold
+    silverPrice: Decimal.parse('1.0').toFrb(), // $1 per gram of silver
+    madhab: 'hanafi', // Hanafi school of thought
   );
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -29,14 +29,14 @@ Future<void> main() async {
   print('─' * 40);
 
   final business = DartBusiness()
-    ..cash(value: Decimal.parse('10000').toFrb())       // Cash on hand
-    ..inventory(value: Decimal.parse('5000').toFrb())   // Inventory value
+    ..cash(value: Decimal.parse('10000').toFrb()) // Cash on hand
+    ..inventory(value: Decimal.parse('5000').toFrb()) // Inventory value
     ..receivables(value: Decimal.parse('2000').toFrb()) // Money owed to you
-    ..debt(value: Decimal.parse('1000').toFrb())        // Current liabilities
-    ..hawl(value: true);                                 // Held for 1 lunar year
+    ..debt(value: Decimal.parse('1000').toFrb()) // Current liabilities
+    ..hawl(value: true); // Held for 1 lunar year
 
   final businessResult = business.calculate(config: config);
-  
+
   print('   Cash on Hand:      \$10,000');
   print('   Inventory Value:   \$ 5,000');
   print('   Receivables:       \$ 2,000');
@@ -56,14 +56,15 @@ Future<void> main() async {
   print('🥇 GOLD ZAKAT CALCULATION');
   print('─' * 40);
 
-  final gold = DartPreciousMetals.gold(
-    weightGrams: Decimal.parse('100').toFrb(),  // 100 grams of gold
-  )
-    ..purity(value: 22)                          // 22 Karat gold
-    ..hawl(satisfied: true);                     // Held for 1 lunar year
+  final gold =
+      DartPreciousMetals.gold(
+          weightGrams: Decimal.parse('100').toFrb(), // 100 grams of gold
+        )
+        ..purity(value: 22) // 22 Karat gold
+        ..hawl(satisfied: true); // Held for 1 lunar year
 
   final goldResult = gold.calculate(config: config);
-  
+
   print('   Weight:            100 grams');
   print('   Purity:            22 Karat');
   print('   Market Price:      \$85/gram');
@@ -83,17 +84,19 @@ Future<void> main() async {
   print('─' * 40);
 
   final silver = DartPreciousMetals.silver(
-    weightGrams: Decimal.parse('100').toFrb(),  // 100 grams of silver
+    weightGrams: Decimal.parse('100').toFrb(), // 100 grams of silver
   )..hawl(satisfied: true);
 
   final silverResult = silver.calculate(config: config);
-  
+
   print('   Weight:            100 grams');
   print('   Market Price:      \$1/gram');
   print('   ─────────────────────────');
   print('   Net Value:         \$${silverResult.netAssets.toDecimal()}');
   print('   Nisab Threshold:   \$${silverResult.nisabThreshold.toDecimal()}');
-  print('   Zakat Payable?     ${silverResult.isPayable ? "✅ Yes" : "❌ No (below nisab)"}');
+  print(
+    '   Zakat Payable?     ${silverResult.isPayable ? "✅ Yes" : "❌ No (below nisab)"}',
+  );
   print('');
 
   print('✅ All calculations completed successfully!');

@@ -80,7 +80,7 @@ DartZakatConfig createConfig(Map<String, dynamic> config) {
   final goldPrice = config['gold_price_per_gram'] as String;
   final silverPrice = config['silver_price_per_gram'] as String;
   final madhab = config['madhab'] as String? ?? 'hanafi';
-  
+
   return DartZakatConfig(
     goldPrice: Decimal.parse(goldPrice).toFrb(),
     silverPrice: Decimal.parse(silverPrice).toFrb(),
@@ -116,8 +116,9 @@ void main() {
 
   group('Business Compliance Tests', () {
     test('Run all business cases', () async {
-      final businessCases =
-          allCases.where((c) => c.assetType == 'business').toList();
+      final businessCases = allCases
+          .where((c) => c.assetType == 'business')
+          .toList();
       // ignore: avoid_print
       print('\n🏢 Testing ${businessCases.length} business cases...');
 
@@ -128,12 +129,14 @@ void main() {
         }
 
         final config = createConfig(testCase.config);
-        
+
         // Get field values from input (flat structure, not nested in 'fields')
         final cashOnHand = testCase.input['cash_on_hand'] as String? ?? '0';
-        final inventoryValue = testCase.input['inventory_value'] as String? ?? '0';
+        final inventoryValue =
+            testCase.input['inventory_value'] as String? ?? '0';
         final receivables = testCase.input['receivables'] as String? ?? '0';
-        final liabilities = testCase.input['liabilities_due_now'] as String? ?? '0';
+        final liabilities =
+            testCase.input['liabilities_due_now'] as String? ?? '0';
         final hawlSatisfied = testCase.input['hawl_satisfied'] as bool? ?? true;
 
         // Use fluent builder API
@@ -149,7 +152,8 @@ void main() {
         expect(
           result.isPayable,
           testCase.expected['is_payable'],
-          reason: '[${testCase.id}] ${testCase.description} - is_payable mismatch',
+          reason:
+              '[${testCase.id}] ${testCase.description} - is_payable mismatch',
         );
 
         expectDecimalEqual(
@@ -163,7 +167,7 @@ void main() {
           testCase.expected['net_assets'] as String,
           '[${testCase.id}] ${testCase.description} - net_assets mismatch',
         );
-        
+
         // ignore: avoid_print
         print('  ✅ ${testCase.id}: ${testCase.description}');
       }
@@ -172,8 +176,7 @@ void main() {
 
   group('Gold Compliance Tests', () {
     test('Run all gold cases', () async {
-      final goldCases =
-          allCases.where((c) => c.assetType == 'gold').toList();
+      final goldCases = allCases.where((c) => c.assetType == 'gold').toList();
       // ignore: avoid_print
       print('\n🥇 Testing ${goldCases.length} gold cases...');
 
@@ -182,7 +185,7 @@ void main() {
         if (testCase.expected['error_code'] != null) {
           continue;
         }
-        
+
         // Skip Shafi madhab tests (Python does this too)
         final madhab = testCase.config['madhab'] as String? ?? 'hanafi';
         if (madhab != 'hanafi') {
@@ -192,26 +195,30 @@ void main() {
         }
 
         final config = createConfig(testCase.config);
-        
+
         final weightGrams = testCase.input['weight_grams'] as String? ?? '0';
-        final purity = int.tryParse(testCase.input['purity'] as String? ?? '24') ?? 24;
-        final liabilities = testCase.input['liabilities_due_now'] as String? ?? '0';
+        final purity =
+            int.tryParse(testCase.input['purity'] as String? ?? '24') ?? 24;
+        final liabilities =
+            testCase.input['liabilities_due_now'] as String? ?? '0';
         final hawlSatisfied = testCase.input['hawl_satisfied'] as bool? ?? true;
 
         // Use factory constructor and fluent API
-        final gold = DartPreciousMetals.gold(
-          weightGrams: Decimal.parse(weightGrams).toFrb(),
-        )
-          ..purity(value: purity)
-          ..debt(amount: Decimal.parse(liabilities).toFrb())
-          ..hawl(satisfied: hawlSatisfied);
+        final gold =
+            DartPreciousMetals.gold(
+                weightGrams: Decimal.parse(weightGrams).toFrb(),
+              )
+              ..purity(value: purity)
+              ..debt(amount: Decimal.parse(liabilities).toFrb())
+              ..hawl(satisfied: hawlSatisfied);
 
         final result = gold.calculate(config: config);
 
         expect(
           result.isPayable,
           testCase.expected['is_payable'],
-          reason: '[${testCase.id}] ${testCase.description} - is_payable mismatch',
+          reason:
+              '[${testCase.id}] ${testCase.description} - is_payable mismatch',
         );
 
         expectDecimalEqual(
@@ -219,7 +226,7 @@ void main() {
           testCase.expected['zakat_due'] as String,
           '[${testCase.id}] ${testCase.description} - zakat_due mismatch',
         );
-        
+
         // ignore: avoid_print
         print('  ✅ ${testCase.id}: ${testCase.description}');
       }
@@ -228,8 +235,9 @@ void main() {
 
   group('Silver Compliance Tests', () {
     test('Run all silver cases', () async {
-      final silverCases =
-          allCases.where((c) => c.assetType == 'silver').toList();
+      final silverCases = allCases
+          .where((c) => c.assetType == 'silver')
+          .toList();
       // ignore: avoid_print
       print('\n🥈 Testing ${silverCases.length} silver cases...');
 
@@ -240,26 +248,30 @@ void main() {
         }
 
         final config = createConfig(testCase.config);
-        
+
         final weightGrams = testCase.input['weight_grams'] as String? ?? '0';
-        final purity = int.tryParse(testCase.input['purity'] as String? ?? '1000') ?? 1000;
-        final liabilities = testCase.input['liabilities_due_now'] as String? ?? '0';
+        final purity =
+            int.tryParse(testCase.input['purity'] as String? ?? '1000') ?? 1000;
+        final liabilities =
+            testCase.input['liabilities_due_now'] as String? ?? '0';
         final hawlSatisfied = testCase.input['hawl_satisfied'] as bool? ?? true;
 
         // Use factory constructor and fluent API
-        final silver = DartPreciousMetals.silver(
-          weightGrams: Decimal.parse(weightGrams).toFrb(),
-        )
-          ..purity(value: purity)
-          ..debt(amount: Decimal.parse(liabilities).toFrb())
-          ..hawl(satisfied: hawlSatisfied);
+        final silver =
+            DartPreciousMetals.silver(
+                weightGrams: Decimal.parse(weightGrams).toFrb(),
+              )
+              ..purity(value: purity)
+              ..debt(amount: Decimal.parse(liabilities).toFrb())
+              ..hawl(satisfied: hawlSatisfied);
 
         final result = silver.calculate(config: config);
 
         expect(
           result.isPayable,
           testCase.expected['is_payable'],
-          reason: '[${testCase.id}] ${testCase.description} - is_payable mismatch',
+          reason:
+              '[${testCase.id}] ${testCase.description} - is_payable mismatch',
         );
 
         expectDecimalEqual(
@@ -267,7 +279,7 @@ void main() {
           testCase.expected['zakat_due'] as String,
           '[${testCase.id}] ${testCase.description} - zakat_due mismatch',
         );
-        
+
         // ignore: avoid_print
         print('  ✅ ${testCase.id}: ${testCase.description}');
       }
@@ -276,8 +288,9 @@ void main() {
 
   group('Edge Cases Compliance Tests', () {
     test('Run all edge cases', () async {
-      final edgeCases =
-          allCases.where((c) => c.category == 'edge_case').toList();
+      final edgeCases = allCases
+          .where((c) => c.category == 'edge_case')
+          .toList();
       // ignore: avoid_print
       print('\n🔬 Testing ${edgeCases.length} edge cases...');
 
@@ -292,10 +305,13 @@ void main() {
 
         if (testCase.assetType == 'business') {
           final cashOnHand = testCase.input['cash_on_hand'] as String? ?? '0';
-          final inventoryValue = testCase.input['inventory_value'] as String? ?? '0';
+          final inventoryValue =
+              testCase.input['inventory_value'] as String? ?? '0';
           final receivables = testCase.input['receivables'] as String? ?? '0';
-          final liabilities = testCase.input['liabilities_due_now'] as String? ?? '0';
-          final hawlSatisfied = testCase.input['hawl_satisfied'] as bool? ?? true;
+          final liabilities =
+              testCase.input['liabilities_due_now'] as String? ?? '0';
+          final hawlSatisfied =
+              testCase.input['hawl_satisfied'] as bool? ?? true;
 
           final business = DartBusiness()
             ..cash(value: Decimal.parse(cashOnHand).toFrb())
@@ -307,16 +323,20 @@ void main() {
           result = business.calculate(config: config);
         } else if (testCase.assetType == 'gold') {
           final weightGrams = testCase.input['weight_grams'] as String? ?? '0';
-          final purity = int.tryParse(testCase.input['purity'] as String? ?? '24') ?? 24;
-          final liabilities = testCase.input['liabilities_due_now'] as String? ?? '0';
-          final hawlSatisfied = testCase.input['hawl_satisfied'] as bool? ?? true;
+          final purity =
+              int.tryParse(testCase.input['purity'] as String? ?? '24') ?? 24;
+          final liabilities =
+              testCase.input['liabilities_due_now'] as String? ?? '0';
+          final hawlSatisfied =
+              testCase.input['hawl_satisfied'] as bool? ?? true;
 
-          final gold = DartPreciousMetals.gold(
-            weightGrams: Decimal.parse(weightGrams).toFrb(),
-          )
-            ..purity(value: purity)
-            ..debt(amount: Decimal.parse(liabilities).toFrb())
-            ..hawl(satisfied: hawlSatisfied);
+          final gold =
+              DartPreciousMetals.gold(
+                  weightGrams: Decimal.parse(weightGrams).toFrb(),
+                )
+                ..purity(value: purity)
+                ..debt(amount: Decimal.parse(liabilities).toFrb())
+                ..hawl(satisfied: hawlSatisfied);
 
           result = gold.calculate(config: config);
         }
@@ -325,9 +345,10 @@ void main() {
           expect(
             result.isPayable,
             testCase.expected['is_payable'],
-            reason: '[${testCase.id}] ${testCase.description} - is_payable mismatch',
+            reason:
+                '[${testCase.id}] ${testCase.description} - is_payable mismatch',
           );
-          
+
           // ignore: avoid_print
           print('  ✅ ${testCase.id}: ${testCase.description}');
         }
@@ -337,8 +358,9 @@ void main() {
 
   group('Configuration Compliance Tests', () {
     test('Run all configuration cases', () async {
-      final configCases =
-          allCases.where((c) => c.category == 'configuration').toList();
+      final configCases = allCases
+          .where((c) => c.category == 'configuration')
+          .toList();
       // ignore: avoid_print
       print('\n⚙️ Testing ${configCases.length} configuration cases...');
 
@@ -347,7 +369,7 @@ void main() {
         if (testCase.expected['error_code'] != null) {
           continue;
         }
-        
+
         // Skip non-Hanafi madhab (same as Python)
         final madhab = testCase.config['madhab'] as String? ?? 'hanafi';
         if (madhab != 'hanafi') {
@@ -361,10 +383,13 @@ void main() {
 
         if (testCase.assetType == 'business') {
           final cashOnHand = testCase.input['cash_on_hand'] as String? ?? '0';
-          final inventoryValue = testCase.input['inventory_value'] as String? ?? '0';
+          final inventoryValue =
+              testCase.input['inventory_value'] as String? ?? '0';
           final receivables = testCase.input['receivables'] as String? ?? '0';
-          final liabilities = testCase.input['liabilities_due_now'] as String? ?? '0';
-          final hawlSatisfied = testCase.input['hawl_satisfied'] as bool? ?? true;
+          final liabilities =
+              testCase.input['liabilities_due_now'] as String? ?? '0';
+          final hawlSatisfied =
+              testCase.input['hawl_satisfied'] as bool? ?? true;
 
           final business = DartBusiness()
             ..cash(value: Decimal.parse(cashOnHand).toFrb())
@@ -376,16 +401,20 @@ void main() {
           result = business.calculate(config: config);
         } else if (testCase.assetType == 'gold') {
           final weightGrams = testCase.input['weight_grams'] as String? ?? '0';
-          final purity = int.tryParse(testCase.input['purity'] as String? ?? '24') ?? 24;
-          final liabilities = testCase.input['liabilities_due_now'] as String? ?? '0';
-          final hawlSatisfied = testCase.input['hawl_satisfied'] as bool? ?? true;
+          final purity =
+              int.tryParse(testCase.input['purity'] as String? ?? '24') ?? 24;
+          final liabilities =
+              testCase.input['liabilities_due_now'] as String? ?? '0';
+          final hawlSatisfied =
+              testCase.input['hawl_satisfied'] as bool? ?? true;
 
-          final gold = DartPreciousMetals.gold(
-            weightGrams: Decimal.parse(weightGrams).toFrb(),
-          )
-            ..purity(value: purity)
-            ..debt(amount: Decimal.parse(liabilities).toFrb())
-            ..hawl(satisfied: hawlSatisfied);
+          final gold =
+              DartPreciousMetals.gold(
+                  weightGrams: Decimal.parse(weightGrams).toFrb(),
+                )
+                ..purity(value: purity)
+                ..debt(amount: Decimal.parse(liabilities).toFrb())
+                ..hawl(satisfied: hawlSatisfied);
 
           result = gold.calculate(config: config);
         }
@@ -394,9 +423,10 @@ void main() {
           expect(
             result.isPayable,
             testCase.expected['is_payable'],
-            reason: '[${testCase.id}] ${testCase.description} - is_payable mismatch',
+            reason:
+                '[${testCase.id}] ${testCase.description} - is_payable mismatch',
           );
-          
+
           // ignore: avoid_print
           print('  ✅ ${testCase.id}: ${testCase.description}');
         }

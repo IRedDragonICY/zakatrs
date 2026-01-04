@@ -19,8 +19,8 @@ extension DecimalToFrbDecimal on Decimal {
 
 /// Helper for nullable decimals
 extension NullableFrbDecimalToDecimal on FrbDecimal? {
-    Decimal? toDecimal() {
-        if (this == null) return null;
-        return this!.toDecimal();
-    }
+  Decimal? toDecimal() {
+    if (this == null) return null;
+    return this!.toDecimal();
+  }
 }

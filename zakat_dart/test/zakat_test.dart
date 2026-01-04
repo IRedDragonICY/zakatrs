@@ -11,9 +11,9 @@ void main() {
     // 1. Setup Config
     // Gold Price = 100/g. Nisab Gold = 85g * 100 = 8500.
     final config = DartZakatConfig(
-        goldPrice: Decimal.parse('100').toFrb(),
-        silverPrice: Decimal.parse('2').toFrb(),
-        madhab: 'hanafi',
+      goldPrice: Decimal.parse('100').toFrb(),
+      silverPrice: Decimal.parse('2').toFrb(),
+      madhab: 'hanafi',
     );
 
     // 2. Create Business Asset
@@ -23,10 +23,10 @@ void main() {
     // Net: 9000 > 8500 (Nisab). Payable.
     // Zakat: 2.5% * 9000 = 225.
     final business = DartBusiness()
-        ..cash(value: Decimal.parse('5000').toFrb())
-        ..inventory(value: Decimal.parse('4000').toFrb())
-        ..hawl(value: true);
-    
+      ..cash(value: Decimal.parse('5000').toFrb())
+      ..inventory(value: Decimal.parse('4000').toFrb())
+      ..hawl(value: true);
+
     // 3. Calculate
     final result = await business.calculate(config: config);
 
@@ -38,19 +38,22 @@ void main() {
   });
 
   test('Precious Metals (Gold) Calculation', () async {
-     // 1. Setup Config
+    // 1. Setup Config
     final config = DartZakatConfig(
-        goldPrice: Decimal.parse('100').toFrb(),
-        silverPrice: Decimal.parse('2').toFrb(),
-        madhab: 'hanafi',
+      goldPrice: Decimal.parse('100').toFrb(),
+      silverPrice: Decimal.parse('2').toFrb(),
+      madhab: 'hanafi',
     );
 
     // 2. Create Gold Asset
     // 100g > 85g Nisab.
     // Zakat: 2.5% * 100g * 100/g = 250.
-    final gold = DartPreciousMetals.gold(weightGrams: Decimal.parse('100').toFrb())
-        ..purity(value: 24)
-        ..hawl(satisfied: true); // Generated param name is 'satisfied' for hawl in precious_metals macro
+    final gold =
+        DartPreciousMetals.gold(weightGrams: Decimal.parse('100').toFrb())
+          ..purity(value: 24)
+          ..hawl(
+            satisfied: true,
+          ); // Generated param name is 'satisfied' for hawl in precious_metals macro
 
     // 3. Calculate
     final result = await gold.calculate(config: config);

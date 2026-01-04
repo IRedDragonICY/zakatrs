@@ -29,7 +29,7 @@ fn test_ring_with_diamond() {
     assert_eq!(details.total_assets, dec!(300.0));
     
     // Check trace for deduction
-    let trace_str = format!("{:?}", details.calculation_trace);
+    let trace_str = format!("{:?}", details.calculation_breakdown);
     assert!(trace_str.contains("Gemstones Deduction"));
 }
 
@@ -55,7 +55,7 @@ fn test_male_gold_jewelry() {
     assert!(details.zakat_due > Decimal::ZERO);
     
     // Check trace for male gold note
-    let trace_str = format!("{:?}", details.calculation_trace);
+    let trace_str = format!("{:?}", details.calculation_breakdown);
     assert!(trace_str.contains("Gold held by male is not exempt"));
 }
 
@@ -126,7 +126,7 @@ fn test_agriculture_expenses() {
     assert!(!details.is_payable);
     
     // Check trace
-    let trace_str = format!("{:?}", details.calculation_trace);
+    let trace_str = format!("{:?}", details.calculation_breakdown);
     assert!(trace_str.contains("step-deduct-costs"));
     
     // Test Payable Case

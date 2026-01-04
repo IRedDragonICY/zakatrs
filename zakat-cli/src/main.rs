@@ -17,19 +17,19 @@
 //! RUST_LOG=info zakat
 //! ```
 
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use colored::Colorize;
 use inquire::{Confirm, CustomType, Select, Text};
 use rust_decimal::Decimal;
 use rust_decimal_macros::dec;
 use tabled::{Table, Tabled, settings::Style};
 use tracing::warn;
+use std::env;
 
 use zakat_core::assets::PortfolioItem;
 use zakat_core::prelude::*;
 use zakat_providers::{BestEffortPriceProvider, Prices, PriceProvider, FileSystemPriceCache};
 
-#[cfg(feature = "live-pricing")]
 #[cfg(feature = "live-pricing")]
 use zakat_providers::BinancePriceProvider;
 
@@ -73,6 +73,15 @@ struct Args {
     /// Output results as JSON
     #[arg(long, default_value = "false")]
     json: bool,
+
+    #[command(subcommand)]
+    command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Run diagnostics to check system health and connectivity
+    Doctor,
 }
 
 #[derive(Tabled)]
@@ -95,6 +104,11 @@ struct ResultRow {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 1. NO_COLOR Support
+    if env::var("NO_COLOR").is_ok() {
+        colored::control::set_override(false);
+    }
+
     let args = Args::parse();
 
     // Initialize tracing with optional file logging
@@ -105,6 +119,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         use tracing_subscriber::layer::SubscriberExt;
         use tracing_subscriber::util::SubscriberInitExt;
         
+        // Create logs directory if it doesn't exist
+        std::fs::create_dir_all("logs")?;
+
         let file_appender = tracing_appender::rolling::daily("logs", "zakat.log");
         let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
         _file_guard = Some(guard);
@@ -138,6 +155,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .init();
     }
 
+    // Handle Subcommands
+    if let Some(Commands::Doctor) = args.command {
+        return run_doctor().await;
+    }
+
     println!("\n{}", "═══════════════════════════════════════════════".bright_cyan());
     println!("{}", "        🕌  ZAKAT CALCULATOR CLI  🕌           ".bright_cyan().bold());
     println!("{}", "═══════════════════════════════════════════════".bright_cyan());
@@ -146,6 +168,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Step 1: Get prices
     let prices = get_prices(&args).await?;
     
+    // Check for explicit NO_COLOR logic (just to announce it)
+    if env::var("NO_COLOR").is_ok() {
+        println!("NO_COLOR detected: Output coloring disabled.");
+    }
+
     println!(
         "📊 {} Gold: {}/g | Silver: {}/g",
         "Using prices:".bright_green(),
@@ -262,6 +289,59 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{}", "May Allah accept your Zakat! 🤲".bright_green().bold());
     println!();
 
+    Ok(())
+}
+
+async fn run_doctor() -> Result<(), Box<dyn std::error::Error>> {
+    println!("{}", "🚑 Zakat CLI Doctor - Diagnostics Tool".bright_green().bold());
+    println!("{}", "═══════════════════════════════════════════════".bright_green());
+    
+    // 1. Environment Info
+    println!("\n{}", "1. System Information:".bright_blue());
+    println!("  OS: {}", std::env::consts::OS);
+    println!("  Arch: {}", std::env::consts::ARCH);
+    println!("  CLI Version: {}", env!("CARGO_PKG_VERSION"));
+    println!("  NO_COLOR: {}", if env::var("NO_COLOR").is_ok() { "Set (True)" } else { "Unset" });
+
+    // 2. Network Connectivity (Binance Check)
+    println!("\n{}", "2. Network & Pricing:".bright_blue());
+    
+    #[cfg(feature = "live-pricing")]
+    {
+        println!("  Live Pricing Feature: Enabled");
+        print!("  Connecting to Binance API... ");
+        use std::io::Write;
+        std::io::stdout().flush()?;
+        
+        let provider = BinancePriceProvider::default();
+        match provider.get_prices().await {
+            Ok(prices) => {
+                if prices.gold_per_gram > Decimal::ZERO {
+                    println!("{}", "✓ OK".green());
+                    println!("    Gold: ${:.2}/g", prices.gold_per_gram);
+                    println!("    Silver: ${:.2}/g", prices.silver_per_gram);
+                } else {
+                    println!("{}", "⚠ Connected but returned zero prices".yellow());
+                }
+            },
+            Err(e) => {
+                println!("{}", "✗ FAILED".red());
+                println!("    Error: {}", e);
+            }
+        }
+    }
+    #[cfg(not(feature = "live-pricing"))]
+    {
+         println!("  Live Pricing Feature: Disabled (Compiled without 'live-pricing')");
+    }
+
+    // 3. Cache Directory Check
+    println!("\n{}", "3. Storage:".bright_blue());
+    let current_dir = std::env::current_dir()?;
+    println!("  Current Directory: {:?}", current_dir);
+    println!("  Write Access: {}", if !std::fs::metadata(&current_dir)?.permissions().readonly() { "Yes".green() } else { "No".red() });
+
+    println!("\n{}", "Diagnostics Complete.".bright_green());
     Ok(())
 }
 
@@ -568,6 +648,18 @@ fn display_results(result: &PortfolioResult, config: &ZakatConfig, json_mode: bo
 }
 
 fn save_portfolio(portfolio: &ZakatPortfolio, filename: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let path = std::path::Path::new(filename);
+    if path.exists() {
+        let confirm = Confirm::new(&format!("File '{}' already exists. Overwrite?", filename))
+            .with_default(false)
+            .prompt()?;
+        
+        if !confirm {
+            println!("{}", "⚠ Save cancelled.".yellow());
+            return Ok(());
+        }
+    }
+
     let json = serde_json::to_string_pretty(portfolio)?;
     std::fs::write(filename, json)?;
     println!("{} {}", "✓ Portfolio saved to:".green(), filename);

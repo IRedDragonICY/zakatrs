@@ -236,7 +236,7 @@ impl CalculateZakat for AgricultureAssets {
                 irrigation_method: irrigation_desc.to_string(),
                 crop_value: *zakat_due,
             },
-            calculation_trace: crate::types::CalculationTrace(trace),
+            calculation_breakdown: crate::types::CalculationBreakdown(trace),
             warnings: Vec::new(),
             structured_warnings: Vec::new(),
             recommendation: if is_payable { 

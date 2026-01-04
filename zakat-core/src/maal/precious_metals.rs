@@ -334,8 +334,10 @@ impl CalculateZakat for PreciousMetals {
             .with_source(self.label.clone());
 
         // 10. Build trace steps (asset-specific preprocessing)
+        // 10. Build trace steps (asset-specific preprocessing)
         let mut trace_steps = vec![
-            CalculationStep::initial("step-weight", "Total Weight (grams)", self.weight_grams),
+            CalculationStep::initial("step-weight", "Total Weight (grams)", self.weight_grams)
+                .with_reference("Sunan Abu Dawud 1573"),
         ];
 
         if self.stone_weight_grams > Decimal::ZERO {
@@ -344,7 +346,9 @@ impl CalculateZakat for PreciousMetals {
         }
 
         if is_male_gold && self.usage == JewelryUsage::PersonalUse {
-             trace_steps.push(CalculationStep::info("info-male-gold", "Gold held by male is not exempt (Haram usage)").with_args(std::collections::HashMap::from([("gender".to_string(), "Male".to_string())])));
+             trace_steps.push(CalculationStep::info("info-male-gold", "Gold held by male is not exempt (Haram usage)")
+                .with_args(std::collections::HashMap::from([("gender".to_string(), "Male".to_string())]))
+                .with_reference("Fiqh Consensus (Ijma)"));
         }
 
         trace_steps.push(CalculationStep::initial("step-price-per-gram", "Price per gram", price_per_gram));
@@ -365,6 +369,7 @@ impl CalculateZakat for PreciousMetals {
             hawl_satisfied: hawl_is_satisfied,
             trace_steps,
             warnings: Vec::new(),
+            observer: Some(config.observer.clone()),
         };
 
         calculate_monetary_asset(params)
@@ -572,7 +577,7 @@ mod tests {
         assert!(zakat_high.is_payable);
         
         // Check calculation trace contains purity info
-        let trace_str = format!("{:?}", zakat_high.calculation_trace);
+        let trace_str = format!("{:?}", zakat_high.calculation_breakdown);
         assert!(trace_str.contains("Silver Purity Adjustment"));
     }
 

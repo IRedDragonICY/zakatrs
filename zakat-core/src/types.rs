@@ -455,6 +455,8 @@ pub struct CalculationStep {
     /// Variables for fluent.
     #[typeshare(skip)]
     pub args: Option<std::collections::HashMap<String, String>>,
+    /// Fiqh reference source (e.g. "Sahih Bukhari 1454").
+    pub reference: Option<String>,
 }
 
 impl CalculationStep {
@@ -465,6 +467,7 @@ impl CalculationStep {
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Initial,
             args: None,
+            reference: None,
         }
     }
 
@@ -475,6 +478,7 @@ impl CalculationStep {
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Add,
             args: None,
+            reference: None,
         }
     }
 
@@ -485,6 +489,7 @@ impl CalculationStep {
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Subtract,
             args: None,
+            reference: None,
         }
     }
 
@@ -495,6 +500,7 @@ impl CalculationStep {
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Multiply,
             args: None,
+            reference: None,
         }
     }
 
@@ -505,6 +511,7 @@ impl CalculationStep {
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Compare,
             args: None,
+            reference: None,
         }
     }
 
@@ -515,6 +522,7 @@ impl CalculationStep {
             amount: rate.into_zakat_decimal().ok(),
             operation: Operation::Rate,
             args: None,
+            reference: None,
         }
     }
 
@@ -525,6 +533,7 @@ impl CalculationStep {
             amount: amount.into_zakat_decimal().ok(),
             operation: Operation::Result,
             args: None,
+            reference: None,
         }
     }
 
@@ -535,7 +544,13 @@ impl CalculationStep {
             amount: None,
             operation: Operation::Info,
             args: None,
+            reference: None,
         }
+    }
+
+    pub fn with_reference(mut self, reference: impl Into<String>) -> Self {
+        self.reference = Some(reference.into());
+        self
     }
 
     pub fn with_args(mut self, args: std::collections::HashMap<String, String>) -> Self {
@@ -547,30 +562,30 @@ impl CalculationStep {
 /// A collection of calculation steps that can be displayed or serialized.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
 #[typeshare::typeshare]
-pub struct CalculationTrace(pub Vec<CalculationStep>);
+pub struct CalculationBreakdown(pub Vec<CalculationStep>);
 
-impl std::ops::Deref for CalculationTrace {
+impl std::ops::Deref for CalculationBreakdown {
     type Target = Vec<CalculationStep>;
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl std::ops::DerefMut for CalculationTrace {
+impl std::ops::DerefMut for CalculationBreakdown {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
 // Allow creating from Vec
-impl From<Vec<CalculationStep>> for CalculationTrace {
+impl From<Vec<CalculationStep>> for CalculationBreakdown {
     fn from(v: Vec<CalculationStep>) -> Self {
-        CalculationTrace(v)
+        CalculationBreakdown(v)
     }
 }
 
 // Enable iteration
-impl IntoIterator for CalculationTrace {
+impl IntoIterator for CalculationBreakdown {
     type Item = CalculationStep;
     type IntoIter = std::vec::IntoIter<Self::Item>;
 
@@ -579,7 +594,7 @@ impl IntoIterator for CalculationTrace {
     }
 }
 
-impl std::fmt::Display for CalculationTrace {
+impl std::fmt::Display for CalculationBreakdown {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         // Find the maximum description length for alignment
         let max_desc_len = self.0.iter()
@@ -660,8 +675,8 @@ pub struct ZakatDetails {
     pub asset_id: Option<uuid::Uuid>,
     /// Detailed payment payload (Monetary amount or specific assets like Livestock heads).
     pub payload: PaymentPayload,
-    /// Step-by-step trace of how this calculation was derived.
-    pub calculation_trace: CalculationTrace,
+    /// Step-by-step breakdown of how this calculation was derived.
+    pub calculation_breakdown: CalculationBreakdown,
     /// Structured warnings about the calculation (v1.1+).
     pub structured_warnings: Vec<CalculationWarning>,
     /// Non-fatal warnings about the calculation (e.g., negative values clamped).
@@ -712,8 +727,8 @@ impl std::fmt::Display for ZakatExplanation {
         writeln!(f, "Explanation for '{}' ({}):", self.label, self.wealth_type)?;
         writeln!(f, "{:-<50}", "")?;
 
-        // Print steps using CalculationTrace Display
-        let trace = CalculationTrace(self.steps.clone());
+        // Print steps using CalculationBreakdown Display
+        let trace = CalculationBreakdown(self.steps.clone());
         write!(f, "{}", trace)?;
         
         writeln!(f, "{:-<50}", "")?;
@@ -814,7 +829,7 @@ impl ZakatDetails {
             label: None,
             asset_id: None,
             payload: PaymentPayload::Monetary(zakat_due),
-            calculation_trace: CalculationTrace(trace),
+            calculation_breakdown: CalculationBreakdown(trace),
             structured_warnings,
             warnings,
             recommendation,
@@ -846,14 +861,14 @@ impl ZakatDetails {
         }
     }
 
-    /// Creates ZakatDetails with a custom calculation trace.
-    pub fn with_trace(
+    /// Creates ZakatDetails with a custom calculation breakdown.
+    pub fn with_breakdown(
         total_assets: Decimal,
         liabilities_due_now: Decimal,
         nisab_threshold: Decimal,
         rate: Decimal,
         wealth_type: WealthType,
-        mut trace: Vec<CalculationStep>,
+        mut breakdown: Vec<CalculationStep>,
     ) -> Self {
         let mut net_assets = total_assets - liabilities_due_now;
         let mut warnings = Vec::new();
@@ -863,7 +878,7 @@ impl ZakatDetails {
             warn!("Net assets were negative ({}), clamped to zero.", net_assets);
             structured_warnings.push(CalculationWarning::negative_assets_clamped(net_assets));
             net_assets = Decimal::ZERO;
-            trace.push(CalculationStep::info("warn-negative-clamped", "Net Assets are negative, clamped to zero for Zakat purposes"));
+            breakdown.push(CalculationStep::info("warn-negative-clamped", "Net Assets are negative, clamped to zero for Zakat purposes"));
             warnings.push("Net assets were negative and clamped to zero.".to_string());
         }
 
@@ -880,7 +895,7 @@ impl ZakatDetails {
 
         // Add recommendation trace if applicable
         if !is_payable && recommendation == ZakatRecommendation::Recommended {
-            trace.push(CalculationStep::info(
+            breakdown.push(CalculationStep::info(
                 "info-sadaqah-recommended",
                 "Info: Wealth is near Nisab. Voluntary Sadaqah is recommended."
             ));
@@ -899,7 +914,7 @@ impl ZakatDetails {
             label: None,
             asset_id: None,
             payload: PaymentPayload::Monetary(zakat_due),
-            calculation_trace: CalculationTrace(trace),
+            calculation_breakdown: CalculationBreakdown(breakdown),
             structured_warnings,
             warnings,
             recommendation,
@@ -926,7 +941,7 @@ impl ZakatDetails {
             label: None,
             asset_id: None,
             payload: PaymentPayload::Monetary(Decimal::ZERO),
-            calculation_trace: CalculationTrace(trace),
+            calculation_breakdown: CalculationBreakdown(trace),
             structured_warnings: Vec::new(),
             warnings: Vec::new(),
             recommendation: ZakatRecommendation::None,
@@ -1000,7 +1015,7 @@ impl ZakatDetails {
             formatted_due: config.format_currency(self.zakat_due),
             nisab_progress,
             currency_code: config.currency_code.clone(),
-            steps: self.calculation_trace.0.clone(),
+            steps: self.calculation_breakdown.0.clone(),
             warnings: self.warnings.clone(),
             notes,
         }

@@ -191,12 +191,14 @@ impl CalculateZakat for IncomeZakatCalculator {
 
         // Build trace steps based on method
         let mut trace_steps = vec![
-            crate::types::CalculationStep::initial("step-total-income", "Total Income", self.income),
+            crate::types::CalculationStep::initial("step-total-income", "Total Income", self.income)
+                .with_reference("Fiqh al-Zakah (Yusuf Al-Qaradawi)"),
         ];
         
         match self.method {
             IncomeCalculationMethod::Net => {
-                trace_steps.push(crate::types::CalculationStep::subtract("step-basic-expenses", "Basic Living Expenses", self.expenses));
+                trace_steps.push(crate::types::CalculationStep::subtract("step-basic-expenses", "Basic Living Expenses", self.expenses)
+                    .with_reference("Concept of Hajah Asliyyah (Basic Needs)"));
             }
             IncomeCalculationMethod::Gross => {
                 trace_steps.push(crate::types::CalculationStep::info("info-gross-method", "Gross Method used (Expenses not deducted)"));
@@ -223,6 +225,7 @@ impl CalculateZakat for IncomeZakatCalculator {
             hawl_satisfied: hawl_is_satisfied,
             trace_steps,
             warnings,
+            observer: Some(config.observer.clone()),
         };
 
         calculate_monetary_asset(params)

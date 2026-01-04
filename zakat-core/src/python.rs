@@ -28,33 +28,30 @@ impl PyZakatConfig {
     #[new]
     #[pyo3(signature = (gold_price, silver_price, rice_price_kg=None, rice_price_liter=None))]
     pub fn new(
-        gold_price: &str,
-        silver_price: &str,
-        rice_price_kg: Option<&str>,
-        rice_price_liter: Option<&str>,
+        gold_price: &Bound<'_, PyAny>,
+        silver_price: &Bound<'_, PyAny>,
+        rice_price_kg: Option<&Bound<'_, PyAny>>,
+        rice_price_liter: Option<&Bound<'_, PyAny>>,
     ) -> PyResult<Self> {
-        use crate::inputs::IntoZakatDecimal;
-        let gold = gold_price.into_zakat_decimal()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid gold price '{}': {}", gold_price, e)))?;
-        let silver = silver_price.into_zakat_decimal()
-            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid silver price '{}': {}", silver_price, e)))?;
+        let gold = extract_decimal(gold_price, "gold_price")?;
+        let silver = extract_decimal(silver_price, "silver_price")?;
 
         let mut config = ZakatConfig::hanafi(gold, silver);
 
         if let Some(price) = rice_price_kg {
-            let p = price.into_zakat_decimal()
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid rice price (kg) '{}': {}", price, e)))?;
+            let p = extract_decimal(price, "rice_price_kg")?;
             config = config.with_rice_price_per_kg(p);
         }
         
         if let Some(price) = rice_price_liter {
-            let p = price.into_zakat_decimal()
-                .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid rice price (liter) '{}': {}", price, e)))?;
+            let p = extract_decimal(price, "rice_price_liter")?;
             config = config.with_rice_price_per_liter(p);
         }
 
         Ok(PyZakatConfig { inner: config })
     }
+
+
 
     #[getter]
     fn gold_price_per_gram(&self) -> String {
@@ -70,6 +67,41 @@ impl PyZakatConfig {
     fn is_valid_input(val: &str) -> bool {
         crate::inputs::validate_numeric_format(val)
     }
+}
+
+/// Helper to convert a Python object to ZakatDecimal (rust_decimal::Decimal).
+/// Supports: str, int, float, decimal.Decimal
+fn extract_decimal(obj: &Bound<'_, PyAny>, field_name: &str) -> PyResult<rust_decimal::Decimal> {
+    use crate::inputs::IntoZakatDecimal;
+    
+    // 1. Try string directly
+    if let Ok(s) = obj.extract::<String>() {
+        return s.clone().into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid {} string '{}': {}", field_name, s, e)));
+    }
+
+    // 2. Try float (and convert via string to preserve precision if possible or standard float conversion)
+    // ZakatDecimal usually prefers string for precision, but f64 is acceptable if user provides it.
+    if let Ok(_f) = obj.extract::<f64>() {
+        // Use string intermediate to avoid some binary float edge cases, or use form_f64
+        // Logic: rust_decimal::Decimal::from_f64_retain is usually good.
+        // But for "currency", string is safer.
+        // Let's coerce to string on Python side? No, `str(obj)` is safer.
+        let s = obj.str()?.to_string();
+        return s.clone().into_zakat_decimal()
+            .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid {} float '{}': {}", field_name, s, e)));
+    }
+    
+    // 3. Try integer
+    if let Ok(i) = obj.extract::<i64>() {
+        return Ok(rust_decimal::Decimal::from(i));
+    }
+    
+    // 4. Try Python Decimal (if strictly typed) - calling __str__ is the safest generic way
+    // (covered by step 2 fallback essentially if we just call str())
+    let s = obj.str()?.to_string();
+    s.clone().into_zakat_decimal()
+        .map_err(|e| pyo3::exceptions::PyValueError::new_err(format!("Invalid {} value '{}': {}", field_name, s, e)))
 }
 
 // -----------------------------------------------------------------------------

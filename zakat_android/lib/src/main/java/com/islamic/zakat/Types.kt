@@ -43,11 +43,13 @@ data class CalculationStep (
 	/// The value at this step (if applicable).
 	val amount: string? = null,
 	/// The semantic operation type.
-	val operation: Operation
+	val operation: Operation,
+	/// Fiqh reference source (e.g. "Sahih Bukhari 1454").
+	val reference: String? = null
 )
 
 /// A collection of calculation steps that can be displayed or serialized.
-typealias CalculationTrace = List<CalculationStep>
+typealias CalculationBreakdown = List<CalculationStep>
 
 /// Structured warning codes for localization support.
 /// 
@@ -407,8 +409,8 @@ data class ZakatDetails (
 	val label: String? = null,
 	/// Detailed payment payload (Monetary amount or specific assets like Livestock heads).
 	val payload: PaymentPayload,
-	/// Step-by-step trace of how this calculation was derived.
-	val calculationTrace: CalculationTrace,
+	/// Step-by-step breakdown of how this calculation was derived.
+	val calculationBreakdown: CalculationBreakdown,
 	/// Structured warnings about the calculation (v1.1+).
 	val structuredWarnings: List<CalculationWarning>,
 	/// Non-fatal warnings about the calculation (e.g., negative values clamped).

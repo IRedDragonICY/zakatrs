@@ -176,7 +176,7 @@ impl DartZakatResult {
             label: details.label.clone(),
             status_reason: details.status_reason.clone(),
             warnings: details.warnings.clone(),
-            calculation_trace: details.calculation_trace.iter().map(DartCalculationStep::from_core).collect(),
+            calculation_trace: details.calculation_breakdown.iter().map(DartCalculationStep::from_core).collect(),
         }
     }
 }

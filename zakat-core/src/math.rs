@@ -1,5 +1,6 @@
 use rust_decimal::Decimal;
-use crate::types::{ZakatError, ErrorDetails};
+use crate::types::ZakatError; // Removed ErrorDetails as it was unused
+use std::ops::Deref;
 
 /// A wrapper around `Decimal` that provides safe arithmetic operations with automatic
 /// `ZakatError::Overflow` generation.
@@ -47,12 +48,11 @@ impl ZakatDecimal {
     pub fn checked_div(self, other: impl Into<Decimal>) -> Result<Self, ZakatError> {
         let other_dec = other.into();
         if other_dec.is_zero() {
-             return Err(ZakatError::CalculationError(Box::new(ErrorDetails {
-                code: crate::types::ZakatErrorCode::CalculationOverflow,
-                reason_key: "error-division-zero".to_string(),
-                suggestion: Some("Cannot divide by zero.".to_string()),
-                ..Default::default()
-            })));
+             return Err(ZakatError::Overflow {
+                operation: "div (by zero)".to_string(),
+                source_label: None,
+                asset_id: None,
+            });
         }
         self.0.checked_div(other_dec)
             .map(Self)

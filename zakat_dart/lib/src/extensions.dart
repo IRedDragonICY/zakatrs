@@ -7,6 +7,12 @@ extension FrbDecimalToDecimal on FrbDecimal {
   Decimal toDecimal() {
     return Decimal.parse(toString());
   }
+
+  /// Convert Rust [FrbDecimal] to Dart [double].
+  /// Note: This may lose precision for very large numbers.
+  double toDouble() {
+    return double.parse(toString());
+  }
 }
 
 /// Extensions to bridge Dart's [Decimal] with Rust's [FrbDecimal].

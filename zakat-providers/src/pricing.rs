@@ -826,15 +826,30 @@ impl PriceProvider for BinancePriceProvider {
         const OUNCE_TO_GRAM: rust_decimal::Decimal = rust_decimal_macros::dec!(31.1034768);
         
         // Fetch Gold Price (PAXG/USDT)
+        // Fetch Gold Price (PAXG/USDT)
         let url = "https://api.binance.com/api/v3/ticker/price?symbol=PAXGUSDT";
-        let response = match self.client.get(url).send().await {
-            Ok(resp) => {
-                self.record_success();
-                resp
-            }
-            Err(e) => {
-                self.record_failure();
-                return Err(ZakatError::NetworkError(format!("Binance API error: {}", e)));
+        
+        let mut attempts = 0;
+        let max_retries = 3;
+        let mut backoff = std::time::Duration::from_millis(500);
+
+        let response = loop {
+            attempts += 1;
+            match self.client.get(url).send().await {
+                Ok(resp) => {
+                    self.record_success();
+                    break resp;
+                }
+                Err(e) => {
+                    if attempts > max_retries {
+                        self.record_failure();
+                        return Err(ZakatError::NetworkError(format!("Binance API error after {} attempts: {}", attempts, e)));
+                    }
+                    
+                    tracing::warn!("Binance API request failed (attempt {}/{}): {}. Retrying in {:?}...", attempts, max_retries + 1, e, backoff);
+                    tokio::time::sleep(backoff).await;
+                    backoff = backoff.checked_mul(2).unwrap_or(backoff); // Exponential backoff
+                }
             }
         };
             

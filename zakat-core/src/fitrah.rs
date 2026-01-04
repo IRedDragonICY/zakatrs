@@ -104,7 +104,7 @@ impl CalculateZakat for FitrahCalculator {
             label: self.label.clone(),
             asset_id: Some(self.id),
             payload: crate::types::PaymentPayload::Monetary(total_value),
-            calculation_trace: crate::types::CalculationTrace(trace),
+            calculation_breakdown: crate::types::CalculationBreakdown(trace),
             warnings: Vec::new(),
             structured_warnings: Vec::new(),
             recommendation: crate::types::ZakatRecommendation::Obligatory, // Fitrah is always obligatory

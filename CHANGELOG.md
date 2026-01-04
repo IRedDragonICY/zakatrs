@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.3.0] - 2026-01-04
+
+### Features (QoL & Robustness Sprint)
+
+- **CLI Improvements**:
+    - **Doctor Command**: New `zakat doctor` command to diagnose system health, connectivity, and environment.
+    - **Overwrite Protection**: `zakat save` now prompts for confirmation before overwriting existing files.
+    - **NO_COLOR**: strict adherence to the [NO_COLOR](https://no-color.org/) standard for accessible output.
+
+- **Language Bindings**:
+    - **Python Compatibility**: `PyZakatConfig` now accepts flexible numeric types (`int`, `float`, `decimal` string) ensuring a more Pythonic API.
+    - **Dart Extensions**: Added `toDouble()` for `FrbDecimal` and verified `toFrb()` extensions for seamless UI integration.
+    - **Kotlin Polish**: Fixed casing inconsistency in `LivestockAge` enum serialization.
+
+- **Robustness**:
+    - **Network Resilience**: Implemented exponential backoff retry logic (up to 3 retries) for all network providers in `zakat-providers`.
+    - **Explicit Timeouts**: Enforced strict timeout configuration for Binance API calls.
+
 ## [1.2.1] - 2026-01-04
 
 ### Features (Comprehensive Update)

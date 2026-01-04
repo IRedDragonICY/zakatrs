@@ -204,6 +204,7 @@ impl CalculateZakat for InvestmentAssets {
         let mut trace_steps = vec![
             crate::types::CalculationStep::initial("step-market-value", format!("Market Value ({})", type_desc), self.value)
                  .with_args(std::collections::HashMap::from([("type".to_string(), type_desc.to_string())]))
+                 .with_reference("AAOIFI Sharia Standard No. 35")
         ];
 
         // START CHANGE: Feature 3 (Investment Strategy)
@@ -219,7 +220,7 @@ impl CalculateZakat for InvestmentAssets {
                      "step-dividend-proxy", 
                      "Held for Dividends: 30% Proxy Rule Applied", 
                      proxy_rate
-                 ));
+                 ).with_reference("Modern Fiqh Resolution"));
                  trace_steps.push(crate::types::CalculationStep::result(
                      "step-zakatable-portion", 
                      "Net Zakatable Assets (Proxy)", 
@@ -278,6 +279,7 @@ impl CalculateZakat for InvestmentAssets {
             asset_id: Some(self.id),
             trace_steps,
             warnings: Vec::new(),
+            observer: Some(config.observer.clone()),
         };
 
         calculate_monetary_asset(params)
@@ -324,7 +326,7 @@ mod tests {
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(750));
         // Verify trace contains proxy message
-        let trace = res.calculation_trace.0;
+        let trace = res.calculation_breakdown.0;
         assert!(trace.iter().any(|s| s.description.contains("30% Proxy")));
     }
 }

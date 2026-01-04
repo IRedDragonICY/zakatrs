@@ -115,12 +115,19 @@ impl CalculateZakat for MiningAssets {
                 
                 // Calculate Trace
                 let trace = vec![
-                    crate::types::CalculationStep::initial("step-rikaz-value", "Rikaz Found Value", self.value),
+                    crate::types::CalculationStep::initial("step-rikaz-value", "Rikaz Found Value", self.value)
+                        .with_reference("Sahih Bukhari 1499"),
                     crate::types::CalculationStep::info("info-rikaz-rule", "Rikaz Rule: No Nisab, No Debt Deduction, 20% Rate"),
                     crate::types::CalculationStep::rate("step-rate-applied", "Applied Rate (20%)", rate),
                 ];
                 
-                Ok(ZakatDetails::with_trace(self.value, Decimal::ZERO, Decimal::ZERO, rate, crate::types::WealthType::Rikaz, trace)
+                // Manually notify observer since we bypass standard calculator
+                let observer = config.observer.clone();
+                for step in &trace {
+                    observer.on_step(step);
+                }
+
+                Ok(ZakatDetails::with_breakdown(self.value, Decimal::ZERO, Decimal::ZERO, rate, crate::types::WealthType::Rikaz, trace)
                     .with_label(self.label.clone().unwrap_or_default()))
             },
             MiningType::Mines => {
@@ -133,7 +140,8 @@ impl CalculateZakat for MiningAssets {
                 let rate = config.strategy.get_rules().trade_goods_rate;
 
                 let trace_steps = vec![
-                    crate::types::CalculationStep::initial("step-extracted-value", "Extracted Value", self.value),
+                    crate::types::CalculationStep::initial("step-extracted-value", "Extracted Value", self.value)
+                        .with_reference("Fiqh Consensus"),
                 ];
 
                 let params = MonetaryCalcParams {
@@ -143,10 +151,11 @@ impl CalculateZakat for MiningAssets {
                     rate,
                     wealth_type: crate::types::WealthType::Mining,
                     label: self.label.clone(),
-            asset_id: Some(self.id),
+                    asset_id: Some(self.id),
                     hawl_satisfied: self.hawl_satisfied,
                     trace_steps,
                     warnings: Vec::new(),
+                    observer: Some(config.observer.clone()),
                 };
 
                 calculate_monetary_asset(params)

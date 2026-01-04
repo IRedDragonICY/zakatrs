@@ -81,7 +81,7 @@ impl CalculateZakat for LedgerAsset {
              final_trace.push(CalculationStep::info("info-hawl-progress", format!("Current Streak: {}/354 days", result.current_streak_days)));
         }
         
-        let mut detailed_details = ZakatDetails::with_trace(
+        let mut detailed_details = ZakatDetails::with_breakdown(
             result.total_balance,
             Decimal::ZERO,
             final_nisab,

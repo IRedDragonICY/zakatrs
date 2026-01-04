@@ -15,6 +15,7 @@ pub struct MonetaryCalcParams {
     pub asset_id: Option<uuid::Uuid>,
     pub trace_steps: Vec<CalculationStep>, // Asset-specific steps leading up to Total Assets
     pub warnings: Vec<String>, // Non-fatal warnings to include in the result
+    pub observer: Option<std::sync::Arc<dyn crate::traits::CalculationObserver>>,
 }
 
 /// Standardized Zakat calculation logic for monetary assets.
@@ -67,7 +68,14 @@ pub fn calculate_monetary_asset(params: MonetaryCalcParams) -> Result<ZakatDetai
         final_trace.push(CalculationStep::info("status-exempt", "Below Nisab"));
     }
 
-    let mut result = ZakatDetails::with_trace(
+    // Telemetry: Notify observer of all steps
+    if let Some(obs) = &params.observer {
+        for step in &final_trace {
+            obs.on_step(step);
+        }
+    }
+
+    let mut result = ZakatDetails::with_breakdown(
         params.total_assets,
         params.liabilities,
         params.nisab_threshold,

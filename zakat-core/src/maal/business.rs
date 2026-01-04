@@ -176,8 +176,10 @@ impl CalculateZakat for BusinessZakat {
             .with_source(self.label.clone());
         
         let trace_steps = vec![
-            crate::types::CalculationStep::initial("step-cash-on-hand", "Cash on Hand", self.cash_on_hand),
-            crate::types::CalculationStep::add("step-inventory-value", "Inventory Value", self.inventory_value),
+            crate::types::CalculationStep::initial("step-cash-on-hand", "Cash on Hand", self.cash_on_hand)
+                .with_reference("Sunan Abu Dawud 1562"),
+            crate::types::CalculationStep::add("step-inventory-value", "Inventory Value", self.inventory_value)
+                .with_reference("Fiqh al-Zakah (Commercial Goods)"),
             crate::types::CalculationStep::add("step-receivables", "Receivables", self.receivables),
             crate::types::CalculationStep::result("step-gross-assets", "Gross Assets", *gross_assets),
         ];
@@ -205,6 +207,7 @@ impl CalculateZakat for BusinessZakat {
             asset_id: Some(self.id),
             trace_steps,
             warnings: Vec::new(),
+            observer: Some(config.observer.clone()),
         };
 
         calculate_monetary_asset(params)

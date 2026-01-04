@@ -126,6 +126,15 @@ pub struct ZakatConfig {
     /// Defaults to `Strict` for production use.
     #[serde(default)]
     pub mode: ZakatMode,
+
+    /// Optional observer for telemetry and step tracing.
+    #[serde(skip, default = "default_observer")]
+    #[typeshare(skip)]
+    pub observer: Arc<dyn crate::traits::CalculationObserver>,
+}
+
+fn default_observer() -> Arc<dyn crate::traits::CalculationObserver> {
+    Arc::new(crate::traits::NoOpObserver)
 }
 
 fn default_locale_code() -> String {
@@ -147,6 +156,7 @@ impl std::fmt::Debug for ZakatConfig {
             .field("locale_code", &self.locale_code)
             .field("currency_code", &self.currency_code)
             .field("mode", &self.mode)
+            .field("observer", &"Arc<dyn CalculationObserver>")
             .finish()
     }
 }
@@ -167,6 +177,7 @@ impl Default for ZakatConfig {
             currency_code: default_currency_code(),
             networking: NetworkConfig::default(),
             mode: ZakatMode::default(),
+            observer: default_observer(),
         }
     }
 }
@@ -349,6 +360,28 @@ impl ZakatConfig {
                 suggestion: Some("Run with --silver-price X or set ZAKAT_SILVER_PRICE env var.".to_string()),
                 ..Default::default()
             })));
+        }
+
+        if let Some(rice) = self.rice_price_per_kg {
+            if rice <= Decimal::ZERO {
+                 return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                    code: crate::types::ZakatErrorCode::InvalidInput,
+                    reason_key: "error-config-rice-kg-positive".to_string(),
+                    suggestion: Some("Rice price per kg must be positive.".to_string()),
+                    ..Default::default()
+                })));
+            }
+        }
+
+        if let Some(rice) = self.rice_price_per_liter {
+             if rice <= Decimal::ZERO {
+                 return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                    code: crate::types::ZakatErrorCode::InvalidInput,
+                    reason_key: "error-config-rice-liter-positive".to_string(),
+                    suggestion: Some("Rice price per liter must be positive.".to_string()),
+                    ..Default::default()
+                })));
+            }
         }
 
         // Validation Logic based on Nisab Standard
@@ -594,6 +627,11 @@ impl ZakatConfig {
     /// Returns `true` if running in permissive estimation mode.
     pub fn is_permissive(&self) -> bool {
         self.mode == ZakatMode::Permissive
+    }
+
+    pub fn with_observer(mut self, observer: Arc<dyn crate::traits::CalculationObserver>) -> Self {
+        self.observer = observer;
+        self
     }
 
     // Getters

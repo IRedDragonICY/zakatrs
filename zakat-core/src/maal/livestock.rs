@@ -320,9 +320,9 @@ impl CalculateZakat for LivestockAssets {
             label: self.label.clone(),
             asset_id: Some(self.id),
             payload: crate::types::PaymentPayload::Livestock { heads_due },
-            calculation_trace: crate::types::CalculationTrace(trace),
-            warnings: Vec::new(),
+            calculation_breakdown: crate::types::CalculationBreakdown(trace),
             structured_warnings: Vec::new(),
+            warnings: Vec::new(),
             recommendation: if is_payable { 
                 crate::types::ZakatRecommendation::Obligatory 
             } else { 

@@ -13,6 +13,18 @@ pub trait TemporalAsset {
     fn with_hawl_satisfied(self, satisfied: bool) -> Self;
 }
 
+/// Trait for observing calculation steps and errors (Telemetry/Logging).
+pub trait CalculationObserver: Send + Sync {
+    fn on_step(&self, step: &crate::types::CalculationStep);
+    fn on_error(&self, error: &ZakatError);
+}
+
+pub struct NoOpObserver;
+impl CalculationObserver for NoOpObserver {
+    fn on_step(&self, _step: &crate::types::CalculationStep) {}
+    fn on_error(&self, _error: &ZakatError) {}
+}
+
 /// Trait for handling internationalization of messages.
 pub trait Translator {
     /// Translates a key with optional arguments.

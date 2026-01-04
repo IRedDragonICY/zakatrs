@@ -129,7 +129,7 @@ pub fn sanitize_numeric_string(s: &str) -> Result<Cow<'_, str>, ZakatError> {
     // Fast path: Check if the string is already clean (only ASCII digits, '.', '-', scientific notation)
     // If so, return borrowed reference without any allocation
     let needs_sanitization = trimmed.chars().any(|c| {
-        !matches!(c, '0'..='9' | '.' | '-' | 'e' | 'E' | '+')
+        !matches!(c, '0'..='9' | '.' | '-' | 'e' | 'E' | '+' | 'k' | 'K' | 'm' | 'M')
     });
     
     if !needs_sanitization {
@@ -148,8 +148,8 @@ pub fn sanitize_numeric_string(s: &str) -> Result<Cow<'_, str>, ZakatError> {
             '\u{0660}'..='\u{0669}' => buffer.push(char::from_u32(c as u32 - 0x0660 + '0' as u32).unwrap_or(c)),
             '\u{06F0}'..='\u{06F9}' => buffer.push(char::from_u32(c as u32 - 0x06F0 + '0' as u32).unwrap_or(c)),
             
-            // Allowed characters (including scientific notation)
-            '0'..='9' | '-' | '.' | 'e' | 'E' | '+' => {
+            // Allowed characters (including scientific notation and suffixes)
+            '0'..='9' | '-' | '.' | 'e' | 'E' | '+' | 'k' | 'K' | 'm' | 'M' => {
                 if c == '.' {
                     last_dot_index = Some(buffer.len());
                 }
@@ -204,14 +204,46 @@ pub fn sanitize_numeric_string(s: &str) -> Result<Cow<'_, str>, ZakatError> {
                     final_res.push(c);
                 }
             }
-            return Ok(Cow::Owned(final_res));
+            return process_suffixes(final_res);
         } else {
             // Comma is a thousands separator (US). Remove all commas.
             buffer.retain(|c| c != ',');
         }
     }
     
-    Ok(Cow::Owned(buffer))
+    process_suffixes(buffer)
+}
+
+/// Helper to handle k/m suffixes
+fn process_suffixes(s: String) -> Result<Cow<'static, str>, ZakatError> {
+    let lower = s.to_lowercase();
+    if let Some(stripped) = lower.strip_suffix('k') {
+        let val = Decimal::from_str(stripped).map_err(|e| ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+            field: "suffix_k".to_string(),
+            value: s.clone(),
+            reason_key: "error-parse-suffix".to_string(),
+            args: Some(std::collections::HashMap::from([("details".to_string(), e.to_string())])),
+            suggestion: Some("Ensure the number before 'k' is valid.".to_string()),
+            ..Default::default()
+        })))?;
+        use rust_decimal_macros::dec;
+        return Ok(Cow::Owned((val * dec!(1000)).to_string()));
+    }
+    
+    if let Some(stripped) = lower.strip_suffix('m') {
+        let val = Decimal::from_str(stripped).map_err(|e| ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+            field: "suffix_m".to_string(),
+            value: s.clone(),
+            reason_key: "error-parse-suffix".to_string(),
+            args: Some(std::collections::HashMap::from([("details".to_string(), e.to_string())])),
+            suggestion: Some("Ensure the number before 'm' is valid.".to_string()),
+            ..Default::default()
+        })))?;
+         use rust_decimal_macros::dec;
+        return Ok(Cow::Owned((val * dec!(1000000)).to_string()));
+    }
+    
+    Ok(Cow::Owned(s))
 }
 
 /// Normalizes Arabic numerals to ASCII digits.

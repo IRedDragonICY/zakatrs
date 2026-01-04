@@ -155,17 +155,7 @@ impl PriceProvider for StaticPriceProvider {
     }
 }
 
-#[cfg(target_arch = "wasm32")]
-#[async_trait::async_trait(?Send)]
-impl PriceProvider for StaticPriceProvider {
-    async fn get_prices(&self) -> Result<Prices, ZakatError> {
-        Ok(self.prices.clone())
-    }
-    
-    fn name(&self) -> &str {
-        &self.name
-    }
-}
+
 
 // =============================================================================
 // Feature: Historical Pricing (Qada Support)

@@ -10,8 +10,10 @@
 
 mod pricing;
 mod chain;
+#[cfg(not(target_arch = "wasm32"))]
 mod fs_cache;
 
 pub use pricing::*;
 pub use chain::*;
+#[cfg(not(target_arch = "wasm32"))]
 pub use fs_cache::*;

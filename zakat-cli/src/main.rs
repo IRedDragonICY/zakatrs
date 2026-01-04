@@ -27,7 +27,7 @@ use tracing::warn;
 
 use zakat_core::assets::PortfolioItem;
 use zakat_core::prelude::*;
-use zakat_providers::{BestEffortPriceProvider, Prices, PriceProvider};
+use zakat_providers::{BestEffortPriceProvider, Prices, PriceProvider, FileSystemPriceCache};
 
 #[cfg(feature = "live-pricing")]
 #[cfg(feature = "live-pricing")]
@@ -69,6 +69,10 @@ struct Args {
     /// Load portfolio from file
     #[arg(long)]
     load: Option<std::path::PathBuf>,
+
+    /// Output results as JSON
+    #[arg(long, default_value = "false")]
+    json: bool,
 }
 
 #[derive(Tabled)]
@@ -238,7 +242,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = portfolio.calculate_total(&config);
 
     // Step 5: Display results
-    display_results(&result, &config);
+    display_results(&result, &config, args.json);
 
     // Step 6: Offer to save snapshot
     if Confirm::new("Save calculation snapshot for audit?")
@@ -288,8 +292,16 @@ async fn get_prices(args: &Args) -> Result<Prices, Box<dyn std::error::Error>> {
 
     #[cfg(feature = "live-pricing")]
     {
+        let binance = BinancePriceProvider::default();
+        
+        #[cfg(not(target_arch = "wasm32"))]
+        let primary_provider = FileSystemPriceCache::new(binance, std::time::Duration::from_secs(3600)); 
+        
+        #[cfg(target_arch = "wasm32")]
+        let primary_provider = binance;
+
         let provider = BestEffortPriceProvider::new(
-            BinancePriceProvider::default(),
+            primary_provider,
             fallback.clone(),
         );
         
@@ -454,10 +466,16 @@ fn add_agriculture_asset() -> Result<Option<PortfolioItem>, Box<dyn std::error::
     Ok(Some(asset.into()))
 }
 
-fn display_results(result: &PortfolioResult, config: &ZakatConfig) {
+fn display_results(result: &PortfolioResult, config: &ZakatConfig, json_mode: bool) {
+    if json_mode {
+        let json_output = serde_json::to_string_pretty(result).unwrap_or_else(|e| format!("{{\"error\": \"Serialization failed: {}\"}}", e));
+        println!("{}", json_output);
+        return;
+    }
     use tabled::settings::{Width, Modify, object::Columns, Alignment};
     
-    let rows: Vec<ResultRow> = result.results.iter().filter_map(|r| {
+    let all_results = result.results(); // Use reconstruction method
+    let rows: Vec<ResultRow> = all_results.iter().filter_map(|r| {
         match r {
             PortfolioItemResult::Success { details, .. } => {
                 // With tabled "ansi" feature, colors work correctly

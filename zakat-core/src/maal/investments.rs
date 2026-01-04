@@ -242,14 +242,14 @@ impl CalculateZakat for InvestmentAssets {
              // Let's apply it to the `zakatable_base`.
              
              let impure_amount = ZakatDecimal::new(zakatable_base)
-                .safe_mul(purify_rate)?
+                .checked_mul(purify_rate)?
                 .with_source(self.label.clone());
              
              trace_steps.push(crate::types::CalculationStep::rate("step-purification-rate", "Purification Rate (Tathir)", purify_rate));
              trace_steps.push(crate::types::CalculationStep::subtract("step-purification-amount", "Impure Amount Deducted", *impure_amount));
              
              let puri_val = ZakatDecimal::new(zakatable_base)
-                .safe_sub(*impure_amount)?
+                .checked_sub(*impure_amount)?
                 .with_source(self.label.clone());
              
              trace_steps.push(crate::types::CalculationStep::result("step-purified-value", "Purified Gross Value", *puri_val));
@@ -275,6 +275,7 @@ impl CalculateZakat for InvestmentAssets {
             wealth_type: crate::types::WealthType::Investment,
             label: self.label.clone(),
             hawl_satisfied: hawl_is_satisfied,
+            asset_id: Some(self.id),
             trace_steps,
             warnings: Vec::new(),
         };

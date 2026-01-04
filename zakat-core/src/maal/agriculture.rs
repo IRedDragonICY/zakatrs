@@ -142,11 +142,11 @@ impl CalculateZakat for AgricultureAssets {
         let nisab_threshold_kg = config.get_nisab_agriculture_kg();
 
         let total_value = ZakatDecimal::new(self.harvest_weight_kg)
-            .safe_mul(self.price_per_kg)?
+            .checked_mul(self.price_per_kg)?
             .with_source(self.label.clone());
 
         let nisab_value = ZakatDecimal::new(nisab_threshold_kg)
-            .safe_mul(self.price_per_kg)?
+            .checked_mul(self.price_per_kg)?
             .with_source(self.label.clone()); 
         
         let liabilities = self.liabilities_due_now;
@@ -156,9 +156,9 @@ impl CalculateZakat for AgricultureAssets {
         // We check if (Net Value) >= (Nisab Quantity Value) to determine payability.
         
         // Use *total_value to get Decimal for creating ZakatDecimal again, or implement methods on ZakatDecimal to take ZakatDecimal
-        // safe_sub takes impl Into<Decimal>, so passing ZakatDecimal works (it implements Into<Decimal>).
+        // checked_sub takes impl Into<Decimal>, so passing ZakatDecimal works (it implements Into<Decimal>).
         // Use *total_value to get Decimal for creating ZakatDecimal again, or implement methods on ZakatDecimal to take ZakatDecimal
-        // safe_sub takes impl Into<Decimal>, so passing ZakatDecimal works (it implements Into<Decimal>).
+        // checked_sub takes impl Into<Decimal>, so passing ZakatDecimal works (it implements Into<Decimal>).
         let gross_value = total_value;
         
         // Net Value = Gross - Cultivation Costs.
@@ -174,12 +174,12 @@ impl CalculateZakat for AgricultureAssets {
 
         // Deduct other liabilities if any
         let net_value_final = net_value
-             .safe_sub(liabilities)?
+             .checked_sub(liabilities)?
              .with_source(self.label.clone());
 
         let zakat_due = if *net_value_final >= *nisab_value {
              net_value_final
-                 .safe_mul(rate)?
+                 .checked_mul(rate)?
                  .with_source(self.label.clone())
         } else {
              ZakatDecimal::default()
@@ -230,6 +230,7 @@ impl CalculateZakat for AgricultureAssets {
             wealth_type: crate::types::WealthType::Agriculture,
             status_reason: None,
             label: self.label.clone(),
+            asset_id: Some(self.id),
             payload: crate::types::PaymentPayload::Agriculture {
                 harvest_weight: self.harvest_weight_kg,
                 irrigation_method: irrigation_desc.to_string(),

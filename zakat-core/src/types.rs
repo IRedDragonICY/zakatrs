@@ -655,6 +655,9 @@ pub struct ZakatDetails {
     pub status_reason: Option<String>,
     /// Optional label for the asset (e.g. "Main Store", "Gold Necklace").
     pub label: Option<String>,
+    /// Unique identifier of the asset (v1.2+).
+    #[typeshare(skip)]
+    pub asset_id: Option<uuid::Uuid>,
     /// Detailed payment payload (Monetary amount or specific assets like Livestock heads).
     pub payload: PaymentPayload,
     /// Step-by-step trace of how this calculation was derived.
@@ -809,6 +812,7 @@ impl ZakatDetails {
             wealth_type,
             status_reason: clamped_msg.map(|s| s.to_string()),
             label: None,
+            asset_id: None,
             payload: PaymentPayload::Monetary(zakat_due),
             calculation_trace: CalculationTrace(trace),
             structured_warnings,
@@ -893,6 +897,7 @@ impl ZakatDetails {
             wealth_type,
             status_reason: None,
             label: None,
+            asset_id: None,
             payload: PaymentPayload::Monetary(zakat_due),
             calculation_trace: CalculationTrace(trace),
             structured_warnings,
@@ -919,6 +924,7 @@ impl ZakatDetails {
             wealth_type,
             status_reason: Some(reason.to_string()),
             label: None,
+            asset_id: None,
             payload: PaymentPayload::Monetary(Decimal::ZERO),
             calculation_trace: CalculationTrace(trace),
             structured_warnings: Vec::new(),

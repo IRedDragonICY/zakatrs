@@ -125,7 +125,7 @@ impl CalculateZakat for MiningAssets {
             },
             MiningType::Mines => {
                 let nisab_threshold = ZakatDecimal::new(config.gold_price_per_gram)
-                    .safe_mul(config.get_nisab_gold_grams())?
+                    .checked_mul(config.get_nisab_gold_grams())?
                     .with_source(self.label.clone());
                 
                 // Rate: 2.5%. Nisab: 85g Gold.
@@ -143,6 +143,7 @@ impl CalculateZakat for MiningAssets {
                     rate,
                     wealth_type: crate::types::WealthType::Mining,
                     label: self.label.clone(),
+            asset_id: Some(self.id),
                     hawl_satisfied: self.hawl_satisfied,
                     trace_steps,
                     warnings: Vec::new(),

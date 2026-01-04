@@ -176,7 +176,10 @@ pub enum PortfolioStatus {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct PortfolioResult {
     pub status: PortfolioStatus,
-    pub results: Vec<PortfolioItemResult>,
+    /// Successfully calculated details (v1.2+).
+    pub successes: Vec<ZakatDetails>,
+    /// Failed calculations (v1.2+).
+    pub failures: Vec<PortfolioItemResult>,
     pub total_assets: Decimal,
     pub total_zakat_due: Decimal,
     pub items_attempted: usize,
@@ -185,16 +188,26 @@ pub struct PortfolioResult {
 
 impl PortfolioResult {
     /// Returns a list of failed calculations.
-    pub fn failures(&self) -> Vec<&PortfolioItemResult> {
-        self.results.iter().filter(|r| matches!(r, PortfolioItemResult::Failure { .. })).collect()
+    pub fn failures(&self) -> &Vec<PortfolioItemResult> {
+        &self.failures
     }
 
     /// Returns a list of successful calculation details.
-    pub fn successes(&self) -> Vec<&ZakatDetails> {
-        self.results.iter().filter_map(|r| match r {
-            PortfolioItemResult::Success { details, .. } => Some(details),
-            _ => None
-        }).collect()
+    pub fn successes(&self) -> &Vec<ZakatDetails> {
+        &self.successes
+    }
+
+    /// Reconstructs the legacy results list for backward compatibility.
+    pub fn results(&self) -> Vec<PortfolioItemResult> {
+        let mut list = Vec::with_capacity(self.successes.len() + self.failures.len());
+        for s in &self.successes {
+            list.push(PortfolioItemResult::Success {
+                asset_id: s.asset_id.unwrap_or_else(Uuid::nil),
+                details: s.clone()
+            });
+        }
+        list.extend(self.failures.clone());
+        list
     }
 
     /// Returns true if there were no failures.
@@ -367,7 +380,8 @@ impl ZakatPortfolio {
         if let Err(e) = config.validate() {
             return PortfolioResult {
                 status: PortfolioStatus::Failed,
-                results: vec![PortfolioItemResult::Failure {
+                successes: Vec::new(),
+                failures: vec![PortfolioItemResult::Failure {
                     asset_id: Uuid::nil(), // No specific asset
                     source: "Configuration".to_string(),
                     error: e,
@@ -415,7 +429,8 @@ impl ZakatPortfolio {
         if let Err(e) = config.validate() {
              return PortfolioResult {
                 status: PortfolioStatus::Failed,
-                results: vec![PortfolioItemResult::Failure {
+                successes: Vec::new(),
+                failures: vec![PortfolioItemResult::Failure {
                     asset_id: Uuid::nil(),
                     source: "Configuration".to_string(),
                     error: e,
@@ -427,39 +442,40 @@ impl ZakatPortfolio {
             };
         }
 
-        let mut new_results = Vec::with_capacity(previous_result.results.len());
+        let mut new_results = Vec::with_capacity(previous_result.items_attempted);
         
-        // We iterate over previous results and retry ONLY the failures.
-        // We find the corresponding calculator by ID.
+        // 1. Keep existing successes
+        for success in &previous_result.successes {
+            new_results.push(PortfolioItemResult::Success { 
+                asset_id: success.asset_id.unwrap_or_else(Uuid::nil), 
+                details: success.clone() 
+            });
+        }
         
-        for result in &previous_result.results {
-            match result {
-                PortfolioItemResult::Success { .. } => {
-                    new_results.push(result.clone());
-                },
-                PortfolioItemResult::Failure { asset_id, source, error: _ } => {
-                     // Try to find the calculator with this ID
-                     if let Some(calc) = self.get(*asset_id) {
-                         match calc.calculate_zakat(config) {
-                             Ok(detail) => new_results.push(PortfolioItemResult::Success { 
-                                 asset_id: *asset_id, 
-                                 details: detail 
-                             }),
-                             Err(new_err) => {
-                                 let mut e = new_err;
-                                 e = e.with_source(source.clone());
-                                 new_results.push(PortfolioItemResult::Failure {
-                                     asset_id: *asset_id,
-                                     source: source.clone(),
-                                     error: e,
-                                 });
-                             }
+        // 2. Retry failures
+        for failure in &previous_result.failures {
+            if let PortfolioItemResult::Failure { asset_id, source, .. } = failure {
+                 // Try to find the calculator with this ID
+                 if let Some(calc) = self.get(*asset_id) {
+                     match calc.calculate_zakat(config) {
+                         Ok(detail) => new_results.push(PortfolioItemResult::Success { 
+                             asset_id: *asset_id, 
+                             details: detail 
+                         }),
+                         Err(new_err) => {
+                             let mut e = new_err;
+                             e = e.with_source(source.clone());
+                             new_results.push(PortfolioItemResult::Failure {
+                                 asset_id: *asset_id,
+                                 source: source.clone(),
+                                 error: e,
+                             });
                          }
-                     } else {
-                         // If the calculator was removed, we preserve the original error to maintain history.
-                         new_results.push(result.clone());
                      }
-                }
+                 } else {
+                     // If the calculator was removed, we preserve the original error to maintain history.
+                     new_results.push(failure.clone());
+                 }
             }
         }
         
@@ -489,39 +505,47 @@ impl ZakatPortfolio {
     /// This method aggregates individual asset explanations, calculation steps, 
     /// and any warnings into a single structured string. It is ideal for 
     /// CLI output or providing detailed feedback to end-users.
-    pub fn explain(&self, config: &crate::config::ZakatConfig) -> String {
+    pub fn explain(&self, config: &crate::config::ZakatConfig, translator: &impl crate::traits::Translator) -> String {
         let result = self.calculate_total(config);
         let mut output = String::new();
         
         use std::fmt::Write;
         
-        writeln!(&mut output, "=== Zakat Portfolio Report ===").ok();
-        writeln!(&mut output, "Total Zakat Due: {}", result.total_zakat_due).ok();
-        writeln!(&mut output, "Total Net Assets: {}", result.total_assets).ok();
+        writeln!(&mut output, "{}", translator.translate("report-header", None)).ok();
+        writeln!(&mut output, "{}: {}", translator.translate("report-total-zakat", None), result.total_zakat_due).ok();
+        writeln!(&mut output, "{}: {}", translator.translate("report-total-assets", None), result.total_assets).ok();
         writeln!(&mut output, "==============================").ok();
         
-        output.push_str("\nAsset Breakdown:\n");
+        output.push_str(&format!("\n{}\n", translator.translate("report-breakdown-title", None)));
         
-        for (idx, (item, result_item)) in self.items.iter().zip(result.results.iter()).enumerate() {
+        // Mix successes and failures by reconstructing order or just listing successes then failures
+        // For CLI report, order matters (input order).
+        // Since we split them, we lost input order unless we sort by something?
+        // But ZakatDetails has label.
+        // Ideally we iterate `items` and find result?
+        // Or we iterate `self.items` and lookup in result.
+        
+        for (idx, item) in self.items.iter().enumerate() {
+            let item_id = crate::traits::CalculateZakat::get_id(item);
             let label = crate::traits::CalculateZakat::get_label(item).unwrap_or_else(|| format!("Asset #{}", idx + 1));
             
-            match result_item {
-                PortfolioItemResult::Success { details, .. } => {
-                    writeln!(&mut output, "\n[{}]: {}", label, details.status_reason.as_deref().unwrap_or("Unknown Status")).ok();
-                    writeln!(&mut output, "  - Value: {}", details.total_assets).ok();
-                    writeln!(&mut output, "  - Zakat: {}", details.zakat_due).ok();
-                    
-                    if !details.structured_warnings.is_empty() {
-                        writeln!(&mut output, "  - Warnings:").ok();
-                        for w in &details.structured_warnings {
-                            writeln!(&mut output, "    * {}", w.message).ok();
-                        }
+            // Find in success
+            if let Some(details) = result.successes.iter().find(|s| s.asset_id == Some(item_id)) {
+                writeln!(&mut output, "\n[{}]: {}", label, details.status_reason.as_deref().unwrap_or("Unknown")).ok();
+                writeln!(&mut output, "  - {}: {}", translator.translate("report-value", None), details.total_assets).ok(); // Simplified lookup
+                writeln!(&mut output, "  - {}: {}", translator.translate("report-zakat-due", None), details.zakat_due).ok();
+                
+                if !details.structured_warnings.is_empty() {
+                    writeln!(&mut output, "  - Warnings:").ok();
+                    for w in &details.structured_warnings {
+                        writeln!(&mut output, "    * {}", w.message).ok();
                     }
-                },
-                PortfolioItemResult::Failure { error, .. } => {
-                    writeln!(&mut output, "\n[{}]: Calculation Failed", label).ok();
-                    writeln!(&mut output, "  - Error: {}", error).ok();
                 }
+            } else if let Some(fail) = result.failures.iter().find(|f| matches!(f, PortfolioItemResult::Failure{asset_id, ..} if *asset_id == item_id)) {
+                 if let PortfolioItemResult::Failure { error, .. } = fail {
+                    writeln!(&mut output, "\n[{}]: {}", label, translator.translate("report-failed", None)).ok();
+                    writeln!(&mut output, "  - Error: {}", error).ok();
+                 }
             }
         }
         
@@ -585,7 +609,8 @@ impl AsyncZakatPortfolio {
         if let Err(e) = config.validate() {
             return PortfolioResult {
                 status: PortfolioStatus::Failed,
-                results: vec![PortfolioItemResult::Failure {
+                successes: Vec::new(),
+                failures: vec![PortfolioItemResult::Failure {
                     asset_id: Uuid::nil(),
                     source: "Configuration".to_string(),
                     error: e,
@@ -720,9 +745,20 @@ fn aggregate_and_summarize(mut results: Vec<PortfolioItemResult>, config: &crate
         PortfolioStatus::Partial
     };
 
+    let mut successes = Vec::with_capacity(results.len());
+    let mut failures = Vec::with_capacity(results.len());
+
+    for result in results {
+        match result {
+            PortfolioItemResult::Success { details, .. } => successes.push(details),
+            r @ PortfolioItemResult::Failure { .. } => failures.push(r),
+        }
+    }
+
     PortfolioResult {
         status,
-        results,
+        successes,
+        failures,
         total_assets,
         total_zakat_due,
         items_attempted,
@@ -737,6 +773,18 @@ mod tests {
     use rust_decimal_macros::dec;
     use crate::maal::business::BusinessZakat;
 
+    struct MockTranslator;
+    impl crate::traits::Translator for MockTranslator {
+         fn translate(&self, key: &str, _args: Option<&std::collections::HashMap<String, String>>) -> String {
+             // Return meaningful strings for assertions
+             if key == "report-header" { return "=== Zakat Portfolio Report ===".to_string(); }
+             if key == "report-total-zakat" { return "Total Zakat Due".to_string(); }
+             if key == "report-total-assets" { return "Total Assets".to_string(); }
+             if key == "report-breakdown-title" { return "Asset Breakdown".to_string(); }
+             key.to_string()
+         }
+    }
+
     #[test]
     fn test_portfolio_explain_aggregation() {
         let mut portfolio = ZakatPortfolio::new();
@@ -746,7 +794,8 @@ mod tests {
         let biz = BusinessZakat::new().cash(10000).label("Shop").hawl(true);
         portfolio = portfolio.add(biz);
         
-        let explanation = portfolio.explain(&config);
+        let translator = MockTranslator;
+        let explanation = portfolio.explain(&config, &translator);
         
         assert!(explanation.contains("=== Zakat Portfolio Report ==="));
         assert!(explanation.contains("Total Zakat Due"));

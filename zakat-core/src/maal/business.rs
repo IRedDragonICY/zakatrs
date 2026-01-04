@@ -171,8 +171,8 @@ impl CalculateZakat for BusinessZakat {
         let rate = config.strategy.get_rules().trade_goods_rate;
         
         let gross_assets = ZakatDecimal::new(self.cash_on_hand)
-            .safe_add(self.inventory_value)?
-            .safe_add(self.receivables)?
+            .checked_add(self.inventory_value)?
+            .checked_add(self.receivables)?
             .with_source(self.label.clone());
         
         let trace_steps = vec![
@@ -202,6 +202,7 @@ impl CalculateZakat for BusinessZakat {
             wealth_type: crate::types::WealthType::Business,
             label: self.label.clone(),
             hawl_satisfied: hawl_is_satisfied,
+            asset_id: Some(self.id),
             trace_steps,
             warnings: Vec::new(),
         };

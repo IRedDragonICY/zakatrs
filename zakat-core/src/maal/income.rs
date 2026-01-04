@@ -183,7 +183,7 @@ impl CalculateZakat for IncomeZakatCalculator {
                 // Net means (Income - Basic Living Expenses).
                 // Then we also deduct any extra debts.
                 let combined_liabilities = ZakatDecimal::new(self.expenses)
-                    .safe_add(external_debt)?
+                    .checked_add(external_debt)?
                     .with_source(self.label.clone());
                 (self.income, *combined_liabilities)
             }
@@ -219,6 +219,7 @@ impl CalculateZakat for IncomeZakatCalculator {
             rate,
             wealth_type: crate::types::WealthType::Income,
             label: self.label.clone(),
+            asset_id: Some(self.id),
             hawl_satisfied: hawl_is_satisfied,
             trace_steps,
             warnings,

@@ -11,6 +11,8 @@ pub struct MonetaryCalcParams {
     pub wealth_type: WealthType,
     pub label: Option<String>,
     pub hawl_satisfied: bool,
+
+    pub asset_id: Option<uuid::Uuid>,
     pub trace_steps: Vec<CalculationStep>, // Asset-specific steps leading up to Total Assets
     pub warnings: Vec<String>, // Non-fatal warnings to include in the result
 }
@@ -30,7 +32,7 @@ pub fn calculate_monetary_asset(params: MonetaryCalcParams) -> Result<ZakatDetai
     // 2. Net Calculation
     // Note: ZakatDecimal handles safe math and context errors
     let net_val = ZakatDecimal::new(params.total_assets)
-        .safe_sub(params.liabilities)
+        .checked_sub(params.liabilities)
         .map_err(|e| e.with_source(params.label.clone().unwrap_or_default()))?;
     
     let net_assets = *net_val;
@@ -40,7 +42,7 @@ pub fn calculate_monetary_asset(params: MonetaryCalcParams) -> Result<ZakatDetai
     
     let zakat_due = if is_payable {
         ZakatDecimal::new(net_assets)
-            .safe_mul(params.rate)
+            .checked_mul(params.rate)
             .map_err(|e| e.with_source(params.label.clone().unwrap_or_default()))?
             .0
     } else {
@@ -73,6 +75,8 @@ pub fn calculate_monetary_asset(params: MonetaryCalcParams) -> Result<ZakatDetai
         params.wealth_type,
         final_trace
     ).with_label(params.label.unwrap_or_default());
+    
+    result.asset_id = params.asset_id;
     
     // Add any warnings from params to the result
     #[allow(deprecated)] // Uses deprecated `warnings` field for backward compat

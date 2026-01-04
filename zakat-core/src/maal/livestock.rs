@@ -227,9 +227,9 @@ impl CalculateZakat for LivestockAssets {
 
         // Calculate Nisab Count Value for reporting consistency even if not payable
         let nisab_count_val = match animal_type {
-            LivestockType::Sheep => ZakatDecimal::new(Decimal::from(40)).safe_mul(single_price)?.with_source(self.label.clone()),
-            LivestockType::Cow => ZakatDecimal::new(Decimal::from(30)).safe_mul(single_price)?.with_source(self.label.clone()),
-            LivestockType::Camel => ZakatDecimal::new(Decimal::from(5)).safe_mul(single_price)?.with_source(self.label.clone()),
+            LivestockType::Sheep => ZakatDecimal::new(Decimal::from(40)).checked_mul(single_price)?.with_source(self.label.clone()),
+            LivestockType::Cow => ZakatDecimal::new(Decimal::from(30)).checked_mul(single_price)?.with_source(self.label.clone()),
+            LivestockType::Camel => ZakatDecimal::new(Decimal::from(5)).checked_mul(single_price)?.with_source(self.label.clone()),
         };
 
         // Fiqh Rule: Working animals (Al-Awamil) are Exempt
@@ -263,13 +263,13 @@ impl CalculateZakat for LivestockAssets {
         // Total Assets = Count * Price (Approx value of herd)
         
         let total_value = ZakatDecimal::new(Decimal::from(self.count))
-            .safe_mul(single_price)?
+            .checked_mul(single_price)?
             .with_source(self.label.clone());
             
         let is_payable = zakat_value > Decimal::ZERO;
         
         let nisab_threshold = ZakatDecimal::new(Decimal::from(nisab_count))
-            .safe_mul(single_price)?
+            .checked_mul(single_price)?
             .with_source(self.label.clone());
 
         // Generate description string from heads_due using PaymentPayload helper
@@ -318,6 +318,7 @@ impl CalculateZakat for LivestockAssets {
             wealth_type: crate::types::WealthType::Livestock,
             status_reason: None,
             label: self.label.clone(),
+            asset_id: Some(self.id),
             payload: crate::types::PaymentPayload::Livestock { heads_due },
             calculation_trace: crate::types::CalculationTrace(trace),
             warnings: Vec::new(),
@@ -358,7 +359,7 @@ fn calculate_sheep_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Ve
     };
 
     let zakat_value = ZakatDecimal::new(Decimal::from(sheep_due))
-        .safe_mul(price)?
+        .checked_mul(price)?
         .with_source(Some("Sheep Zakat".to_string()));
     
     Ok((*zakat_value, nisab, vec![LivestockDueItem::new(sheep_due, LivestockAge::Jadha, LivestockKind::Sheep)]))
@@ -415,12 +416,12 @@ fn calculate_cow_zakat(count: u32, price: Decimal) -> Result<(Decimal, u32, Vec<
     }
 
     // Value estimation
-    let val_tabi = ZakatDecimal::new(price).safe_mul(dec!(0.7))?.with_source(Some("Cow Zakat".to_string()));
+    let val_tabi = ZakatDecimal::new(price).checked_mul(dec!(0.7))?.with_source(Some("Cow Zakat".to_string()));
     let val_musinnah = price;
     
-    let tabi_total = ZakatDecimal::new(Decimal::from(tabi)).safe_mul(*val_tabi)?.with_source(Some("Cow Zakat".to_string()));
-    let musinnah_total = ZakatDecimal::new(Decimal::from(musinnah)).safe_mul(val_musinnah)?.with_source(Some("Cow Zakat".to_string()));
-    let total_zakat_val = tabi_total.safe_add(*musinnah_total)?.with_source(Some("Cow Zakat".to_string()));
+    let tabi_total = ZakatDecimal::new(Decimal::from(tabi)).checked_mul(*val_tabi)?.with_source(Some("Cow Zakat".to_string()));
+    let musinnah_total = ZakatDecimal::new(Decimal::from(musinnah)).checked_mul(val_musinnah)?.with_source(Some("Cow Zakat".to_string()));
+    let total_zakat_val = tabi_total.checked_add(*musinnah_total)?.with_source(Some("Cow Zakat".to_string()));
     
     let mut parts = Vec::new();
     if tabi > 0 { 
@@ -486,16 +487,16 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decima
     // Pricing
     let v_sheep = prices.sheep_price;
     let v_camel = prices.camel_price; 
-    let v_bm = ZakatDecimal::new(v_camel).safe_mul(dec!(0.5))?.with_source(Some("Camel Zakat".to_string()));
-    let v_bl = ZakatDecimal::new(v_camel).safe_mul(dec!(0.75))?.with_source(Some("Camel Zakat".to_string()));
+    let v_bm = ZakatDecimal::new(v_camel).checked_mul(dec!(0.5))?.with_source(Some("Camel Zakat".to_string()));
+    let v_bl = ZakatDecimal::new(v_camel).checked_mul(dec!(0.75))?.with_source(Some("Camel Zakat".to_string()));
     let v_hq = v_camel;
-    let v_jz = ZakatDecimal::new(v_camel).safe_mul(dec!(1.25))?.with_source(Some("Camel Zakat".to_string()));
+    let v_jz = ZakatDecimal::new(v_camel).checked_mul(dec!(1.25))?.with_source(Some("Camel Zakat".to_string()));
     
-    let total = ZakatDecimal::new(Decimal::from(sheep)).safe_mul(v_sheep)?
-        .safe_add(ZakatDecimal::new(Decimal::from(b_makhad)).safe_mul(*v_bm)?.0)?
-        .safe_add(ZakatDecimal::new(Decimal::from(b_labun)).safe_mul(*v_bl)?.0)?
-        .safe_add(ZakatDecimal::new(Decimal::from(hiqqah)).safe_mul(v_hq)?.0)?
-        .safe_add(ZakatDecimal::new(Decimal::from(jazaah)).safe_mul(*v_jz)?.0)?
+    let total = ZakatDecimal::new(Decimal::from(sheep)).checked_mul(v_sheep)?
+        .checked_add(ZakatDecimal::new(Decimal::from(b_makhad)).checked_mul(*v_bm)?.0)?
+        .checked_add(ZakatDecimal::new(Decimal::from(b_labun)).checked_mul(*v_bl)?.0)?
+        .checked_add(ZakatDecimal::new(Decimal::from(hiqqah)).checked_mul(v_hq)?.0)?
+        .checked_add(ZakatDecimal::new(Decimal::from(jazaah)).checked_mul(*v_jz)?.0)?
         .with_source(Some("Camel Zakat".to_string()));
         
     let mut parts = Vec::new();

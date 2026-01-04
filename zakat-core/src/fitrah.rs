@@ -102,6 +102,7 @@ impl CalculateZakat for FitrahCalculator {
             wealth_type: crate::types::WealthType::Fitrah,
             status_reason: None,
             label: self.label.clone(),
+            asset_id: Some(self.id),
             payload: crate::types::PaymentPayload::Monetary(total_value),
             calculation_trace: crate::types::CalculationTrace(trace),
             warnings: Vec::new(),

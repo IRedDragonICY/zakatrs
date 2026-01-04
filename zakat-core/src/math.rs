@@ -11,7 +11,7 @@ impl ZakatDecimal {
         Self(val)
     }
 
-    pub fn safe_add(self, other: impl Into<Decimal>) -> Result<Self, ZakatError> {
+    pub fn checked_add(self, other: impl Into<Decimal>) -> Result<Self, ZakatError> {
         let other_dec = other.into();
         self.0.checked_add(other_dec)
             .map(Self)
@@ -22,7 +22,7 @@ impl ZakatDecimal {
             })
     }
 
-    pub fn safe_sub(self, other: impl Into<Decimal>) -> Result<Self, ZakatError> {
+    pub fn checked_sub(self, other: impl Into<Decimal>) -> Result<Self, ZakatError> {
         let other_dec = other.into();
         self.0.checked_sub(other_dec)
             .map(Self)
@@ -33,7 +33,7 @@ impl ZakatDecimal {
             })
     }
 
-    pub fn safe_mul(self, other: impl Into<Decimal>) -> Result<Self, ZakatError> {
+    pub fn checked_mul(self, other: impl Into<Decimal>) -> Result<Self, ZakatError> {
         let other_dec = other.into();
         self.0.checked_mul(other_dec)
             .map(Self)
@@ -44,7 +44,7 @@ impl ZakatDecimal {
             })
     }
 
-    pub fn safe_div(self, other: impl Into<Decimal>) -> Result<Self, ZakatError> {
+    pub fn checked_div(self, other: impl Into<Decimal>) -> Result<Self, ZakatError> {
         let other_dec = other.into();
         if other_dec.is_zero() {
              return Err(ZakatError::CalculationError(Box::new(ErrorDetails {

@@ -13,6 +13,12 @@ pub trait TemporalAsset {
     fn with_hawl_satisfied(self, satisfied: bool) -> Self;
 }
 
+/// Trait for handling internationalization of messages.
+pub trait Translator {
+    /// Translates a key with optional arguments.
+    fn translate(&self, key: &str, args: Option<&std::collections::HashMap<String, String>>) -> String;
+}
+
 // 1. Support passing &ZakatConfig directly
 impl ZakatConfigArgument for &ZakatConfig {
     fn resolve_config(&self) -> Cow<'_, ZakatConfig> {

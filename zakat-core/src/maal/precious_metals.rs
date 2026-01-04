@@ -118,6 +118,7 @@ impl PreciousMetals {
         Self::new()
             .weight(weight)
             .metal_type(WealthType::Silver)
+            .purity(1000)
             .usage(JewelryUsage::Investment)
             .hawl(true)
     }
@@ -311,7 +312,7 @@ impl CalculateZakat for PreciousMetals {
 
         // 6. Calculate nisab threshold in currency
         let nisab_value = ZakatDecimal::new(nisab_threshold_grams)
-            .safe_mul(price_per_gram)?
+            .checked_mul(price_per_gram)?
             .with_source(self.label.clone());
 
         // 7. Determine hawl satisfaction (acquisition_date takes precedence)
@@ -329,7 +330,7 @@ impl CalculateZakat for PreciousMetals {
 
         // 9. Calculate total value
         let total_value = effective_weight
-            .safe_mul(price_per_gram)?
+            .checked_mul(price_per_gram)?
             .with_source(self.label.clone());
 
         // 10. Build trace steps (asset-specific preprocessing)
@@ -360,6 +361,7 @@ impl CalculateZakat for PreciousMetals {
             rate,
             wealth_type: metal_type,
             label: self.label.clone(),
+            asset_id: Some(self.id),
             hawl_satisfied: hawl_is_satisfied,
             trace_steps,
             warnings: Vec::new(),
@@ -380,10 +382,10 @@ impl PreciousMetals {
         let effective_weight = if *metal_type == WealthType::Gold && self.purity < purity_24 {
             // Gold: weight * (karat / 24)
             let purity_ratio = ZakatDecimal::new(self.purity)
-                .safe_div(purity_24)?
+                .checked_div(purity_24)?
                 .with_source(self.label.clone());
             let weight = ZakatDecimal::new(base_weight)
-                .safe_mul(*purity_ratio)?
+                .checked_mul(*purity_ratio)?
                 .with_source(self.label.clone());
             
             trace_steps.push(CalculationStep::info(
@@ -398,10 +400,10 @@ impl PreciousMetals {
         } else if *metal_type == WealthType::Silver && self.purity < purity_1000 {
             // Silver: weight * (purity / 1000)
             let purity_ratio = ZakatDecimal::new(self.purity)
-                .safe_div(purity_1000)?
+                .checked_div(purity_1000)?
                 .with_source(self.label.clone());
             let weight = ZakatDecimal::new(base_weight)
-                .safe_mul(*purity_ratio)?
+                .checked_mul(*purity_ratio)?
                 .with_source(self.label.clone());
             
             trace_steps.push(CalculationStep::info(

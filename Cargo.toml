@@ -57,7 +57,7 @@ fluent-bundle = "0.15.2"
 intl-memoizer = "0.5.1"
 unic-langid = "0.9.1"
 rust-embed = "8.0.0"
-icu = { version = "1.5", features = ["serde", "compiled_data", "experimental"] }
+icu = { version = "2.1", features = ["serde", "compiled_data", "experimental"] }
 fixed_decimal = "0.5"
 writeable = "0.5"
 

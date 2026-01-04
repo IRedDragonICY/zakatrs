@@ -868,8 +868,8 @@ fn update_pyproject_version(path: &Path, version: &str) -> Result<()> {
 const WORKSPACE_CRATES: &[&str] = &[
     "zakat-core",      // No internal deps
     "zakat-i18n",      // Depends on zakat-core
-    "zakat-ledger",    // Depends on zakat-core
-    "zakat-providers", // Depends on zakat-core
+    "zakat-providers", // Depends on zakat-core, used by zakat-ledger
+    "zakat-ledger",    // Depends on zakat-core, zakat-providers
     "zakat-sqlite",    // Depends on zakat-core, zakat-ledger
     "zakat-cli",       // Interactive CLI tool
     "zakat",           // Facade - depends on all above

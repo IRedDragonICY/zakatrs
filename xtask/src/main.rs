@@ -988,6 +988,48 @@ fn publish_all(specific_target: Option<&str>) -> Result<()> {
                     fail_count += 1;
                 }
             }
+        } else if target.id == "npm" && !dry_run {
+            // Special handling for NPM with auto-login on auth failure
+            let dir = root.join(target.path_relative);
+            if !dir.exists() {
+                println!("    ⚠️  Directory not found: {}", dir.display());
+                fail_count += 1;
+                continue;
+            }
+            
+            let args = &target.args_publish;
+            let result = run_cmd_in_dir_interactive(&dir, target.cmd, args);
+            
+            match result {
+                Ok(_) => {
+                    println!("  ✅ {} publish successful!", target.name);
+                    success_count += 1;
+                }
+                Err(_e) => {
+                    // On any NPM failure, try re-login and retry
+                    // Common issues: token expired, revoked, permission denied
+                    println!("  ⚠️  NPM publish failed. Attempting re-authentication...");
+                    
+                    // Prompt for npm login
+                    println!("  🔐 Running 'npm login' to refresh authentication...");
+                    if run_cmd_in_dir_interactive(&dir, "npm", &["login"]).is_ok() {
+                        println!("  🔄 Retrying publish after login...");
+                        match run_cmd_in_dir_interactive(&dir, target.cmd, args) {
+                            Ok(_) => {
+                                println!("  ✅ {} publish successful after re-login!", target.name);
+                                success_count += 1;
+                            }
+                            Err(e2) => {
+                                println!("  ❌ {} still failed after re-login: {}", target.name, e2);
+                                fail_count += 1;
+                            }
+                        }
+                    } else {
+                        println!("  ❌ npm login failed");
+                        fail_count += 1;
+                    }
+                }
+            }
         } else {
             let dir = root.join(target.path_relative);
             if !dir.exists() {

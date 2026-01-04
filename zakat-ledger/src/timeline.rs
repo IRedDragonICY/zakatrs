@@ -49,44 +49,45 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
     
     let mut current_date = start_date;
     
-    // We need an iterator for events
-    let mut event_iter = sorted_events.into_iter().peekable();
+    // We use an index instead of an iterator for batch processing
+    let mut current_event_idx = 0;
     
     let mut current_nisab;
 
     while current_date <= end_date {
         let mut balance_changed = false;
 
-        // Process all events for the current day
-        while let Some(event) = event_iter.peek() {
-            if event.date == current_date {
-                if event.amount < Decimal::ZERO {
-                     return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
-                        code: zakat_core::types::ZakatErrorCode::InvalidInput,
-                        field: "amount".to_string(),
-                        value: event.amount.to_string(),
-                        reason_key: "error-amount-positive".to_string(),
-                        source_label: Some("simulate_timeline".to_string()),
-                        asset_id: Some(event.id),
-                        suggestion: Some("Transaction amounts must be non-negative.".to_string()),
-                        ..Default::default()
-                    })));
-                }
-
-                use super::events::TransactionType::*;
-                match event.transaction_type {
-                    Deposit | Income | Profit => current_balance += event.amount,
-                    Withdrawal | Expense | Loss => current_balance -= event.amount,
-                }
-                balance_changed = true;
-                event_iter.next();
-            } else if event.date < current_date {
-                // Should not happen if sorted and logic is correct, but safe to consume
-                event_iter.next(); 
-            } else {
-                // Event is in future relative to current_date
-                break;
-            }
+        // Optimized Batch Processing: Find all events for the current day
+        if current_event_idx < sorted_events.len() && sorted_events[current_event_idx].date == current_date {
+             // Find how many events belong to this day using binary search (partition_point)
+             // The slice is sorted by date, so we find the first event whose date is > current_date.
+             let remaining_events = &sorted_events[current_event_idx..];
+             let batch_count = remaining_events.partition_point(|e| e.date <= current_date);
+             
+             // Process the batch
+             for event in &remaining_events[..batch_count] {
+                 if event.amount < Decimal::ZERO {
+                      return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+                         code: zakat_core::types::ZakatErrorCode::InvalidInput,
+                         field: "amount".to_string(),
+                         value: event.amount.to_string(),
+                         reason_key: "error-amount-positive".to_string(),
+                         source_label: Some("simulate_timeline".to_string()),
+                         asset_id: Some(event.id),
+                         suggestion: Some("Transaction amounts must be non-negative.".to_string()),
+                         ..Default::default()
+                     })));
+                 }
+ 
+                 use super::events::TransactionType::*;
+                 match event.transaction_type {
+                     Deposit | Income | Profit => current_balance += event.amount,
+                     Withdrawal | Expense | Loss => current_balance -= event.amount,
+                 }
+             }
+             
+             current_event_idx += batch_count;
+             balance_changed = true;
         }
         
         // Refresh nisab for the current day
@@ -106,7 +107,11 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
 
         // TIME JUMP LOGIC
         // Determine the next interesting date
-        let next_event_date = event_iter.peek().map(|e| e.date).unwrap_or(end_date + Duration::days(1));
+        let next_event_date = if current_event_idx < sorted_events.len() {
+            sorted_events[current_event_idx].date
+        } else {
+            end_date + Duration::days(1)
+        };
         
         // Use optimized next_price_change lookup
         let next_price_date = price_provider.next_price_change(current_date)

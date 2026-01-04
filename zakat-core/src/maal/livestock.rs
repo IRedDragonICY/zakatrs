@@ -84,6 +84,7 @@ pub struct LivestockAssets {
     pub liabilities_due_now: Decimal,
     pub hawl_satisfied: bool,
     pub grazing_method: GrazingMethod,
+    pub is_working_animal: bool, // Exemption for Awamil
     pub label: Option<String>,
     pub id: uuid::Uuid,
 }
@@ -97,6 +98,7 @@ impl Default for LivestockAssets {
             liabilities_due_now: Decimal::ZERO,
             hawl_satisfied: true,
             grazing_method: GrazingMethod::Saimah,
+            is_working_animal: false,
             label: None,
             id: uuid::Uuid::new_v4(),
         }
@@ -137,6 +139,13 @@ impl LivestockAssets {
 
     pub fn grazing(mut self, method: GrazingMethod) -> Self {
         self.grazing_method = method;
+        self
+    }
+
+    /// Sets whether the animals are working animals (Al-Awamil).
+    /// Working animals (plowing, transport, irrigation) are exempt from Zakat.
+    pub fn working_animal(mut self, is_working: bool) -> Self {
+        self.is_working_animal = is_working;
         self
     }
 
@@ -222,6 +231,15 @@ impl CalculateZakat for LivestockAssets {
             LivestockType::Cow => ZakatDecimal::new(Decimal::from(30)).safe_mul(single_price)?.with_source(self.label.clone()),
             LivestockType::Camel => ZakatDecimal::new(Decimal::from(5)).safe_mul(single_price)?.with_source(self.label.clone()),
         };
+
+        // Fiqh Rule: Working animals (Al-Awamil) are Exempt
+        if self.is_working_animal {
+             return Ok(ZakatDetails::below_threshold(
+                *nisab_count_val, 
+                crate::types::WealthType::Livestock, 
+                "Working animals (Awamil) are exempt"
+            ).with_label(self.label.clone().unwrap_or_default()));
+        }
 
         if self.grazing_method != GrazingMethod::Saimah {
              return Ok(ZakatDetails::below_threshold(*nisab_count_val, crate::types::WealthType::Livestock, "Not Sa'imah (naturally grazed)")

@@ -44,6 +44,25 @@ impl crate::inputs::FromFfiString for JewelryUsage {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, strum::Display, strum::EnumString, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Gender {
+    Male,
+    Female,
+}
+
+impl crate::inputs::ToFfiString for Gender {
+    fn to_ffi_string(&self) -> String { self.to_string() }
+}
+
+impl crate::inputs::FromFfiString for Gender {
+    type Err = strum::ParseError;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+        use std::str::FromStr;
+        Self::from_str(s)
+    }
+}
+
 // MACRO USAGE
 crate::zakat_ffi_export! {
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +71,8 @@ crate::zakat_ffi_export! {
         pub metal_type: Option<WealthType>,
         pub purity: u32,
         pub usage: JewelryUsage,
+        pub stone_weight_grams: Decimal,
+        pub gender: Option<Gender>,
     }
 }
 
@@ -64,6 +85,8 @@ impl Default for PreciousMetals {
             metal_type: None,
             purity: 24,
             usage: JewelryUsage::Investment,
+            stone_weight_grams: Decimal::ZERO,
+            gender: None,
             liabilities_due_now,
             named_liabilities,
             hawl_satisfied,
@@ -157,6 +180,27 @@ impl PreciousMetals {
         self.usage = usage;
         self
     }
+
+    /// Sets the weight of stones/gemstones to be deducted from the total weight.
+    pub fn with_stones(mut self, weight: impl IntoZakatDecimal) -> Self {
+        match weight.into_zakat_decimal() {
+             Ok(v) => self.stone_weight_grams = v,
+             Err(e) => self._input_errors.push(e),
+        }
+        self
+    }
+
+    /// Sets the gender of the owner (relevant for Gold jewelry exemption rules).
+    pub fn gender(mut self, g: Gender) -> Self {
+        self.gender = Some(g);
+        self
+    }
+
+    /// Constructor for White Gold (alias for Gold).
+    /// Treat as Gold but semantically clearer for users.
+    pub fn white_gold(weight: impl IntoZakatDecimal, purity: u32) -> Self {
+        Self::gold(weight).purity(purity)
+    }
 }
 
 impl CalculateZakat for PreciousMetals {
@@ -175,9 +219,23 @@ impl CalculateZakat for PreciousMetals {
         // 1. Validate metal type
         let metal_type = Validator::require(&self.metal_type, "metal_type", self.label.clone())?.clone();
 
-        // 2. Validate weight
+        // 2. Validate weight & Deduct Stones
+        let net_weight = self.weight_grams - self.stone_weight_grams;
+        if net_weight < Decimal::ZERO {
+             return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+                field: "stone_weight_grams".to_string(),
+                value: self.stone_weight_grams.to_string(),
+                reason_key: "error-stones-exceed-weight".to_string(),
+                args: None,
+                source_label: self.label.clone(),
+                asset_id: Some(self.id),
+                suggestion: Some("Stone weight cannot exceed total weight.".to_string()),
+            })));
+        }
+
         Validator::ensure_non_negative(&[
-            ("weight", self.weight_grams)
+            ("weight", self.weight_grams),
+            ("net_weight", net_weight)
         ], self.label.clone())?;
 
         // 3. Validate purity range based on metal type
@@ -210,7 +268,19 @@ impl CalculateZakat for PreciousMetals {
         };
 
         // 4. Check for personal usage exemption (Madhab-specific)
-        if self.usage == JewelryUsage::PersonalUse && config.strategy.get_rules().jewelry_exempt {
+        // Fiqh Rule: Gold for Men is Haram. Haram wealth is not exempt (Kanz).
+        let is_male_gold = matches!((&self.gender, &metal_type), (Some(Gender::Male), WealthType::Gold));
+        
+        let exempt_base = self.usage == JewelryUsage::PersonalUse && config.strategy.get_rules().jewelry_exempt;
+        
+        let effectively_exempt = if is_male_gold && self.usage == JewelryUsage::PersonalUse {
+            // Male wearing gold -> Prohibited -> Not Exempt despite Madhab rules for women
+             false
+        } else {
+             exempt_base
+        };
+
+        if effectively_exempt {
             return Ok(ZakatDetails::below_threshold(
                 Decimal::ZERO, 
                 metal_type, 
@@ -250,7 +320,8 @@ impl CalculateZakat for PreciousMetals {
         };
 
         // 8. Apply purity normalization (unique to precious metals)
-        let (effective_weight, purity_trace_steps) = self.normalize_purity(&metal_type)?;
+        // Use net_weight (after stone deduction) for purity calc
+        let (effective_weight, purity_trace_steps) = self.normalize_purity(&metal_type, net_weight)?;
 
         // 9. Calculate total value
         let total_value = effective_weight
@@ -259,9 +330,19 @@ impl CalculateZakat for PreciousMetals {
 
         // 10. Build trace steps (asset-specific preprocessing)
         let mut trace_steps = vec![
-            CalculationStep::initial("step-weight", "Weight (grams)", self.weight_grams),
-            CalculationStep::initial("step-price-per-gram", "Price per gram", price_per_gram),
+            CalculationStep::initial("step-weight", "Total Weight (grams)", self.weight_grams),
         ];
+
+        if self.stone_weight_grams > Decimal::ZERO {
+             trace_steps.push(CalculationStep::subtract("step-deduct-stones", "Gemstones Deduction", self.stone_weight_grams));
+             trace_steps.push(CalculationStep::result("step-net-weight", "Net Metal Weight", net_weight));
+        }
+
+        if is_male_gold && self.usage == JewelryUsage::PersonalUse {
+             trace_steps.push(CalculationStep::info("info-male-gold", "Gold held by male is not exempt (Haram usage)").with_args(std::collections::HashMap::from([("gender".to_string(), "Male".to_string())])));
+        }
+
+        trace_steps.push(CalculationStep::initial("step-price-per-gram", "Price per gram", price_per_gram));
         trace_steps.extend(purity_trace_steps);
         trace_steps.push(CalculationStep::result("step-total-value", "Total Value", *total_value));
 
@@ -287,7 +368,7 @@ impl CalculateZakat for PreciousMetals {
 impl PreciousMetals {
     /// Normalizes weight based on purity.
     /// Returns (effective_weight, trace_steps_for_purity_adjustment)
-    fn normalize_purity(&self, metal_type: &WealthType) -> Result<(ZakatDecimal, Vec<CalculationStep>), ZakatError> {
+    fn normalize_purity(&self, metal_type: &WealthType, base_weight: Decimal) -> Result<(ZakatDecimal, Vec<CalculationStep>), ZakatError> {
         let mut trace_steps = Vec::new();
         
         let effective_weight = if *metal_type == WealthType::Gold && self.purity < 24 {
@@ -295,7 +376,7 @@ impl PreciousMetals {
             let purity_ratio = ZakatDecimal::new(Decimal::from(self.purity))
                 .safe_div(Decimal::from(24))?
                 .with_source(self.label.clone());
-            let weight = ZakatDecimal::new(self.weight_grams)
+            let weight = ZakatDecimal::new(base_weight)
                 .safe_mul(*purity_ratio)?
                 .with_source(self.label.clone());
             
@@ -313,7 +394,7 @@ impl PreciousMetals {
             let purity_ratio = ZakatDecimal::new(Decimal::from(self.purity))
                 .safe_div(Decimal::from(1000))?
                 .with_source(self.label.clone());
-            let weight = ZakatDecimal::new(self.weight_grams)
+            let weight = ZakatDecimal::new(base_weight)
                 .safe_mul(*purity_ratio)?
                 .with_source(self.label.clone());
             
@@ -327,7 +408,7 @@ impl PreciousMetals {
             
             weight
         } else {
-            ZakatDecimal::new(self.weight_grams)
+            ZakatDecimal::new(base_weight)
         };
         
         Ok((effective_weight, trace_steps))

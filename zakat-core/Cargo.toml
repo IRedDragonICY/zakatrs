@@ -34,7 +34,7 @@ typeshare = { workspace = true }
 tracing = { workspace = true }
 paste = { workspace = true }
 icu_calendar = { version = "1.5", features = ["serde"] }
-icu_locid = "1.5"
+icu_locid = "2.0"
 
 # Optional async support
 async-trait = { workspace = true, optional = true }

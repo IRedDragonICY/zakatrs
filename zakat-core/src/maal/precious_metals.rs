@@ -205,7 +205,7 @@ impl PreciousMetals {
 
     /// Constructor for White Gold (alias for Gold).
     /// Treat as Gold but semantically clearer for users.
-    pub fn white_gold(weight: impl IntoZakatDecimal, purity: u32) -> Self {
+    pub fn white_gold(weight: impl IntoZakatDecimal, purity: impl IntoZakatDecimal) -> Self {
         Self::gold(weight).purity(purity)
     }
 }
@@ -312,8 +312,8 @@ impl CalculateZakat for PreciousMetals {
 
         // 6. Calculate nisab threshold in currency
         let nisab_value = ZakatDecimal::new(nisab_threshold_grams)
-            .checked_mul(price_per_gram)?
-            .with_source(self.label.clone());
+            .with_source(self.label.clone())
+            .checked_mul(price_per_gram)?;
 
         // 7. Determine hawl satisfaction (acquisition_date takes precedence)
         let hawl_is_satisfied = if let Some(date) = self.acquisition_date {
@@ -330,8 +330,8 @@ impl CalculateZakat for PreciousMetals {
 
         // 9. Calculate total value
         let total_value = effective_weight
-            .checked_mul(price_per_gram)?
-            .with_source(self.label.clone());
+            .with_source(self.label.clone())
+            .checked_mul(price_per_gram)?;
 
         // 10. Build trace steps (asset-specific preprocessing)
         // 10. Build trace steps (asset-specific preprocessing)
@@ -387,11 +387,11 @@ impl PreciousMetals {
         let effective_weight = if *metal_type == WealthType::Gold && self.purity < purity_24 {
             // Gold: weight * (karat / 24)
             let purity_ratio = ZakatDecimal::new(self.purity)
-                .checked_div(purity_24)?
-                .with_source(self.label.clone());
+                .with_source(self.label.clone())
+                .checked_div(purity_24)?;
             let weight = ZakatDecimal::new(base_weight)
-                .checked_mul(*purity_ratio)?
-                .with_source(self.label.clone());
+                .with_source(self.label.clone())
+                .checked_mul(*purity_ratio)?;
             
             trace_steps.push(CalculationStep::info(
                 "info-purity-adjustment",
@@ -405,11 +405,11 @@ impl PreciousMetals {
         } else if *metal_type == WealthType::Silver && self.purity < purity_1000 {
             // Silver: weight * (purity / 1000)
             let purity_ratio = ZakatDecimal::new(self.purity)
-                .checked_div(purity_1000)?
-                .with_source(self.label.clone());
+                .with_source(self.label.clone())
+                .checked_div(purity_1000)?;
             let weight = ZakatDecimal::new(base_weight)
-                .checked_mul(*purity_ratio)?
-                .with_source(self.label.clone());
+                .with_source(self.label.clone())
+                .checked_mul(*purity_ratio)?;
             
             trace_steps.push(CalculationStep::info(
                 "info-purity-adjustment",
@@ -506,7 +506,6 @@ mod tests {
         assert!(!zakat.is_payable);
         assert_eq!(zakat.zakat_due, Decimal::ZERO);
         
-        // Test 24K explicit
         let metal24 = PreciousMetals::new()
             .weight(100.0)
             .metal_type(WealthType::Gold)
@@ -515,6 +514,30 @@ mod tests {
         let zakat24 = metal24.calculate_zakat(&config).unwrap();
         assert!(zakat24.is_payable);
     }
+
+    #[test]
+    fn test_gold_fractional_purity() {
+        let config = ZakatConfig::new().with_gold_price(100);
+        
+        // 100g of 21.6K Gold.
+        // Effective Weight = 100 * (21.6 / 24) = 90g.
+        // Nisab = 85g.
+        // 90g >= 85g -> Payable.
+        
+        let metal = PreciousMetals::new()
+            .weight(100.0)
+            .metal_type(WealthType::Gold)
+            .purity(21.6)
+            .hawl(true);
+            
+        let zakat = metal.calculate_zakat(&config).unwrap();
+        
+        assert!(zakat.is_payable);
+        // Value = 90 * 100 = 9000
+        // Due = 9000 * 0.025 = 225
+        assert_eq!(zakat.zakat_due, dec!(225.0));
+    }
+
     #[test]
     fn test_personal_jewelry_hanafi_payable() {
         // Hanafi uses LowerOfTwo. Personal jewelry is Zakatable.

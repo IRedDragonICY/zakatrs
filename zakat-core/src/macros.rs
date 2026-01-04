@@ -285,11 +285,13 @@ macro_rules! zakat_ffi_export {
             use crate::inputs::{ToFfiString, FromFfiString};
 
             #[pyclass]
+            #[cfg_attr(feature = "stub-gen", pyo3_stub_gen::derive::gen_stub_pyclass)]
             #[derive(Clone)]
             pub struct $name {
                 pub inner: super::$name
             }
 
+            #[cfg_attr(feature = "stub-gen", pyo3_stub_gen::derive::gen_stub_pymethods)]
             #[pymethods]
             impl $name {
                 #[new]
@@ -369,11 +371,11 @@ macro_rules! zakat_ffi_export {
                     self.inner._input_errors.iter().map(|e| e.to_string()).collect::<std::vec::Vec<String>>()
                 }
 
-                fn calculate(&self, config: &crate::python::PyZakatConfig) -> pyo3::PyResult<crate::python::PyZakatDetails> {
-                     use crate::traits::CalculateZakat;
+                fn calculate(&self, config: &$crate::python::ZakatConfig) -> pyo3::PyResult<$crate::python::ZakatDetails> {
+                     use $crate::traits::CalculateZakat;
                      let details = self.inner.calculate_zakat(&config.inner)
-                        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
-                     Ok(crate::python::PyZakatDetails { inner: details })
+                        .map_err(|e| pyo3::PyErr::new::<pyo3::exceptions::PyValueError, _>(e.to_string()))?;
+                     Ok($crate::python::ZakatDetails { inner: details })
                 }
             }
         }

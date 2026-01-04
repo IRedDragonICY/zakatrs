@@ -35,6 +35,7 @@ fn main() -> Result<()> {
         "build-all" => build_all()?,
         "build-wasm" => build_wasm()?,
         "build-go" => build_go()?,
+        "build-py-stubs" => generate_python_stubs()?,
         "sync-versions" => sync_versions()?,
         "publish-all" => publish_all(None)?,
         "publish-crates" => publish_all(Some("crates"))?,
@@ -69,6 +70,7 @@ COMMANDS:
     build-all       Build all targets (Rust, Python, WASM, Dart)
     build-wasm      Build WASM target only
     build-go        Build Go bindings via UniFFI
+    build-py-stubs  Generate Python stub files (.pyi)
     sync-versions   Synchronize versions across all package manifests
     test            Run Rust tests only
     test-all        Run full compliance test suite (Rust + Python + Dart + WASM)
@@ -521,8 +523,10 @@ fn build_all() -> Result<()> {
         run_cmd("maturin", &["build", "--release", &manifest_arg])?;
     } else {
         println!("  ⚠️ 'maturin' not in PATH, trying 'python -m maturin'...");
-        run_cmd("python", &["-m", "maturin", "build", "--release", &manifest_arg])?;
     }
+
+    // 3.1 Generate Python Stubs
+    generate_python_stubs()?;
 
     // 4. WASM & JSR Build
     println!("\n🕸️  Building WASM & JSR Package...");
@@ -541,7 +545,7 @@ fn build_all() -> Result<()> {
 
     println!("\n✅✅✅ ALL BUILDS COMPLETE! ✅✅✅");
     println!(" - Rust: target/release");
-    println!(" - Python: target/wheels");
+    println!(" - Python: target/wheels & zakatrs.pyi");
     println!(" - WASM/JS: pkg/");
     println!(" - Dart: zakat_dart/");
 
@@ -739,6 +743,23 @@ fn build_dart(root: &Path) -> Result<()> {
     }
     
     println!("  ✨ Dart package ready! Go to ./zakat_dart and run 'dart pub publish'");
+    Ok(())
+}
+
+/// Generate Python stub files using pyo3-stub-gen via a test runner
+fn generate_python_stubs() -> Result<()> {
+    println!("\n🐍 Generating Python Stub files (.pyi)...");
+    
+    // Run the gen_py_stubs test in zakat-core with stub-gen feature
+    run_cmd("cargo", &[
+        "test", 
+        "-p", "zakat-core", 
+        "--test", "gen_py_stubs", 
+        "--features", "python,stub-gen", 
+        "--", "--nocapture"
+    ])?;
+    
+    println!("  ✅ Python stubs generated and deployed to root.");
     Ok(())
 }
 

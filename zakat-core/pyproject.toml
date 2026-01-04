@@ -1,0 +1,70 @@
+[build-system]
+requires = ["maturin>=1.7,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "zakatrs"
+version = "1.3.0"
+requires-python = ">=3.8"
+authors = [
+    { name = "Mohammad Farid Hendianto (IRedDragonICY)", email = "mfrfrdhndnt@gmail.com" }
+]
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Office/Business :: Financial :: Accounting",
+    "Topic :: Religion",
+]
+description = "A type-safe, comprehensive, and Fiqh-compliant Zakat calculation library with high-precision decimal support."
+readme = "README.md"
+license = {file = "LICENSE"}
+keywords = ["zakat", "islamic-finance", "fiqh", "halal", "rust", "decimal-precision"]
+dynamic = []
+
+[project.urls]
+Homepage = "https://github.com/IRedDragonICY/zakatrs"
+Repository = "https://github.com/IRedDragonICY/zakatrs"
+Documentation = "https://github.com/IRedDragonICY/zakatrs#readme"
+
+[tool.maturin]
+# Crate configuration
+manifest-path = "zakat-core/Cargo.toml"
+bindings = "pyo3"
+features = ["python"]
+include = [
+    "zakat/**/*",
+    "zakat-core/**/*",
+    "zakat-ledger/**/*",
+    "zakat-sqlite/**/*",
+    "zakat-providers/**/*",
+    "zakat-i18n/**/*",
+    "Cargo.toml",
+    "Cargo.lock"
+]
+exclude = [
+    "**/target/**/*",
+    "**/.git/**/*",
+    "**/.github/**/*",
+    "**/node_modules/**/*",
+    "zakat-cli/**/*",
+    "zakat-test-gen/**/*",
+    "xtask/**/*",
+    "zakat_dart/**/*",
+    "pkg/**/*",
+    "docs/**/*",
+    "examples/**/*"
+]
+
+# Compatibility settings for cross-platform builds
+compatibility = "manylinux2014"
+strip = true
+
+# Target configuration for multi-platform wheels
+# Uncomment when building for specific Android targets:
+# [tool.maturin.target.aarch64-linux-android]
+# [tool.maturin.target.armv7-linux-androideabi]
+# [tool.maturin.target.x86_64-linux-android]

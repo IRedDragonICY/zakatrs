@@ -259,6 +259,34 @@ impl ZakatPortfolio {
          self
     }
 
+    /// Convenience method to add a cash asset.
+    pub fn add_cash(self, amount: impl crate::inputs::IntoZakatDecimal, label: &str) -> Self {
+        use crate::maal::business::BusinessZakat;
+        self.add(BusinessZakat::cash_only(amount).label(label))
+    }
+
+    /// Convenience method to add a gold asset.
+    pub fn add_gold(self, grams: impl crate::inputs::IntoZakatDecimal, purity_24k: impl crate::inputs::IntoZakatDecimal) -> Self {
+        use crate::maal::precious_metals::PreciousMetals;
+        self.add(PreciousMetals::gold(grams).purity(purity_24k))
+    }
+
+    /// Convenience method to add a silver asset.
+    pub fn add_silver(self, grams: impl crate::inputs::IntoZakatDecimal) -> Self {
+        use crate::maal::precious_metals::PreciousMetals;
+        self.add(PreciousMetals::silver(grams))
+    }
+
+    /// Convenience method to add a business asset.
+    pub fn add_business(self, cash: impl crate::inputs::IntoZakatDecimal, inventory: impl crate::inputs::IntoZakatDecimal, receivables: impl crate::inputs::IntoZakatDecimal, debts: impl crate::inputs::IntoZakatDecimal) -> Self {
+        use crate::maal::business::BusinessZakat;
+        self.add(BusinessZakat::new()
+            .cash(cash)
+            .inventory(inventory)
+            .receivables(receivables)
+            .add_liability("Short-term Debt", debts))
+    }
+
     /// Adds an asset and returns the portfolio along with the asset's UUID.
     /// Useful for tracking the asset for later updates/removals.
     pub fn add_with_id<T: Into<PortfolioItem>>(mut self, item: T) -> (Self, Uuid) {

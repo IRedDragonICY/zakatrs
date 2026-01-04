@@ -67,6 +67,15 @@ impl BusinessZakat {
             .hawl(true)
     }
 
+    /// Creates a BusinessZakat instance with basic assets (Cash + Inventory).
+    /// This is common for small traders.
+    pub fn simple(cash: impl IntoZakatDecimal, inventory: impl IntoZakatDecimal) -> Self {
+        Self::new()
+            .cash(cash)
+            .inventory(inventory)
+            .hawl(true)
+    }
+
     /// Sets cash on hand.
     /// 
     /// If the value cannot be converted to a valid decimal, the error is
@@ -171,9 +180,9 @@ impl CalculateZakat for BusinessZakat {
         let rate = config.strategy.get_rules().trade_goods_rate;
         
         let gross_assets = ZakatDecimal::new(self.cash_on_hand)
+            .with_source(self.label.clone())
             .checked_add(self.inventory_value)?
-            .checked_add(self.receivables)?
-            .with_source(self.label.clone());
+            .checked_add(self.receivables)?;
         
         let trace_steps = vec![
             crate::types::CalculationStep::initial("step-cash-on-hand", "Cash on Hand", self.cash_on_hand)

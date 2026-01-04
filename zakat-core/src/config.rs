@@ -239,6 +239,28 @@ impl ZakatConfig {
             .with_gold_price(gold)
     }
 
+    /// Creates a pre-configured ZakatConfig for the Maliki Madhab.
+    /// Sets strategy to Maliki and Nisab standard to Gold.
+    pub fn maliki(gold_price: impl IntoZakatDecimal) -> Self {
+        let gold = gold_price.into_zakat_decimal().unwrap_or(Decimal::ZERO);
+        
+        Self::new()
+            .with_madhab(Madhab::Maliki)
+            .with_nisab_standard(NisabStandard::Gold)
+            .with_gold_price(gold)
+    }
+
+    /// Creates a pre-configured ZakatConfig for the Hanbali Madhab.
+    /// Sets strategy to Hanbali and Nisab standard to Gold.
+    pub fn hanbali(gold_price: impl IntoZakatDecimal) -> Self {
+        let gold = gold_price.into_zakat_decimal().unwrap_or(Decimal::ZERO);
+        
+        Self::new()
+            .with_madhab(Madhab::Hanbali)
+            .with_nisab_standard(NisabStandard::Gold)
+            .with_gold_price(gold)
+    }
+
     /// Initializes a `ZakatConfig` with regional Fiqh defaults and locale settings.
     /// 
     /// This method provides sensible presets based on dominant schools of jurisprudence (Madhab)
@@ -712,4 +734,20 @@ mod tests {
         let config_sa = ZakatConfig::for_region("SA");
         assert_eq!(config_sa.cash_nisab_standard, NisabStandard::Gold);
     }
+    
+    #[test]
+    fn test_madhab_presets() {
+        let hanafi = ZakatConfig::hanafi(dec!(85), dec!(1));
+        assert!(matches!(hanafi.cash_nisab_standard, NisabStandard::LowerOfTwo));
+        
+        let shafi = ZakatConfig::shafi(dec!(85));
+        assert!(matches!(shafi.cash_nisab_standard, NisabStandard::Gold));
+        
+        let maliki = ZakatConfig::maliki(dec!(85));
+        assert!(matches!(maliki.cash_nisab_standard, NisabStandard::Gold));
+        
+        let hanbali = ZakatConfig::hanbali(dec!(85));
+        assert!(matches!(hanbali.cash_nisab_standard, NisabStandard::Gold));
+    }
 }
+

@@ -7,24 +7,29 @@
 use pyo3::prelude::*;
 
 #[cfg(feature = "python")]
-use crate::config::ZakatConfig;
+use crate::config::ZakatConfig as CoreZakatConfig;
 
 #[cfg(feature = "python")]
-use crate::types::{WealthType, ZakatDetails};
+use crate::types::{WealthType as CoreWealthType, ZakatDetails as CoreZakatDetails};
+
+#[cfg(feature = "stub-gen")]
+use pyo3_stub_gen::derive::*; // For #[gen_stub_pyclass]
 
 // -----------------------------------------------------------------------------
-// PyZakatConfig - Python wrapper for ZakatConfig
+// ZakatConfig - Python wrapper for ZakatConfig
 // -----------------------------------------------------------------------------
 #[cfg(feature = "python")]
 #[pyclass(name = "ZakatConfig")]
+#[cfg_attr(feature = "stub-gen", pyo3_stub_gen::derive::gen_stub_pyclass)]
 #[derive(Clone)]
-pub struct PyZakatConfig {
-    pub inner: ZakatConfig,
+pub struct ZakatConfig {
+    pub inner: CoreZakatConfig,
 }
 
 #[cfg(feature = "python")]
+#[cfg_attr(feature = "stub-gen", pyo3_stub_gen::derive::gen_stub_pymethods)]
 #[pymethods]
-impl PyZakatConfig {
+impl ZakatConfig {
     #[new]
     #[pyo3(signature = (gold_price, silver_price, rice_price_kg=None, rice_price_liter=None))]
     pub fn new(
@@ -36,7 +41,7 @@ impl PyZakatConfig {
         let gold = extract_decimal(gold_price, "gold_price")?;
         let silver = extract_decimal(silver_price, "silver_price")?;
 
-        let mut config = ZakatConfig::hanafi(gold, silver);
+        let mut config = CoreZakatConfig::hanafi(gold, silver);
 
         if let Some(price) = rice_price_kg {
             let p = extract_decimal(price, "rice_price_kg")?;
@@ -48,10 +53,8 @@ impl PyZakatConfig {
             config = config.with_rice_price_per_liter(p);
         }
 
-        Ok(PyZakatConfig { inner: config })
+        Ok(ZakatConfig { inner: config })
     }
-
-
 
     #[getter]
     fn gold_price_per_gram(&self) -> String {
@@ -66,6 +69,36 @@ impl PyZakatConfig {
     #[staticmethod]
     fn is_valid_input(val: &str) -> bool {
         crate::inputs::validate_numeric_format(val)
+    }
+
+    #[staticmethod]
+    pub fn hanafi(gold_price: &Bound<'_, PyAny>, silver_price: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let gold = extract_decimal(gold_price, "gold_price")?;
+        let silver = extract_decimal(silver_price, "silver_price")?;
+        Ok(ZakatConfig { inner: CoreZakatConfig::hanafi(gold, silver) })
+    }
+
+    #[staticmethod]
+    pub fn shafi(gold_price: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let gold = extract_decimal(gold_price, "gold_price")?;
+        Ok(ZakatConfig { inner: CoreZakatConfig::shafi(gold) })
+    }
+
+    #[staticmethod]
+    pub fn maliki(gold_price: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let gold = extract_decimal(gold_price, "gold_price")?;
+        Ok(ZakatConfig { inner: CoreZakatConfig::maliki(gold) })
+    }
+
+    #[staticmethod]
+    pub fn hanbali(gold_price: &Bound<'_, PyAny>) -> PyResult<Self> {
+        let gold = extract_decimal(gold_price, "gold_price")?;
+        Ok(ZakatConfig { inner: CoreZakatConfig::hanbali(gold) })
+    }
+
+    #[staticmethod]
+    pub fn for_region(iso_code: String) -> Self {
+        ZakatConfig { inner: CoreZakatConfig::for_region(&iso_code) }
     }
 }
 
@@ -109,8 +142,9 @@ fn extract_decimal(obj: &Bound<'_, PyAny>, field_name: &str) -> PyResult<rust_de
 // -----------------------------------------------------------------------------
 #[cfg(feature = "python")]
 #[pyclass(name = "WealthType")]
+#[cfg_attr(feature = "stub-gen", pyo3_stub_gen::derive::gen_stub_pyclass_enum)]
 #[derive(Clone, Copy, PartialEq, Eq)]
-pub enum PyWealthType {
+pub enum WealthType {
     Gold = 0,
     Silver = 1,
     Business = 2,
@@ -123,39 +157,96 @@ pub enum PyWealthType {
 }
 
 #[cfg(feature = "python")]
-impl From<WealthType> for PyWealthType {
-    fn from(wt: WealthType) -> Self {
+impl From<CoreWealthType> for WealthType {
+    fn from(wt: CoreWealthType) -> Self {
         match wt {
-            WealthType::Gold => PyWealthType::Gold,
-            WealthType::Silver => PyWealthType::Silver,
-            WealthType::Business => PyWealthType::Business,
-            WealthType::Agriculture => PyWealthType::Agriculture,
-            WealthType::Livestock => PyWealthType::Livestock,
-            WealthType::Mining => PyWealthType::Mining,
-            WealthType::Income => PyWealthType::Income,
-            WealthType::Investment => PyWealthType::Investment,
-            WealthType::Fitrah => PyWealthType::Fitrah,
-            WealthType::Rikaz | WealthType::Other(_) => PyWealthType::Business,
+            CoreWealthType::Gold => WealthType::Gold,
+            CoreWealthType::Silver => WealthType::Silver,
+            CoreWealthType::Business => WealthType::Business,
+            CoreWealthType::Agriculture => WealthType::Agriculture,
+            CoreWealthType::Livestock => WealthType::Livestock,
+            CoreWealthType::Mining => WealthType::Mining,
+            CoreWealthType::Income => WealthType::Income,
+            CoreWealthType::Investment => WealthType::Investment,
+            CoreWealthType::Fitrah => WealthType::Fitrah,
+            CoreWealthType::Rikaz | CoreWealthType::Other(_) => WealthType::Business,
         }
     }
 }
 
 // -----------------------------------------------------------------------------
-// PyZakatDetails - Python wrapper for ZakatDetails
+// PyZakatRecommendation
 // -----------------------------------------------------------------------------
 #[cfg(feature = "python")]
-#[pyclass(name = "ZakatDetails")]
-#[derive(Clone)]
-pub struct PyZakatDetails {
-    pub inner: ZakatDetails,
+#[pyclass(name = "ZakatRecommendation")]
+#[cfg_attr(feature = "stub-gen", pyo3_stub_gen::derive::gen_stub_pyclass_enum)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum ZakatRecommendation {
+    Obligatory = 0,
+    Recommended = 1,
+    None = 2,
 }
 
 #[cfg(feature = "python")]
+impl From<crate::types::ZakatRecommendation> for ZakatRecommendation {
+    fn from(rec: crate::types::ZakatRecommendation) -> Self {
+        match rec {
+            crate::types::ZakatRecommendation::Obligatory => ZakatRecommendation::Obligatory,
+            crate::types::ZakatRecommendation::Recommended => ZakatRecommendation::Recommended,
+            crate::types::ZakatRecommendation::None => ZakatRecommendation::None,
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// PyLiabilityType
+// -----------------------------------------------------------------------------
+#[cfg(feature = "python")]
+#[pyclass(name = "LiabilityType")]
+#[cfg_attr(feature = "stub-gen", pyo3_stub_gen::derive::gen_stub_pyclass_enum)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum LiabilityType {
+    Immediate = 0,
+    LongTerm = 1,
+}
+
+// -----------------------------------------------------------------------------
+// PyWarningCode
+// -----------------------------------------------------------------------------
+#[cfg(feature = "python")]
+#[pyclass(name = "WarningCode")]
+#[cfg_attr(feature = "stub-gen", pyo3_stub_gen::derive::gen_stub_pyclass_enum)]
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum WarningCode {
+    NegativeAssetsClamped = 0,
+    GrossMethodExpensesIgnored = 1,
+    LivestockBelowNisab = 2,
+    MetalBelowNisab = 3,
+    PriceDataStale = 4,
+    HawlNotMet = 5,
+    PartialCalculation = 6,
+    CurrencyConversionApplied = 7,
+    Other = 8,
+}
+
+// -----------------------------------------------------------------------------
+// ZakatDetails - Python wrapper for ZakatDetails
+// -----------------------------------------------------------------------------
+#[cfg(feature = "python")]
+#[pyclass(name = "ZakatDetails")]
+#[cfg_attr(feature = "stub-gen", pyo3_stub_gen::derive::gen_stub_pyclass)]
+#[derive(Clone)]
+pub struct ZakatDetails {
+    pub inner: CoreZakatDetails,
+}
+
+#[cfg(feature = "python")]
+#[cfg_attr(feature = "stub-gen", pyo3_stub_gen::derive::gen_stub_pymethods)]
 #[pymethods]
-impl PyZakatDetails {
+impl ZakatDetails {
     #[getter]
-    fn wealth_type(&self) -> PyWealthType {
-        PyWealthType::from(self.inner.wealth_type.clone())
+    fn wealth_type(&self) -> WealthType {
+        WealthType::from(self.inner.wealth_type.clone())
     }
 
     #[getter]
@@ -187,37 +278,62 @@ impl PyZakatDetails {
     fn status_reason(&self) -> Option<String> {
         self.inner.status_reason.clone()
     }
+
+    #[getter]
+    fn recommendation(&self) -> String {
+        format!("{:?}", self.inner.recommendation)
+    }
+
+    #[getter]
+    fn structured_warnings(&self, py: Python<'_>) -> PyResult<PyObject> {
+        use pyo3::types::{PyDict, PyList};
+        let list = PyList::empty(py);
+        for w in &self.inner.structured_warnings {
+            let dict = PyDict::new(py);
+            dict.set_item("code", format!("{:?}", w.code))?;
+            dict.set_item("message", &w.message)?;
+            if let Some(details) = &w.details {
+                let d = PyDict::new(py);
+                for (k, v) in details {
+                    d.set_item(k, v)?;
+                }
+                dict.set_item("details", d)?;
+            }
+            list.append(dict)?;
+        }
+        Ok(list.into())
+    }
 }
 
 // -----------------------------------------------------------------------------
 // PyPreciousMetals - Python wrapper for PreciousMetals
 // -----------------------------------------------------------------------------
 #[cfg(feature = "python")]
-pub use crate::maal::precious_metals::python_ffi::PreciousMetals as PyPreciousMetals;
+pub use crate::maal::precious_metals::python_ffi::PreciousMetals;
 
 // -----------------------------------------------------------------------------
 // PyBusinessZakat - Python wrapper for BusinessZakat
 // -----------------------------------------------------------------------------
 #[cfg(feature = "python")]
-pub use crate::maal::business::python_ffi::BusinessZakat as PyBusinessZakat;
+pub use crate::maal::business::python_ffi::BusinessZakat;
 
 // -----------------------------------------------------------------------------
 // PyInvestmentAssets - Python wrapper for InvestmentAssets
 // -----------------------------------------------------------------------------
 #[cfg(feature = "python")]
-pub use crate::maal::investments::python_ffi::InvestmentAssets as PyInvestmentAssets;
+pub use crate::maal::investments::python_ffi::InvestmentAssets;
 
 // -----------------------------------------------------------------------------
 // PyIncomeZakatCalculator - Python wrapper for IncomeZakatCalculator
 // -----------------------------------------------------------------------------
 #[cfg(feature = "python")]
-pub use crate::maal::income::python_ffi::IncomeZakatCalculator as PyIncomeZakatCalculator;
+pub use crate::maal::income::python_ffi::IncomeZakatCalculator;
 
 // -----------------------------------------------------------------------------
 // PyMiningAssets - Python wrapper for MiningAssets
 // -----------------------------------------------------------------------------
 #[cfg(feature = "python")]
-pub use crate::maal::mining::python_ffi::MiningAssets as PyMiningAssets;
+pub use crate::maal::mining::python_ffi::MiningAssets;
 
 // -----------------------------------------------------------------------------
 // Main Python module definition
@@ -225,13 +341,23 @@ pub use crate::maal::mining::python_ffi::MiningAssets as PyMiningAssets;
 #[cfg(feature = "python")]
 #[pymodule]
 fn zakatrs(m: &Bound<'_, PyModule>) -> PyResult<()> {
-    m.add_class::<PyZakatConfig>()?;
-    m.add_class::<PyWealthType>()?;
-    m.add_class::<PyZakatDetails>()?;
-    m.add_class::<PyPreciousMetals>()?;
-    m.add_class::<PyBusinessZakat>()?;
-    m.add_class::<PyIncomeZakatCalculator>()?;
-    m.add_class::<PyInvestmentAssets>()?;
-    m.add_class::<PyMiningAssets>()?;
+    m.add_class::<ZakatConfig>()?;
+    m.add_class::<WealthType>()?;
+    m.add_class::<ZakatDetails>()?;
+    m.add_class::<PreciousMetals>()?;
+    m.add_class::<BusinessZakat>()?;
+    m.add_class::<IncomeZakatCalculator>()?;
+    m.add_class::<InvestmentAssets>()?;
+    m.add_class::<MiningAssets>()?;
+    m.add_class::<ZakatRecommendation>()?;
+    m.add_class::<LiabilityType>()?;
+    m.add_class::<WarningCode>()?;
     Ok(())
+}
+
+#[cfg(all(feature = "python", feature = "stub-gen"))]
+pub fn stub_info() -> pyo3_stub_gen::StubInfo {
+    use pyo3_stub_gen::define_stub_info_gatherer;
+    define_stub_info_gatherer!(internal_stub_info);
+    internal_stub_info().expect("Failed to generate stub info")
 }

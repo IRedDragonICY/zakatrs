@@ -48,3 +48,12 @@ impl Validator {
         })))
     }
 }
+
+/// Trait for validating the state of a Zakat asset or configuration.
+/// 
+/// Implementing this trait allows for consistent validation logic across the library.
+/// It is often called before calculation to ensure data integrity.
+pub trait Validate {
+    /// Validates the object's state and returns a `Result`.
+    fn validate(&self) -> Result<(), ZakatError>;
+}

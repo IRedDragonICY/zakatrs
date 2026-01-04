@@ -9,6 +9,11 @@
 
 use serde::{Deserialize, Serialize};
 
+use std::str::FromStr;
+use crate::types::ZakatError; // Removed ErrorDetails as it is unused in the snippet or I will use simple implementation
+
+// ... rest of file (Actually I should probably implement it properly)
+
 /// Nisab standard for calculating the Zakat threshold on monetary wealth.
 /// - `Gold`: Use the gold Nisab (85g × gold_price).
 /// - `Silver`: Use the silver Nisab (595g × silver_price).
@@ -41,6 +46,26 @@ pub enum Madhab {
     Maliki,
     /// Hanbali Madhab - Uses LowerOfTwo Nisab standard, personal jewelry is exempt.
     Hanbali,
+}
+
+impl std::str::FromStr for Madhab {
+    type Err = ZakatError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "hanafi" => Ok(Madhab::Hanafi),
+            "shafi" | "shafii" | "shafi'i" => Ok(Madhab::Shafi),
+            "maliki" => Ok(Madhab::Maliki),
+            "hanbali" => Ok(Madhab::Hanbali),
+            _ => Err(ZakatError::InvalidInput(Box::new(crate::types::InvalidInputDetails {
+                field: "madhab".to_string(),
+                value: s.to_string(),
+                reason_key: "error-invalid-madhab".to_string(),
+                suggestion: Some("Use 'Hanafi', 'Shafi', 'Maliki', or 'Hanbali'.".to_string()),
+                ..Default::default()
+            }))),
+        }
+    }
 }
 
 use rust_decimal::Decimal;

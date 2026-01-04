@@ -159,12 +159,12 @@ impl CalculateZakat for AgricultureAssets {
         // checked_sub takes impl Into<Decimal>, so passing ZakatDecimal works (it implements Into<Decimal>).
         // Use *total_value to get Decimal for creating ZakatDecimal again, or implement methods on ZakatDecimal to take ZakatDecimal
         // checked_sub takes impl Into<Decimal>, so passing ZakatDecimal works (it implements Into<Decimal>).
-        let gross_value = total_value;
+        let gross_value = total_value.clone();
         
         // Net Value = Gross - Cultivation Costs.
         // If cultivation costs exceed gross, net is zero.
         let cultivation_costs = self.cultivation_costs;
-        let mut net_val_dec = *gross_value - cultivation_costs;
+        let mut net_val_dec = gross_value.value - cultivation_costs;
         if net_val_dec < Decimal::ZERO {
             net_val_dec = Decimal::ZERO;
         }
@@ -173,19 +173,19 @@ impl CalculateZakat for AgricultureAssets {
              .with_source(self.label.clone()); 
 
         // Deduct other liabilities if any
-        let net_value_final = net_value
+        let net_value_final = net_value.clone()
              .checked_sub(liabilities)?
              .with_source(self.label.clone());
 
-        let zakat_due = if *net_value_final >= *nisab_value {
-             net_value_final
+        let zakat_due = if net_value_final.value >= nisab_value.value {
+             net_value_final.clone()
                  .checked_mul(rate)?
                  .with_source(self.label.clone())
         } else {
              ZakatDecimal::default()
         };
 
-        let is_payable = *zakat_due > Decimal::ZERO;
+        let is_payable = zakat_due.value > Decimal::ZERO;
 
         // Build calculation trace
         let irrigation_desc = match self.irrigation {
@@ -197,36 +197,36 @@ impl CalculateZakat for AgricultureAssets {
         let mut trace = vec![
             crate::types::CalculationStep::initial("step-harvest-weight", "Harvest Weight (kg)", self.harvest_weight_kg),
             crate::types::CalculationStep::initial("step-price-per-kg", "Price per kg", self.price_per_kg),
-            crate::types::CalculationStep::result("step-total-harvest-value", "Gross Harvest Value", *total_value),
+            crate::types::CalculationStep::result("step-total-harvest-value", "Gross Harvest Value", total_value.value),
         ];
 
         if cultivation_costs > Decimal::ZERO {
              trace.push(crate::types::CalculationStep::subtract("step-deduct-costs", "Cultivation Costs", cultivation_costs));
-             trace.push(crate::types::CalculationStep::result("step-net-after-costs", "Net Value (After Costs)", *net_value));
+             trace.push(crate::types::CalculationStep::result("step-net-after-costs", "Net Value (After Costs)", net_value.value));
         }
 
         trace.push(crate::types::CalculationStep::subtract("step-debts-due-now", "Liabilities Due Now", liabilities));
-        trace.push(crate::types::CalculationStep::result("step-final-net-value", "Final Net Value", *net_value_final));
-        trace.push(crate::types::CalculationStep::compare("step-nisab-check-value", "Nisab Threshold (653kg value)", *nisab_value));
+        trace.push(crate::types::CalculationStep::result("step-final-net-value", "Final Net Value", net_value_final.value));
+        trace.push(crate::types::CalculationStep::compare("step-nisab-check-value", "Nisab Threshold (653kg value)", nisab_value.value));
 
         if is_payable {
             trace.push(crate::types::CalculationStep::info("info-irrigation-method", format!("Irrigation Method: {}", irrigation_desc))
                  .with_args(std::collections::HashMap::from([("method".to_string(), irrigation_desc.to_string())])));
             trace.push(crate::types::CalculationStep::rate("step-rate-applied", "Applied Rate", rate));
-            trace.push(crate::types::CalculationStep::result("step-zakat-due", "Zakat Due", *zakat_due));
+            trace.push(crate::types::CalculationStep::result("step-zakat-due", "Zakat Due", zakat_due.value));
         } else {
             trace.push(crate::types::CalculationStep::info("status-exempt", "Net Value below Nisab - No Zakat Due"));
         }
 
         #[allow(deprecated)]
         Ok(ZakatDetails {
-            total_assets: *total_value,
+            total_assets: total_value.value,
             liabilities_due_now: liabilities + cultivation_costs, // Include costs in total liabilities report ?? Or separately? Stick to liabilities_due_now field
             liabilities: Vec::new(),
-            net_assets: *net_value_final, 
-            nisab_threshold: *nisab_value, 
+            net_assets: net_value_final.value, 
+            nisab_threshold: nisab_value.value, 
             is_payable,
-            zakat_due: *zakat_due,
+            zakat_due: zakat_due.value,
             wealth_type: crate::types::WealthType::Agriculture,
             status_reason: None,
             label: self.label.clone(),
@@ -234,7 +234,7 @@ impl CalculateZakat for AgricultureAssets {
             payload: crate::types::PaymentPayload::Agriculture {
                 harvest_weight: self.harvest_weight_kg,
                 irrigation_method: irrigation_desc.to_string(),
-                crop_value: *zakat_due,
+                crop_value: zakat_due.value,
             },
             calculation_breakdown: crate::types::CalculationBreakdown(trace),
             warnings: Vec::new(),

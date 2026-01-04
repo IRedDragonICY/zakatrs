@@ -493,10 +493,10 @@ fn calculate_camel_zakat(count: u32, prices: &LivestockPrices) -> Result<(Decima
     let v_jz = ZakatDecimal::new(v_camel).checked_mul(dec!(1.25))?.with_source(Some("Camel Zakat".to_string()));
     
     let total = ZakatDecimal::new(Decimal::from(sheep)).checked_mul(v_sheep)?
-        .checked_add(ZakatDecimal::new(Decimal::from(b_makhad)).checked_mul(*v_bm)?.0)?
-        .checked_add(ZakatDecimal::new(Decimal::from(b_labun)).checked_mul(*v_bl)?.0)?
-        .checked_add(ZakatDecimal::new(Decimal::from(hiqqah)).checked_mul(v_hq)?.0)?
-        .checked_add(ZakatDecimal::new(Decimal::from(jazaah)).checked_mul(*v_jz)?.0)?
+        .checked_add(ZakatDecimal::new(Decimal::from(b_makhad)).checked_mul(*v_bm)?.value)?
+        .checked_add(ZakatDecimal::new(Decimal::from(b_labun)).checked_mul(*v_bl)?.value)?
+        .checked_add(ZakatDecimal::new(Decimal::from(hiqqah)).checked_mul(v_hq)?.value)?
+        .checked_add(ZakatDecimal::new(Decimal::from(jazaah)).checked_mul(*v_jz)?.value)?
         .with_source(Some("Camel Zakat".to_string()));
         
     let mut parts = Vec::new();

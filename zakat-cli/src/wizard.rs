@@ -13,6 +13,15 @@ pub fn run_wizard_mode() -> Result<ZakatPortfolio, Box<dyn std::error::Error>> {
     println!("{}", "You can press Ctrl+C at any time to exit.".dimmed());
     println!();
 
+    // Helper validator for non-negative Decimals
+    let non_negative = |input: &Decimal| {
+        if *input < Decimal::ZERO {
+            Ok(inquire::validator::Validation::Invalid(inquire::validator::ErrorMessage::Custom("Value must be non-negative".to_string())))
+        } else {
+            Ok(inquire::validator::Validation::Valid)
+        }
+    };
+
     // 1. Precious Metals
     if Confirm::new("Do you possess Gold or Silver (jewelry, bars, coins)?")
         .with_default(false)
@@ -28,6 +37,7 @@ pub fn run_wizard_mode() -> Result<ZakatPortfolio, Box<dyn std::error::Error>> {
             let weight: Decimal = CustomType::new("Weight (grams):")
                 .with_placeholder("e.g. 85.0")
                 .with_error_message("Please enter a valid number")
+                .with_validator(non_negative)
                 .prompt()?;
                 
             let purity = Select::new("Purity (Karat):", vec![
@@ -42,6 +52,14 @@ pub fn run_wizard_mode() -> Result<ZakatPortfolio, Box<dyn std::error::Error>> {
                 "Other" => {
                     let p: Decimal = CustomType::new("Enter purity (0.0 - 1.0):")
                         .with_help_message("e.g. 0.875 for 21K")
+                        .with_validator(non_negative)
+                        .with_validator(|p: &Decimal| {
+                            if *p > dec!(1.0) {
+                                Ok(inquire::validator::Validation::Invalid(inquire::validator::ErrorMessage::Custom("Purity cannot exceed 1.0".to_string())))
+                            } else {
+                                Ok(inquire::validator::Validation::Valid)
+                            }
+                        })
                         .prompt()?;
                     p
                 },
@@ -63,7 +81,7 @@ pub fn run_wizard_mode() -> Result<ZakatPortfolio, Box<dyn std::error::Error>> {
         // Silver loop
         loop {
             if !Confirm::new("Add a Silver item?").with_default(false).prompt()? { break; }
-             let weight: Decimal = CustomType::new("Weight (grams):").prompt()?;
+             let weight: Decimal = CustomType::new("Weight (grams):").with_validator(non_negative).prompt()?;
              let mut asset = PreciousMetals::new();
              asset.weight_grams = weight;
              asset.metal_type = Some(WealthType::Silver);
@@ -82,7 +100,9 @@ pub fn run_wizard_mode() -> Result<ZakatPortfolio, Box<dyn std::error::Error>> {
         loop {
              if !Confirm::new("Add a Cash entry?").with_default(true).prompt()? { break; }
              
-             let amount: Decimal = CustomType::new("Amount:").prompt()?;
+             let amount: Decimal = CustomType::new("Amount:")
+                 .with_validator(non_negative)
+                 .prompt()?;
              let label: String = Text::new("Description:").with_default("Savings").prompt()?;
              
              let mut asset = BusinessZakat::new();
@@ -100,10 +120,10 @@ pub fn run_wizard_mode() -> Result<ZakatPortfolio, Box<dyn std::error::Error>> {
     {
         println!("\n{}", "--- Business Assets ---".bright_blue());
         
-        let cash_on_hand: Decimal = CustomType::new("Business Cash on Hand:").with_default(dec!(0)).prompt()?;
-        let inventory: Decimal = CustomType::new("Value of Inventory (Goods for Sale):").with_default(dec!(0)).prompt()?;
-        let receivables: Decimal = CustomType::new("Money Owed TO You (Good Debt):").with_default(dec!(0)).prompt()?;
-        let debts: Decimal = CustomType::new("Debts/Expenses Due NOW:").with_default(dec!(0)).prompt()?;
+        let cash_on_hand: Decimal = CustomType::new("Business Cash on Hand:").with_default(dec!(0)).with_validator(non_negative).prompt()?;
+        let inventory: Decimal = CustomType::new("Value of Inventory (Goods for Sale):").with_default(dec!(0)).with_validator(non_negative).prompt()?;
+        let receivables: Decimal = CustomType::new("Money Owed TO You (Good Debt):").with_default(dec!(0)).with_validator(non_negative).prompt()?;
+        let debts: Decimal = CustomType::new("Debts/Expenses Due NOW:").with_default(dec!(0)).with_validator(non_negative).prompt()?;
         
         let mut asset = BusinessZakat::new();
         asset.cash_on_hand = cash_on_hand;
@@ -129,7 +149,7 @@ pub fn run_wizard_mode() -> Result<ZakatPortfolio, Box<dyn std::error::Error>> {
     {
          println!("\n{}", "--- Investments ---".bright_magenta());
          // Simple prompt for total value for now
-         let value: Decimal = CustomType::new("Total Market Value of Investments:").prompt()?;
+         let value: Decimal = CustomType::new("Total Market Value of Investments:").with_validator(non_negative).prompt()?;
          let mut asset = InvestmentAssets::new();
          asset.value = value;
          let asset = asset.label("Investments");

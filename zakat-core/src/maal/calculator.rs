@@ -45,7 +45,7 @@ pub fn calculate_monetary_asset(params: MonetaryCalcParams) -> Result<ZakatDetai
         ZakatDecimal::new(net_assets)
             .checked_mul(params.rate)
             .map_err(|e| e.with_source(params.label.clone().unwrap_or_default()))?
-            .0
+            .value
     } else {
         Decimal::ZERO
     };

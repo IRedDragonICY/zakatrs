@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "zakatrs"
-version = "1.2.0"
+version = "1.2.1"
 requires-python = ">=3.8"
 authors = [
     { name = "Mohammad Farid Hendianto (IRedDragonICY)", email = "mfrfrdhndnt@gmail.com" }
@@ -35,6 +35,20 @@ Documentation = "https://github.com/IRedDragonICY/zakatrs#readme"
 manifest-path = "zakat-core/Cargo.toml"
 bindings = "pyo3"
 features = ["python"]
+include = [
+    "zakat/**/*",
+    "zakat-core/**/*",
+    "zakat-ledger/**/*",
+    "zakat-sqlite/**/*",
+    "zakat-providers/**/*",
+    "zakat-i18n/**/*",
+    "zakat-cli/**/*",
+    "zakat-test-gen/**/*",
+    "xtask/**/*",
+    "zakat_dart/rust/**/*",
+    "Cargo.toml",
+    "Cargo.lock"
+]
 
 # Compatibility settings for cross-platform builds
 compatibility = "manylinux2014"

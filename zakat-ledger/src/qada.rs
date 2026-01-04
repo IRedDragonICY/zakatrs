@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
-use chrono::{NaiveDate, Datelike};
-use zakat_core::types::{ZakatError, ErrorDetails};
+use chrono::NaiveDate;
+use zakat_core::types::ZakatError;
 use zakat_providers::HistoricalPriceProvider;
 use serde::{Serialize, Deserialize};
 

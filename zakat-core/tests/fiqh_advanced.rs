@@ -1,5 +1,5 @@
 use zakat_core::maal::precious_metals::{PreciousMetals, JewelryUsage, Gender};
-use zakat_core::maal::livestock::{LivestockAssets, GrazingMethod, LivestockPrices, LivestockType};
+use zakat_core::maal::livestock::{LivestockAssets, LivestockPrices, LivestockType};
 use zakat_core::maal::agriculture::{AgricultureAssets, IrrigationMethod};
 use zakat_core::config::ZakatConfig;
 use zakat_core::madhab::Madhab;

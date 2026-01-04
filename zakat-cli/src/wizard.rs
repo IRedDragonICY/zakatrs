@@ -51,7 +51,6 @@ pub fn run_wizard_mode() -> Result<ZakatPortfolio, Box<dyn std::error::Error>> {
 
             
             let final_weight = weight * purity_val;
-            let final_weight = weight * purity_val;
             
             let mut asset = PreciousMetals::new();
             asset.weight_grams = final_weight;

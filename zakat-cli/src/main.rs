@@ -42,6 +42,10 @@ mod wizard;
 #[command(version)]
 #[command(about = "Interactive Zakat calculator with live pricing support", long_about = None)]
 struct Args {
+    /// Enable file logging to logs/ directory
+    #[arg(long, default_value = "false")]
+    log: bool,
+
     /// Use static prices instead of fetching live
     #[arg(long, default_value = "false")]
     offline: bool,
@@ -86,15 +90,48 @@ struct ResultRow {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("zakat=info".parse().unwrap()),
-        )
-        .init();
-
     let args = Args::parse();
+
+    // Initialize tracing with optional file logging
+    // The _guard must be held for the duration of main() to flush logs
+    let _file_guard: Option<tracing_appender::non_blocking::WorkerGuard>;
+    
+    if args.log {
+        use tracing_subscriber::layer::SubscriberExt;
+        use tracing_subscriber::util::SubscriberInitExt;
+        
+        let file_appender = tracing_appender::rolling::daily("logs", "zakat.log");
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        _file_guard = Some(guard);
+        
+        // Console layer for stdout
+        let console_layer = tracing_subscriber::fmt::layer();
+        
+        // File layer with no ANSI colors
+        let file_layer = tracing_subscriber::fmt::layer()
+            .with_writer(non_blocking)
+            .with_ansi(false);
+        
+        // Use a global env filter for both
+        let env_filter = tracing_subscriber::EnvFilter::from_default_env()
+            .add_directive("zakat=debug".parse().unwrap());
+        
+        tracing_subscriber::registry()
+            .with(env_filter)
+            .with(console_layer)
+            .with(file_layer)
+            .init();
+        
+        tracing::info!("--- Zakat Calculation Session Started [{}] ---", chrono::Utc::now());
+    } else {
+        _file_guard = None;
+        tracing_subscriber::fmt()
+            .with_env_filter(
+                tracing_subscriber::EnvFilter::from_default_env()
+                    .add_directive("zakat=info".parse().unwrap()),
+            )
+            .init();
+    }
 
     println!("\n{}", "═══════════════════════════════════════════════".bright_cyan());
     println!("{}", "        🕌  ZAKAT CALCULATOR CLI  🕌           ".bright_cyan().bold());
@@ -135,6 +172,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         loop {
             let choices = vec![
                 "➕ Add Asset",
+                "✏️ Edit Asset",
                 "💾 Save Portfolio",
                 "📂 Load Portfolio",
                 "🧮 Calculate & Exit",
@@ -150,6 +188,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             println!("{}", "✓ Asset added successfully!".green());
                         }
                         Ok(None) => println!("{}", "⚠ Skipped asset entry.".yellow()),
+                        Err(e) => println!("{} {}", "✗ Error:".red(), e),
+                    }
+                }
+                "✏️ Edit Asset" => {
+                    match edit_asset_interactive(&mut p) {
+                        Ok(true) => println!("{}", "✓ Asset updated successfully!".green()),
+                        Ok(false) => println!("{}", "⚠ Edit cancelled.".yellow()),
                         Err(e) => println!("{} {}", "✗ Error:".red(), e),
                     }
                 }
@@ -471,3 +516,200 @@ fn load_portfolio(path: &std::path::Path) -> Result<ZakatPortfolio, Box<dyn std:
     let portfolio: ZakatPortfolio = serde_json::from_str(&content)?;
     Ok(portfolio)
 }
+
+// =============================================================================
+// Edit Asset Functions
+// =============================================================================
+
+/// Interactive prompt to edit an existing asset in the portfolio.
+/// Returns Ok(true) if asset was updated, Ok(false) if cancelled.
+fn edit_asset_interactive(portfolio: &mut ZakatPortfolio) -> Result<bool, Box<dyn std::error::Error>> {
+    use zakat_core::traits::CalculateZakat;
+    
+    let items = portfolio.get_items();
+    
+    // Check if portfolio is empty
+    if items.is_empty() {
+        println!("{}", "⚠ No assets in portfolio to edit.".yellow());
+        return Ok(false);
+    }
+    
+    // Build selection list with format: [index] label (type)
+    let choices: Vec<String> = items.iter().enumerate().map(|(idx, item)| {
+        let label = CalculateZakat::get_label(item).unwrap_or_else(|| format!("Asset #{}", idx + 1));
+        let type_name = match item {
+            PortfolioItem::Business(_) => "Business",
+            PortfolioItem::PreciousMetals(_) => "Precious Metal",
+            PortfolioItem::Investment(_) => "Investment",
+            PortfolioItem::Agriculture(_) => "Agriculture",
+            PortfolioItem::Income(_) => "Income",
+            PortfolioItem::Livestock(_) => "Livestock",
+            PortfolioItem::Mining(_) => "Mining",
+            PortfolioItem::Fitrah(_) => "Fitrah",
+            PortfolioItem::Custom(_) => "Custom",
+        };
+        format!("[{}] {} ({})", idx + 1, label, type_name)
+    }).collect();
+    
+    let mut cancel_choices = choices.clone();
+    cancel_choices.push("❌ Cancel".to_string());
+    
+    let selection = Select::new("Select asset to edit:", cancel_choices).prompt()?;
+    
+    if selection == "❌ Cancel" {
+        return Ok(false);
+    }
+    
+    // Find the selected index
+    let selected_idx = choices.iter().position(|c| c == &selection).ok_or("Invalid selection")?;
+    let selected_item = &items[selected_idx];
+    let asset_id = CalculateZakat::get_id(selected_item);
+    
+    // Edit based on type
+    let new_item: Option<PortfolioItem> = match selected_item {
+        PortfolioItem::Business(asset) => edit_business_asset(asset)?,
+        PortfolioItem::PreciousMetals(asset) => edit_precious_metal_asset(asset)?,
+        PortfolioItem::Investment(asset) => edit_investment_asset(asset)?,
+        PortfolioItem::Agriculture(asset) => edit_agriculture_asset(asset)?,
+        PortfolioItem::Income(_) => {
+            println!("{}", "⚠ Income asset editing not yet supported.".yellow());
+            None
+        }
+        PortfolioItem::Livestock(_) => {
+            println!("{}", "⚠ Livestock asset editing not yet supported.".yellow());
+            None
+        }
+        PortfolioItem::Mining(_) => {
+            println!("{}", "⚠ Mining asset editing not yet supported.".yellow());
+            None
+        }
+        PortfolioItem::Fitrah(_) => {
+            println!("{}", "⚠ Fitrah asset editing not yet supported.".yellow());
+            None
+        }
+        PortfolioItem::Custom(_) => {
+            println!("{}", "⚠ Custom asset editing not yet supported.".yellow());
+            None
+        }
+    };
+    
+    if let Some(item) = new_item {
+        portfolio.replace(asset_id, item)?;
+        return Ok(true);
+    }
+    
+    Ok(false)
+}
+
+fn edit_business_asset(asset: &BusinessZakat) -> Result<Option<PortfolioItem>, Box<dyn std::error::Error>> {
+    println!("\n{}", "--- Editing Business Asset ---".bright_blue());
+    
+    let label = Text::new("Asset label:")
+        .with_default(&asset.label.clone().unwrap_or_else(|| "Business".to_string()))
+        .prompt()?;
+    
+    let cash: Decimal = CustomType::new("Cash on hand ($):")
+        .with_default(asset.cash_on_hand)
+        .with_error_message("Please enter a valid number")
+        .prompt()?;
+    
+    let inventory: Decimal = CustomType::new("Inventory value ($):")
+        .with_default(asset.inventory_value)
+        .with_error_message("Please enter a valid number")
+        .prompt()?;
+    
+    let receivables: Decimal = CustomType::new("Accounts receivable ($):")
+        .with_default(asset.receivables)
+        .with_error_message("Please enter a valid number")
+        .prompt()?;
+    
+    let liabilities: Decimal = CustomType::new("Liabilities/debts due now ($):")
+        .with_default(asset.total_liabilities())
+        .with_error_message("Please enter a valid number")
+        .prompt()?;
+    
+    let new_asset = BusinessZakat::new()
+        .label(label)
+        .cash(cash)
+        .inventory(inventory)
+        .receivables(receivables)
+        .add_liability("Liabilities", liabilities);
+    
+    Ok(Some(new_asset.into()))
+}
+
+fn edit_precious_metal_asset(asset: &PreciousMetals) -> Result<Option<PortfolioItem>, Box<dyn std::error::Error>> {
+    println!("\n{}", "--- Editing Precious Metal Asset ---".bright_yellow());
+    
+    let is_gold = matches!(asset.metal_type, Some(WealthType::Gold));
+    let metal_name = if is_gold { "Gold" } else { "Silver" };
+    
+    let label = Text::new(&format!("{} asset label:", metal_name))
+        .with_default(&asset.label.clone().unwrap_or_else(|| metal_name.to_string()))
+        .prompt()?;
+    
+    let weight: Decimal = CustomType::new(&format!("{} weight in grams:", metal_name))
+        .with_default(asset.weight_grams)
+        .with_error_message("Please enter a valid number")
+        .prompt()?;
+    
+    let new_asset = if is_gold {
+        PreciousMetals::gold(weight).label(label)
+    } else {
+        PreciousMetals::silver(weight).label(label)
+    };
+    
+    Ok(Some(new_asset.into()))
+}
+
+fn edit_investment_asset(asset: &InvestmentAssets) -> Result<Option<PortfolioItem>, Box<dyn std::error::Error>> {
+    println!("\n{}", "--- Editing Investment Asset ---".bright_magenta());
+    
+    let label = Text::new("Investment label:")
+        .with_default(&asset.label.clone().unwrap_or_else(|| "Investments".to_string()))
+        .prompt()?;
+    
+    let market_value: Decimal = CustomType::new("Current market value ($):")
+        .with_default(asset.value)
+        .with_error_message("Please enter a valid number")
+        .prompt()?;
+    
+    let new_asset = InvestmentAssets::new()
+        .label(label)
+        .value(market_value)
+        .kind(asset.investment_type);
+    
+    Ok(Some(new_asset.into()))
+}
+
+fn edit_agriculture_asset(asset: &AgricultureAssets) -> Result<Option<PortfolioItem>, Box<dyn std::error::Error>> {
+    println!("\n{}", "--- Editing Agriculture Asset ---".bright_green());
+    
+    let label = Text::new("Crop/Harvest label:")
+        .with_default(&asset.label.clone().unwrap_or_else(|| "Harvest".to_string()))
+        .prompt()?;
+    
+    let weight: Decimal = CustomType::new("Harvest weight in kg:")
+        .with_default(asset.harvest_weight_kg)
+        .with_error_message("Please enter a valid number")
+        .prompt()?;
+    
+    let is_irrigated = matches!(asset.irrigation, IrrigationMethod::Irrigated);
+    let irrigated = Confirm::new("Was it irrigated artificially (vs rain-fed)?")
+        .with_default(is_irrigated)
+        .prompt()?;
+    
+    let method = if irrigated {
+        IrrigationMethod::Irrigated
+    } else {
+        IrrigationMethod::Rain
+    };
+    
+    let new_asset = AgricultureAssets::new()
+        .label(label)
+        .harvest_weight(weight)
+        .irrigation(method);
+    
+    Ok(Some(new_asset.into()))
+}
+

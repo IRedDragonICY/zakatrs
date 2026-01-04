@@ -15,6 +15,20 @@ extension DecimalToFrbDecimal on Decimal {
   FrbDecimal toFrb() {
     return FrbDecimal.fromString(s: toString());
   }
+
+  /// Adds an [FrbDecimal] to this [Decimal].
+  /// Example: `Decimal total = myDecimal + result.zakatDue;`
+  Decimal operator +(FrbDecimal other) => this + other.toDecimal();
+
+  /// Subtracts an [FrbDecimal] from this [Decimal].
+  Decimal operator -(FrbDecimal other) => this - other.toDecimal();
+
+  /// Multiplies this [Decimal] by an [FrbDecimal].
+  Decimal operator *(FrbDecimal other) => this * other.toDecimal();
+
+  /// Divides this [Decimal] by an [FrbDecimal].
+  /// Note: Division returns Rational, so we convert back to Decimal.
+  Decimal operator /(FrbDecimal other) => (this / other.toDecimal()).toDecimal();
 }
 
 /// Helper for nullable decimals

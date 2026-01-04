@@ -887,6 +887,17 @@ struct RegistryTarget<'a> {
 }
 
 fn get_registry_targets() -> Vec<RegistryTarget<'static>> {
+    // Determine Dart command: prefer 'dart', fallback to 'flutter'
+    let (dart_cmd, dart_args_pub, dart_args_dry) = if command_exists("dart") {
+        ("dart", vec!["pub", "publish", "--force"], vec!["pub", "publish", "--dry-run"])
+    } else if command_exists("flutter") {
+        println!("  ⚠️  'dart' command not found, falling back to 'flutter pub publish'");
+        ("flutter", vec!["pub", "publish", "--force"], vec!["pub", "publish", "--dry-run"])
+    } else {
+        // Fallback to dart and let it fail if neither exists
+        ("dart", vec!["pub", "publish", "--force"], vec!["pub", "publish", "--dry-run"])
+    };
+
     vec![
         RegistryTarget {
             id: "crates",
@@ -933,9 +944,9 @@ fn get_registry_targets() -> Vec<RegistryTarget<'static>> {
             name: "Pub.dev",
             skip_flag: "--skip-dart",
             path_relative: "zakat_dart",
-            cmd: "dart",
-            args_publish: vec!["pub", "publish", "--force"],
-            args_dry_run: vec!["pub", "publish", "--dry-run"],
+            cmd: dart_cmd,
+            args_publish: dart_args_pub,
+            args_dry_run: dart_args_dry,
             is_interactive: true,
         },
     ]

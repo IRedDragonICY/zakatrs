@@ -42,12 +42,21 @@ include = [
     "zakat-sqlite/**/*",
     "zakat-providers/**/*",
     "zakat-i18n/**/*",
+    "Cargo.toml",
+    "Cargo.lock"
+]
+exclude = [
+    "**/target/**/*",
+    "**/.git/**/*",
+    "**/.github/**/*",
+    "**/node_modules/**/*",
     "zakat-cli/**/*",
     "zakat-test-gen/**/*",
     "xtask/**/*",
-    "zakat_dart/rust/**/*",
-    "Cargo.toml",
-    "Cargo.lock"
+    "zakat_dart/**/*",
+    "pkg/**/*",
+    "docs/**/*",
+    "examples/**/*"
 ]
 
 # Compatibility settings for cross-platform builds

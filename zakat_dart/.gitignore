@@ -12,6 +12,12 @@
 .swiftpm/
 migrate_working_dir/
 
+# Compiled Binaries (Should not be in git)
+*.dll
+*.dylib
+*.so
+*.exe
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -49,4 +55,3 @@ app.*.map.json
 /README.md
 /LICENSE
 /CHANGELOG.md
-

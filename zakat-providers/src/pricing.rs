@@ -155,9 +155,100 @@ impl PriceProvider for StaticPriceProvider {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+#[async_trait::async_trait(?Send)]
+impl PriceProvider for StaticPriceProvider {
+    async fn get_prices(&self) -> Result<Prices, ZakatError> {
+        Ok(self.prices.clone())
+    }
+    
+    fn name(&self) -> &str {
+        &self.name
+    }
+}
+
 // =============================================================================
-// Feature 2: Failover Price Provider (Chain of Responsibility)
+// Feature: Historical Pricing (Qada Support)
 // =============================================================================
+
+/// Trait for fetching historical metal prices.
+/// 
+/// Primarily used by the Qada (Missed Zakat) engine to determine Nishab thresholds
+/// for past years. Implementation might vary from in-memory caches to database
+/// lookups or web-based historical financial APIs.
+#[cfg(not(target_arch = "wasm32"))]
+#[async_trait::async_trait]
+pub trait HistoricalPriceProvider: Send + Sync {
+    /// Fetches metal prices on a specific Gregorian date.
+    async fn get_prices_on(&self, date: chrono::NaiveDate) -> Result<Prices, ZakatError>;
+}
+
+#[cfg(target_arch = "wasm32")]
+#[async_trait::async_trait(?Send)]
+pub trait HistoricalPriceProvider {
+    async fn get_prices_on(&self, date: chrono::NaiveDate) -> Result<Prices, ZakatError>;
+}
+
+/// A seedable, in-memory provider for historical prices.
+/// 
+/// Designed for testing or scenarios where a small subset of historical data 
+/// is provided upfront (e.g., from a JSON configuration).
+#[derive(Debug, Clone)]
+pub struct StaticHistoricalPriceProvider {
+    prices: std::collections::HashMap<chrono::NaiveDate, Prices>,
+    default_price: Option<Prices>,
+}
+
+impl StaticHistoricalPriceProvider {
+    /// Creates a new empty `StaticHistoricalPriceProvider`.
+    pub fn new() -> Self {
+        Self {
+            prices: std::collections::HashMap::new(),
+            default_price: None,
+        }
+    }
+
+    /// Appends a specific price data point for a given date.
+    pub fn with_price(mut self, date: chrono::NaiveDate, prices: Prices) -> Self {
+        self.prices.insert(date, prices);
+        self
+    }
+    
+    /// Sets a default price to be returned if a specific date is not found.
+    pub fn with_default(mut self, prices: Prices) -> Self {
+        self.default_price = Some(prices);
+        self
+    }
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[async_trait::async_trait]
+impl HistoricalPriceProvider for StaticHistoricalPriceProvider {
+    async fn get_prices_on(&self, date: chrono::NaiveDate) -> Result<Prices, ZakatError> {
+        if let Some(p) = self.prices.get(&date) {
+            Ok(p.clone())
+        } else if let Some(d) = &self.default_price {
+            Ok(d.clone())
+        } else {
+            Err(ZakatError::NetworkError(format!("No historical price found for {}", date)))
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+#[async_trait::async_trait(?Send)]
+impl HistoricalPriceProvider for StaticHistoricalPriceProvider {
+    async fn get_prices_on(&self, date: chrono::NaiveDate) -> Result<Prices, ZakatError> {
+        if let Some(p) = self.prices.get(&date) {
+            Ok(p.clone())
+        } else if let Some(d) = &self.default_price {
+            Ok(d.clone())
+        } else {
+            Err(ZakatError::NetworkError(format!("No historical price found for {}", date)))
+        }
+    }
+}
+
 
 /// A resilient price provider that tries multiple providers in sequence.
 /// 

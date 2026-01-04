@@ -483,6 +483,78 @@ impl ZakatPortfolio {
     pub fn snapshot(&self, config: &crate::config::ZakatConfig, result: &PortfolioResult) -> PortfolioSnapshot {
         PortfolioSnapshot::new(config, self.items.clone(), result.clone())
     }
+
+    /// Generates a comprehensive, human-readable report of the entire portfolio.
+    /// 
+    /// This method aggregates individual asset explanations, calculation steps, 
+    /// and any warnings into a single structured string. It is ideal for 
+    /// CLI output or providing detailed feedback to end-users.
+    pub fn explain(&self, config: &crate::config::ZakatConfig) -> String {
+        let result = self.calculate_total(config);
+        let mut output = String::new();
+        
+        use std::fmt::Write;
+        
+        writeln!(&mut output, "=== Zakat Portfolio Report ===").ok();
+        writeln!(&mut output, "Total Zakat Due: {}", result.total_zakat_due).ok();
+        writeln!(&mut output, "Total Net Assets: {}", result.total_assets).ok();
+        writeln!(&mut output, "==============================").ok();
+        
+        output.push_str("\nAsset Breakdown:\n");
+        
+        for (idx, (item, result_item)) in self.items.iter().zip(result.results.iter()).enumerate() {
+            let label = crate::traits::CalculateZakat::get_label(item).unwrap_or_else(|| format!("Asset #{}", idx + 1));
+            
+            match result_item {
+                PortfolioItemResult::Success { details, .. } => {
+                    writeln!(&mut output, "\n[{}]: {}", label, details.status_reason.as_deref().unwrap_or("Unknown Status")).ok();
+                    writeln!(&mut output, "  - Value: {}", details.total_assets).ok();
+                    writeln!(&mut output, "  - Zakat: {}", details.zakat_due).ok();
+                    
+                    if !details.structured_warnings.is_empty() {
+                        writeln!(&mut output, "  - Warnings:").ok();
+                        for w in &details.structured_warnings {
+                            writeln!(&mut output, "    * {}", w.message).ok();
+                        }
+                    }
+                },
+                PortfolioItemResult::Failure { error, .. } => {
+                    writeln!(&mut output, "\n[{}]: Calculation Failed", label).ok();
+                    writeln!(&mut output, "  - Error: {}", error).ok();
+                }
+            }
+        }
+        
+        output
+    }
+
+    /// Performs a non-destructive "What-If" simulation on the portfolio.
+    ///
+    /// This method clones the current portfolio and applies the provided closure 
+    /// to the clone, allowing for temporary modifications (e.g., adding a hypothetical 
+    /// asset or changing a price) without affecting the actual portfolio state.
+    ///
+    /// # Arguments
+    /// * `func` - A closure that modifies the cloned portfolio before calculation.
+    /// * `config` - The configuration and prices to use for the simulation.
+    ///
+    /// # Returns
+    /// A `PortfolioResult` representing the outcome of the simulated state.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// let result = portfolio.simulate_change(|p| {
+    ///     p.push(BusinessZakat::new().cash(5000));
+    /// }, &config);
+    /// ```
+    pub fn simulate_change<F>(&self, func: F, config: &crate::config::ZakatConfig) -> PortfolioResult 
+    where
+        F: FnOnce(&mut Self)
+    {
+        let mut sim = self.clone();
+        func(&mut sim);
+        sim.calculate_total(config)
+    }
 }
 
 #[cfg(feature = "async")]
@@ -655,5 +727,46 @@ fn aggregate_and_summarize(mut results: Vec<PortfolioItemResult>, config: &crate
         total_zakat_due,
         items_attempted,
         items_failed,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::ZakatConfig;
+    use rust_decimal_macros::dec;
+    use crate::maal::business::BusinessZakat;
+
+    #[test]
+    fn test_portfolio_explain_aggregation() {
+        let mut portfolio = ZakatPortfolio::new();
+        let config = ZakatConfig::test_default().with_gold_price(dec!(100));
+        
+        // 1. Business asset worth 10000 (Above Nisab 8500)
+        let biz = BusinessZakat::new().cash(10000).label("Shop").hawl(true);
+        portfolio = portfolio.add(biz);
+        
+        let explanation = portfolio.explain(&config);
+        
+        assert!(explanation.contains("=== Zakat Portfolio Report ==="));
+        assert!(explanation.contains("Total Zakat Due"));
+        assert!(explanation.contains("250"));
+        assert!(explanation.contains("[Shop]"));
+    }
+
+    #[test]
+    fn test_simulator_non_destructive() {
+        let mut portfolio = ZakatPortfolio::new();
+        let config = ZakatConfig::test_default();
+        
+        portfolio = portfolio.add(BusinessZakat::new().cash(1000));
+        let original_count = portfolio.items.len();
+        
+        let sim_res = portfolio.simulate_change(|p| {
+            p.push(BusinessZakat::new().cash(5000));
+        }, &config);
+        
+        assert_eq!(portfolio.items.len(), original_count, "Original portfolio should not be modified");
+        assert_eq!(sim_res.items_attempted, 2, "Simulated result should have 2 items");
     }
 }

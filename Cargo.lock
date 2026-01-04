@@ -5171,6 +5171,7 @@ dependencies = [
  "tracing",
  "uuid",
  "zakat-core",
+ "zakat-providers",
 ]
 
 [[package]]
@@ -5178,6 +5179,7 @@ name = "zakat-providers"
 version = "1.2.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "dirs",
  "gloo-net",
  "reqwest",

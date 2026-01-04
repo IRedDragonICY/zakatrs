@@ -16,6 +16,7 @@ pub mod timeline;
 pub mod analyzer;
 pub mod assets;
 pub mod hawl;
+pub mod qada;
 
 // Re-exports for convenience
 pub use events::{LedgerEvent, TransactionType, EventStream};
@@ -24,3 +25,4 @@ pub use timeline::{DailyBalance, simulate_timeline};
 pub use analyzer::{LedgerZakatResult, analyze_hawl};
 pub use assets::LedgerAsset;
 pub use hawl::HawlTracker;
+pub use qada::{QadaCalculator, QadaYearResult, QadaReport};

@@ -201,6 +201,101 @@ impl ZakatConfig {
             .with_gold_price(gold)
     }
 
+    /// Initializes a `ZakatConfig` with regional Fiqh defaults and locale settings.
+    /// 
+    /// This method provides sensible presets based on dominant schools of jurisprudence (Madhab)
+    /// and prevailing Nisab standards in specific regions.
+    /// 
+    /// # Regional Defaults
+    /// - **South East Asia (ID, MY, SG, BN)**: Defaults to the **Shafi** Madhab and **Gold** Nisab standard, 
+    ///   reflecting common practice in the Nusantara region.
+    /// - **South Asia (PK, IN, BD, AF)**: Defaults to the **Hanafi** Madhab and **Silver** (LowerOfTwo) 
+    ///   standard to ensure broader inclusion of those eligible to pay.
+    /// - **Turkey (TR)**: Defaults to the **Hanafi** Madhab with a **Gold** Nisab, aligning with 
+    ///   Diyanet's official annual guidance.
+    /// - **GCC/Arab World**: Defaults to **Gold** Nisab, which is widely adopted for currency-based 
+    ///   Zakat in modern stable economies.
+    /// 
+    /// # Example
+    /// ```rust,ignore
+    /// let config = ZakatConfig::for_region("MY")
+    ///     .with_gold_price(300);
+    /// ```
+    pub fn for_region(iso_code: &str) -> Self {
+        let code = iso_code.to_uppercase();
+        match code.as_str() {
+            // South East Asia -> Shafi (Gold)
+            "ID" | "MY" | "SG" | "BN" => {
+                Self::new()
+                    .with_madhab(Madhab::Shafi)
+                    .with_nisab_standard(NisabStandard::Gold)
+                    .with_locale_code(match code.as_str() {
+                        "ID" => "id-ID",
+                        "MY" => "ms-MY",
+                        _ => "en-SG"
+                    })
+                    .with_currency_code(match code.as_str() {
+                        "ID" => "IDR",
+                        "MY" => "MYR",
+                        "SG" => "SGD",
+                         "BN" => "BND",
+                        _ => "USD"
+                    })
+            },
+            // South Asia -> Hanafi (Silver/LowerOfTwo)
+            "PK" | "IN" | "BD" | "AF" => {
+                 Self::new()
+                    .with_madhab(Madhab::Hanafi)
+                    .with_nisab_standard(NisabStandard::LowerOfTwo) // Safer for poor
+                    .with_locale_code(match code.as_str() {
+                        "PK" => "ur-PK",
+                        "BD" => "bn-BD",
+                        _ => "en-IN"
+                    })
+                    .with_currency_code(match code.as_str() {
+                        "PK" => "PKR",
+                        "IN" => "INR",
+                        "BD" => "BDT",
+                        "AF" => "AFN",
+                        _ => "USD"
+                    })
+            },
+            // Turkey -> Hanafi (Gold - Diyanet standard)
+            "TR" => {
+                Self::new()
+                    .with_madhab(Madhab::Hanafi)
+                    .with_nisab_standard(NisabStandard::Gold)
+                    .with_locale_code("tr-TR")
+                    .with_currency_code("TRY")
+            }
+            // Arab World -> Defaulting to standard settings (often Gold or Silver)
+            "SA" | "AE" | "QA" | "KW" => {
+                 Self::new()
+                    .with_madhab(Madhab::Hanafi) // Dominant but Hanbali also common
+                    .with_nisab_standard(NisabStandard::Gold)
+                    .with_locale_code("ar-SA")
+                    .with_currency_code(match code.as_str() {
+                        "AE" => "AED",
+                        "QA" => "QAR",
+                        "KW" => "KWD",
+                         _ => "SAR"
+                    })
+            }
+            // Western World -> Gold is common to avoid excessive burden on small savings
+            "US" | "UK" | "CA" | "AU" | "NZ" | "FR" | "DE" => {
+                 Self::new()
+                    .with_madhab(Madhab::Hanafi)
+                    .with_nisab_standard(NisabStandard::Gold)
+                    .with_currency_code(match code.as_str() {
+                        "UK" => "GBP",
+                        "EU" | "DE" | "FR" => "EUR",
+                        _ => "USD"
+                    })
+            }
+            _ => Self::default()
+        }
+    }
+
     /// Finalizes the configuration and runs validation.
     /// 
     /// This is the recommended way to finish a ZakatConfig builder chain.
@@ -531,5 +626,17 @@ mod tests {
         let config = ZakatConfig::test_default();
         let res = config.validate();
         assert!(res.is_ok(), "test_default() should produce valid config");
+    }
+
+    #[test]
+    fn test_region_presets() {
+        // Malaysia (MY) -> Shafi (Shafii) -> Gold Standard
+        let config_my = ZakatConfig::for_region("MY");
+        assert_eq!(config_my.cash_nisab_standard, NisabStandard::Gold);
+        
+        // Saudi Arabia (SA) -> Hanbali (Hanafi/Hanbali/Shafi use Gold, but Hanafi uses Silver often)
+        // Our implementation for SA uses Gold as a safe baseline for modern GCC.
+        let config_sa = ZakatConfig::for_region("SA");
+        assert_eq!(config_sa.cash_nisab_standard, NisabStandard::Gold);
     }
 }

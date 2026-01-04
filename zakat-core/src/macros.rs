@@ -122,11 +122,54 @@ macro_rules! zakat_asset {
                 }
                 self
             }
+
+            /// Adds a long-term liability (e.g., Mortgage).
+            /// Only 12 months of payments will be deductible.
+            pub fn add_long_term_liability(mut self, description: impl Into<String>, total_amount: impl $crate::inputs::IntoZakatDecimal, monthly_payment: impl $crate::inputs::IntoZakatDecimal) -> Self {
+                let amount_res = total_amount.into_zakat_decimal();
+                let monthly_res = monthly_payment.into_zakat_decimal();
+                
+                match (amount_res, monthly_res) {
+                    (Ok(a), Ok(m)) => {
+                        self.named_liabilities.push($crate::types::Liability::long_term(description, a, m));
+                    },
+                    (Err(e), _) => self._input_errors.push(e),
+                    (_, Err(e)) => self._input_errors.push(e),
+                }
+                self
+            }
             
-            /// Returns the total liabilities (legacy + named).
+            /// Returns the total *deductible* liabilities (legacy + smart calculation).
+            ///
+            /// # Fiqh Logic (Dayn al-Hal)
+            /// - **Immediate Debt**: Fully deductible.
+            /// - **Long-Term Debt**: Only the upcoming year's payments (12 months) are deductible.
             #[allow(deprecated)]
             pub fn total_liabilities(&self) -> rust_decimal::Decimal {
-                let named_sum: rust_decimal::Decimal = self.named_liabilities.iter().map(|l| l.amount).sum();
+                let named_sum: rust_decimal::Decimal = self.named_liabilities.iter().map(|l| {
+                    match l.kind {
+                        $crate::types::LiabilityType::Immediate => l.amount,
+                        $crate::types::LiabilityType::LongTerm => {
+                            if let Some(monthly) = l.monthly_payment {
+                                use rust_decimal_macros::dec;
+                                // Deduct min(total_balance, 12 * monthly)
+                                let annual_cap = monthly * dec!(12);
+                                l.amount.min(annual_cap)
+                            } else {
+                                // Fallback if no monthly payment specified: Treat as immediate or capped?
+                                // Safer to treat as full amount if data is missing, or 0? 
+                                // Let's treat as full amount but warn? 
+                                // For safety/correctness, if it's LongTerm but no monthly info, 
+                                // we can't calculate the cap. 
+                                // Defaulting to amount (conservative for the user? No, aggressive deduction).
+                                // Fiqh: If unknown, assume Immediate?
+                                // Let's stick to amount for now to avoid breaking changes, 
+                                // but ideally strict mode would require monthly_payment.
+                                l.amount
+                            }
+                        }
+                    }
+                }).sum();
                 self.liabilities_due_now + named_sum
             }
 

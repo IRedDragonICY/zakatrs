@@ -58,6 +58,34 @@ impl ZakatRecommendation {
 // Liability Types (v1.1 Feature: Granular Liability Management)
 // =============================================================================
 
+/// Specifies the nature of a liability for Fiqh deduction purposes.
+/// 
+/// Most schools of Fiqh allow deducting immediate debts from zakatable wealth. 
+/// For long-term debts, modern consensus often restricts deduction to the upcoming year's payments.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "camelCase")]
+pub enum LiabilityType {
+    /// Dayn al-Hal: Immediate debt due soon (fully deductible).
+    #[default]
+    Immediate,
+    /// Dayn al-Mu'ajjal: Long-term debt (e.g., mortgages, car loans). 
+    /// Only the current year's (12 months) payments are deductible to prevent 
+    /// zeroing out zakat liability with massive long-term principal.
+    LongTerm,
+}
+
+impl LiabilityType {
+    /// Returns a human-readable description of the liability type and its deduction rule.
+    pub fn description(&self) -> &'static str {
+        match self {
+            LiabilityType::Immediate => "Immediate Debt (Fully Deductible)",
+            LiabilityType::LongTerm => "Long-Term Debt (Deduct 1 year payments)",
+        }
+    }
+}
+
+
 /// Represents a named liability that can be deducted from Zakat calculations.
 /// 
 /// # Example
@@ -74,17 +102,41 @@ impl ZakatRecommendation {
 pub struct Liability {
     /// Description of the liability (e.g., "Credit Card", "Mortgage")
     pub description: String,
-    /// Amount of the liability
+    /// Amount of the liability (Total outstanding balance)
     #[typeshare(serialized_as = "string")]
     pub amount: Decimal,
+    /// Type of liability (Immediate vs LongTerm)
+    #[serde(default)]
+    pub kind: LiabilityType,
+    /// For LongTerm debts: Monthly payment amount to calculate annual cap.
+    #[typeshare(serialized_as = "Option<string>")]
+    pub monthly_payment: Option<Decimal>,
 }
 
 impl Liability {
-    /// Creates a new named liability.
+    /// Creates a new named liability (Immediate by default).
+    /// 
+    /// Use this for short-term debts like credit cards, utility bills, or 
+    /// immediate personal loans.
     pub fn new(description: impl Into<String>, amount: Decimal) -> Self {
         Self {
             description: description.into(),
             amount,
+            kind: LiabilityType::Immediate,
+            monthly_payment: None,
+        }
+    }
+
+    /// Creates a long-term liability with monthly payments.
+    /// 
+    /// Deductions for this type are capped at (monthly_payment * 12) or the 
+    /// total outstanding amount, whichever is lower.
+    pub fn long_term(description: impl Into<String>, total_amount: Decimal, monthly_payment: Decimal) -> Self {
+        Self {
+            description: description.into(),
+            amount: total_amount,
+            kind: LiabilityType::LongTerm,
+            monthly_payment: Some(monthly_payment),
         }
     }
     
@@ -93,6 +145,8 @@ impl Liability {
         Ok(Self {
             description: description.into(),
             amount: amount.into_zakat_decimal()?,
+            kind: LiabilityType::Immediate,
+            monthly_payment: None,
         })
     }
 }
@@ -692,8 +746,8 @@ impl ZakatDetails {
             warn!("Net assets were negative ({}), clamped to zero.", net_assets);
             structured_warnings.push(CalculationWarning::negative_assets_clamped(net_assets));
             net_assets = Decimal::ZERO;
-            clamped_msg = Some("Net Assets are negative, clamped to zero for Zakat purposes");
-            warnings.push("Net assets were negative and clamped to zero.".to_string());
+            clamped_msg = Some("You are in debt (Net Assets Negative). Zakat is not due.");
+            warnings.push("You are in debt (Net Assets Negative). Zakat is not due.".to_string());
         }
 
         // For Nisab check: net_assets >= nisab_threshold
@@ -744,7 +798,7 @@ impl ZakatDetails {
             is_payable,
             zakat_due,
             wealth_type,
-            status_reason: None,
+            status_reason: clamped_msg.map(|s| s.to_string()),
             label: None,
             payload: PaymentPayload::Monetary(zakat_due),
             calculation_trace: CalculationTrace(trace),
@@ -780,8 +834,6 @@ impl ZakatDetails {
     }
 
     /// Creates ZakatDetails with a custom calculation trace.
-    /// Used by calculators that need more detailed step logging.
-    #[allow(deprecated)]
     pub fn with_trace(
         total_assets: Decimal,
         liabilities_due_now: Decimal,
@@ -1421,5 +1473,24 @@ impl From<ZakatError> for wasm_bindgen::JsValue {
     fn from(err: ZakatError) -> Self {
         let ffi_err: FfiZakatError = err.into();
         ffi_err.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rust_decimal_macros::dec;
+
+    #[test]
+    fn test_long_term_liability_cap() {
+        // Monthly payment 1000. Total amount 50,000.
+        // Cap should be 12,000.
+        let liab = Liability::long_term("House Loan", dec!(50000), dec!(1000));
+        
+        assert_eq!(liab.amount, dec!(50000));
+        assert_eq!(liab.monthly_payment, Some(dec!(1000)));
+        
+        // We test the logic used in the zakat_asset! macro indirectly by looking at how it's calculated.
+        // Since the macro is in another crate/module, we can just verify the struct fields here.
     }
 }

@@ -18,6 +18,32 @@ use crate::maal::calculator::{calculate_monetary_asset, MonetaryCalcParams};
 use crate::validation::Validator;
 
 
+/// Determines the Zakat calculation logic based on the investor's intention (Niyyah).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, strum::Display, strum::EnumString, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum InvestmentStrategy {
+    /// Held for short-term trading or capital growth. 
+    /// Zakat is due on the full market value as they are treated as trade goods.
+    #[default]
+    CapitalAppreciation,
+    /// Held for long-term passive income or retirement. 
+    /// Uses the 30% proxy rule (Deduction of fixed assets). Instead of analyzing 
+    /// balance sheets for every stock, 30% of market value is taken as the 
+    /// zakatable portion (representing liquid assets like cash and receivables).
+    DividendYield,
+}
+
+impl crate::inputs::ToFfiString for InvestmentStrategy {
+    fn to_ffi_string(&self) -> String { self.to_string() }
+}
+impl crate::inputs::FromFfiString for InvestmentStrategy {
+    type Err = strum::ParseError;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+         use std::str::FromStr;
+        Self::from_str(s)
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, strum::Display, strum::EnumString, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum InvestmentType {
@@ -40,12 +66,19 @@ impl crate::inputs::FromFfiString for InvestmentType {
 
 // MACRO USAGE
 crate::zakat_ffi_export! {
+    /// Represents investment assets (Stocks, Crypto, Mutual Funds) with strategy-based valuation.
     #[derive(Debug, Clone, Serialize, Deserialize)]
     pub struct InvestmentAssets {
+        /// Current market value of the total holding.
         pub value: Decimal,
+        /// Type of investment (affects classification but usually not the rate).
         pub investment_type: InvestmentType,
-        /// Purification rate (e.g., 0.05 for 5%) to cleanse non-halal income.
+        /// Purification rate (e.g., 0.05 for 5%) to cleanse non-halal income (Tathir).
         pub purification_rate: Option<Decimal>,
+        /// Zakat strategy based on intention (Niyyah). 
+        /// Differentiates between trading (100% base) and long-term holding (30% proxy).
+        #[serde(default)]
+        pub strategy: InvestmentStrategy,
     }
 }
 
@@ -57,6 +90,7 @@ impl Default for InvestmentAssets {
             value: Decimal::ZERO,
             investment_type: InvestmentType::default(),
             purification_rate: None,
+            strategy: Default::default(),
             liabilities_due_now,
             named_liabilities,
             hawl_satisfied,
@@ -99,6 +133,12 @@ impl InvestmentAssets {
             Ok(v) => self.purification_rate = Some(v),
             Err(e) => self._input_errors.push(e),
         }
+        self
+    }
+
+    /// Sets the investment strategy (Niyyah).
+    pub fn strategy(mut self, strategy: InvestmentStrategy) -> Self {
+        self.strategy = strategy;
         self
     }
 }
@@ -166,23 +206,56 @@ impl CalculateZakat for InvestmentAssets {
                  .with_args(std::collections::HashMap::from([("type".to_string(), type_desc.to_string())]))
         ];
 
+        // START CHANGE: Feature 3 (Investment Strategy)
+        let zakatable_base = match self.strategy {
+            InvestmentStrategy::CapitalAppreciation => self.value,
+            InvestmentStrategy::DividendYield => {
+                 use rust_decimal_macros::dec;
+                 // 30% Proxy Rule for "Net Zakatable Assets"
+                 let proxy_rate = dec!(0.30);
+                 let zakatable_portion = self.value * proxy_rate;
+                 
+                 trace_steps.push(crate::types::CalculationStep::rate(
+                     "step-dividend-proxy", 
+                     "Held for Dividends: 30% Proxy Rule Applied", 
+                     proxy_rate
+                 ));
+                 trace_steps.push(crate::types::CalculationStep::result(
+                     "step-zakatable-portion", 
+                     "Net Zakatable Assets (Proxy)", 
+                     zakatable_portion
+                 ));
+                 
+                 zakatable_portion
+            }
+        };
+        // END CHANGE
+
         // Apply Purification if set
         let zakatable_gross = if let Some(purify_rate) = self.purification_rate {
-             let impure_amount = ZakatDecimal::new(self.value)
+             // Purify calculate on the BASE (zakatable portion)
+             // Purification is typically on dividends/income, but often applied to total value 
+             // to "cleanse" the holding. 
+             // If Strategy is DividendYield, we already reduced to 30%.
+             // Purification should arguably apply to the *Dividend* not the Asset Value, 
+             // BUT `purification_rate` here is often interpreted as "Portfolio purification".
+             // Let's apply it to the `zakatable_base`.
+             
+             let impure_amount = ZakatDecimal::new(zakatable_base)
                 .safe_mul(purify_rate)?
                 .with_source(self.label.clone());
              
              trace_steps.push(crate::types::CalculationStep::rate("step-purification-rate", "Purification Rate (Tathir)", purify_rate));
              trace_steps.push(crate::types::CalculationStep::subtract("step-purification-amount", "Impure Amount Deducted", *impure_amount));
              
-             let puri_val = ZakatDecimal::new(self.value)
+             let puri_val = ZakatDecimal::new(zakatable_base)
                 .safe_sub(*impure_amount)?
                 .with_source(self.label.clone());
              
              trace_steps.push(crate::types::CalculationStep::result("step-purified-value", "Purified Gross Value", *puri_val));
              *puri_val
         } else {
-            self.value
+            zakatable_base
         };
 
         // Override hawl_satisfied if acquisition_date is present
@@ -231,5 +304,26 @@ mod tests {
         
         assert!(res.is_payable);
         assert_eq!(res.zakat_due, dec!(250));
+    }
+
+    #[test]
+    fn test_investment_strategy_dividend_yield() {
+        let config = ZakatConfig { gold_price_per_gram: dec!(100), ..Default::default() };
+        // Value 100,000. 
+        // Strategy: DividendYield -> Proxy 30% = 30,000.
+        // Zakat 2.5% of 30,000 = 750.
+        
+        let inv = InvestmentAssets::new()
+            .value(100000.0)
+            .strategy(InvestmentStrategy::DividendYield)
+            .hawl(true);
+            
+        let res = inv.calculate_zakat(&config).unwrap();
+        
+        assert!(res.is_payable);
+        assert_eq!(res.zakat_due, dec!(750));
+        // Verify trace contains proxy message
+        let trace = res.calculation_trace.0;
+        assert!(trace.iter().any(|s| s.description.contains("30% Proxy")));
     }
 }

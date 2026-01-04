@@ -287,7 +287,14 @@ async fn get_prices(args: &Args) -> Result<Prices, Box<dyn std::error::Error>> {
             Ok(prices) => {
                 if prices.gold_per_gram > Decimal::ZERO {
                     println!("{}", "✓ Live prices fetched successfully!".green());
-                    return Ok(prices);
+                    // If silver price is zero (Binance doesn't support silver), use fallback
+                    let final_silver = if prices.silver_per_gram.is_zero() {
+                        warn!("Silver price is zero from provider, using fallback silver price");
+                        fallback.silver_per_gram
+                    } else {
+                        prices.silver_per_gram
+                    };
+                    return Ok(Prices::new(prices.gold_per_gram, final_silver)?);
                 }
             }
             Err(e) => {
@@ -438,9 +445,12 @@ fn add_agriculture_asset() -> Result<Option<PortfolioItem>, Box<dyn std::error::
 }
 
 fn display_results(result: &PortfolioResult, config: &ZakatConfig) {
+    use tabled::settings::{Width, Modify, object::Columns, Alignment};
+    
     let rows: Vec<ResultRow> = result.results.iter().filter_map(|r| {
         match r {
             PortfolioItemResult::Success { details, .. } => {
+                // With tabled "ansi" feature, colors work correctly
                 let status = if details.is_payable {
                     "✓ PAYABLE".green().to_string()
                 } else {
@@ -448,9 +458,9 @@ fn display_results(result: &PortfolioResult, config: &ZakatConfig) {
                 };
 
                 let rec = match details.recommendation {
-                    ZakatRecommendation::Obligatory => "Obligatory".to_string(),
-                    ZakatRecommendation::Recommended => "Sadaqah Recommended".bright_cyan().to_string(),
-                    ZakatRecommendation::None => "-".to_string(),
+                    ZakatRecommendation::Obligatory => "Pay 2.5%".green().to_string(),
+                    ZakatRecommendation::Recommended => "Sadaqah".bright_cyan().to_string(),
+                    ZakatRecommendation::None => "-".dimmed().to_string(),
                 };
 
                 Some(ResultRow {
@@ -459,11 +469,32 @@ fn display_results(result: &PortfolioResult, config: &ZakatConfig) {
                     net_assets: config.format_currency(details.net_assets),
                     nisab: config.format_currency(details.nisab_threshold),
                     status,
-                    zakat_due: config.format_currency(details.zakat_due),
+                    zakat_due: if details.is_payable {
+                        config.format_currency(details.zakat_due).green().to_string()
+                    } else {
+                        config.format_currency(details.zakat_due)
+                    },
                     recommendation: rec,
                 })
             }
             PortfolioItemResult::Failure { source, error, .. } => {
+                // Extract a clean, short error message
+                let short_error = match error {
+                    zakat_core::types::ZakatError::ConfigurationError(details) => {
+                        details.suggestion.clone().unwrap_or_else(|| details.reason_key.clone())
+                    },
+                    zakat_core::types::ZakatError::InvalidInput(details) => {
+                        format!("{}: {}", details.field, details.reason_key)
+                    },
+                    _ => error.report(),
+                };
+                // Truncate if too long
+                let display_error = if short_error.len() > 35 {
+                    format!("{}...", &short_error[..32])
+                } else {
+                    short_error
+                };
+
                 Some(ResultRow {
                     label: source.clone(),
                     wealth_type: "ERROR".red().to_string(),
@@ -471,7 +502,7 @@ fn display_results(result: &PortfolioResult, config: &ZakatConfig) {
                     nisab: "-".to_string(),
                     status: "✗ FAILED".red().to_string(),
                     zakat_due: "-".to_string(),
-                    recommendation: error.to_string(),
+                    recommendation: display_error.red().to_string(),
                 })
             }
         }
@@ -479,6 +510,10 @@ fn display_results(result: &PortfolioResult, config: &ZakatConfig) {
 
     let table = Table::new(rows)
         .with(Style::rounded())
+        .with(Modify::new(Columns::single(2)).with(Alignment::right()))
+        .with(Modify::new(Columns::single(3)).with(Alignment::right()))
+        .with(Modify::new(Columns::single(5)).with(Alignment::right()))
+        .with(Modify::new(Columns::single(6)).with(Width::truncate(40)))
         .to_string();
 
     println!("{}", table);

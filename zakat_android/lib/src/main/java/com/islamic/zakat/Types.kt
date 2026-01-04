@@ -535,3 +535,50 @@ sealed class PortfolioItem {
 	data class Custom(val data: CustomAsset): PortfolioItem()
 }
 
+/// Standardized error codes for machine-readable error handling.
+/// 
+/// These codes enable frontends (React, Flutter, etc.) to programmatically
+/// identify and handle error types without parsing error messages.
+/// 
+/// # Example
+/// ```rust,ignore
+/// match error.error_code() {
+/// ZakatErrorCode::InvalidInput => show_validation_error(),
+/// ZakatErrorCode::BelowNisab => show_exempt_message(),
+/// _ => show_generic_error(),
+/// }
+/// ```
+@Serializable
+enum class ZakatErrorCode(val string: String) {
+	/// Invalid input value provided (e.g., negative weight, invalid purity)
+	@SerialName("INVALID_INPUT")
+	InvalidInput("INVALID_INPUT"),
+	/// Required configuration field is missing (e.g., gold/silver price)
+	@SerialName("CONFIG_MISSING")
+	ConfigMissing("CONFIG_MISSING"),
+	/// Numeric overflow during calculation
+	@SerialName("CALCULATION_OVERFLOW")
+	CalculationOverflow("CALCULATION_OVERFLOW"),
+	/// Network-related error (e.g., fetching live prices)
+	@SerialName("NETWORK_ERROR")
+	NetworkError("NETWORK_ERROR"),
+	/// Requested asset was not found in portfolio
+	@SerialName("ASSET_NOT_FOUND")
+	AssetNotFound("ASSET_NOT_FOUND"),
+	/// Hawl (holding period) requirement not met
+	@SerialName("HAWL_NOT_MET")
+	HawlNotMet("HAWL_NOT_MET"),
+	/// Network assets below Nisab threshold
+	@SerialName("BELOW_NISAB")
+	BelowNisab("BELOW_NISAB"),
+	/// General calculation error
+	@SerialName("CALCULATION_ERROR")
+	CalculationError("CALCULATION_ERROR"),
+	/// Multiple validation errors occurred
+	@SerialName("MULTIPLE_ERRORS")
+	MultipleErrors("MULTIPLE_ERRORS"),
+	/// Configuration error (not just missing, but invalid)
+	@SerialName("CONFIG_ERROR")
+	ConfigError("CONFIG_ERROR"),
+}
+

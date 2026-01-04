@@ -35,13 +35,13 @@ impl LedgerStore for JsonFileStore {
         events.push(event.clone());
         
         let json = serde_json::to_string_pretty(&events).map_err(|e| ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
+            code: zakat_core::types::ZakatErrorCode::InvalidInput,
             field: "ledger".to_string(), 
             value: "json".to_string(),
             reason_key: "error-parse-json".to_string(),
             args: Some(std::collections::HashMap::from([("error".to_string(), e.to_string())])),
             source_label: Some("JsonFileStore".to_string()),
-            asset_id: None,
-            suggestion: None
+            ..Default::default()
         })))?;
         
         tokio::fs::write(&self.path, json).await.map_err(|e: std::io::Error| ZakatError::NetworkError(format!("IO Error: {}", e)))?;
@@ -60,13 +60,13 @@ impl LedgerStore for JsonFileStore {
         }
         
         serde_json::from_str(&content).map_err(|e| ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+            code: zakat_core::types::ZakatErrorCode::InvalidInput,
             field: "ledger".to_string(),
             value: "json".to_string(),
             reason_key: "error-parse-json".to_string(),
             args: Some(std::collections::HashMap::from([("error".to_string(), e.to_string())])),
             source_label: Some("JsonFileStore".to_string()),
-            asset_id: None,
-            suggestion: None
+            ..Default::default()
         })))
     }
 }

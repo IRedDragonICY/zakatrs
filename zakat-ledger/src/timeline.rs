@@ -30,13 +30,13 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
 ) -> Result<Vec<DailyBalance>, ZakatError> {
     if start_date > end_date {
         return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
+            code: zakat_core::types::ZakatErrorCode::InvalidInput,
             field: "date_range".to_string(), 
             value: format!("{} > {}", start_date, end_date), 
             reason_key: "error-date-range-invalid".to_string(),
-            args: None,
             source_label: Some("simulate_timeline".to_string()),
-            asset_id: None,
             suggestion: Some("Ensure start_date is before or equal to end_date.".to_string()),
+            ..Default::default()
         })));
     }
 
@@ -62,13 +62,14 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
             if event.date == current_date {
                 if event.amount < Decimal::ZERO {
                      return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+                        code: zakat_core::types::ZakatErrorCode::InvalidInput,
                         field: "amount".to_string(),
                         value: event.amount.to_string(),
                         reason_key: "error-amount-positive".to_string(),
-                        args: None,
                         source_label: Some("simulate_timeline".to_string()),
                         asset_id: Some(event.id),
                         suggestion: Some("Transaction amounts must be non-negative.".to_string()),
+                        ..Default::default()
                     })));
                 }
 

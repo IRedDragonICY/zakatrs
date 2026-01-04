@@ -53,11 +53,12 @@ impl HistoricalPriceProvider for InMemoryPriceHistory {
          // Return the most recent price before or on that date.
          self.prices.range(..=date).next_back().map(|(_, &price)| price)
             .ok_or_else(|| ZakatError::ConfigurationError(Box::new(ErrorDetails { 
+                code: zakat_core::types::ZakatErrorCode::ConfigMissing,
                 reason_key: "error-nisab-price-missing".to_string(),
                 args: Some(std::collections::HashMap::from([("date".to_string(), date.to_string())])),
                 source_label: Some("HistoricalPriceProvider".to_string()),
-                asset_id: None,
                 suggestion: Some("Ensure historical prices are loaded for the requested date.".to_string()),
+                ..Default::default()
             })))
     }
 

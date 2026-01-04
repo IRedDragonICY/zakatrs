@@ -28,7 +28,8 @@ extension DecimalToFrbDecimal on Decimal {
 
   /// Divides this [Decimal] by an [FrbDecimal].
   /// Note: Division returns Rational, so we convert back to Decimal.
-  Decimal operator /(FrbDecimal other) => (this / other.toDecimal()).toDecimal();
+  Decimal operator /(FrbDecimal other) =>
+      (this / other.toDecimal()).toDecimal();
 }
 
 /// Helper for nullable decimals
@@ -40,7 +41,7 @@ extension NullableFrbDecimalToDecimal on FrbDecimal? {
 }
 
 /// Extensions to convert Dart's [double] to [FrbDecimal] directly.
-/// 
+///
 /// Example:
 /// ```dart
 /// final price = 85.5.toFrb();
@@ -53,7 +54,7 @@ extension DoubleToFrbDecimal on double {
 }
 
 /// Extensions to convert Dart's [int] to [FrbDecimal] directly.
-/// 
+///
 /// Example:
 /// ```dart
 /// final count = 1000.toFrb();
@@ -66,7 +67,7 @@ extension IntToFrbDecimal on int {
 }
 
 /// Extensions for [num] to [FrbDecimal] conversion.
-/// 
+///
 /// Useful when the type could be either int or double.
 extension NumToFrbDecimal on num {
   /// Convert any Dart [num] to Rust [FrbDecimal].
@@ -74,4 +75,3 @@ extension NumToFrbDecimal on num {
     return FrbDecimal.fromString(s: toString());
   }
 }
-

@@ -37,10 +37,8 @@ impl FitrahCalculator {
                 field: "person_count".to_string(),
                 value: "0".to_string(),
                 reason_key: "error-fitrah-count".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Person count must be at least 1.".to_string()),
+                ..Default::default()
             })));
         }
         if price < Decimal::ZERO {
@@ -48,10 +46,8 @@ impl FitrahCalculator {
                 field: "price_per_unit".to_string(),
                 value: "negative".to_string(),
                 reason_key: "error-negative-value".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Zakat inputs must be positive.".to_string()),
+                ..Default::default()
             })));
         }
 
@@ -81,10 +77,8 @@ impl CalculateZakat for FitrahCalculator {
             .and_then(|v| v.checked_mul(self.price_per_unit))
             .ok_or(ZakatError::CalculationError(Box::new(ErrorDetails {
                 reason_key: "error-fitrah-overflow".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
-                suggestion: None,
+                code: crate::types::ZakatErrorCode::CalculationOverflow,
+                ..Default::default()
             })))?;
 
         // Build calculation trace

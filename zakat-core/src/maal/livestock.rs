@@ -196,10 +196,9 @@ impl CalculateZakat for LivestockAssets {
                 field: "animal_type".to_string(),
                 value: "None".to_string(),
                 reason_key: "error-type-required".to_string(),
-                args: None,
                 source_label: self.label.clone(),
-                asset_id: None,
                 suggestion: Some("Specify the animal type: Camel, Cow, or Sheep.".to_string()),
+                ..Default::default()
             }))
         )?;
 
@@ -217,11 +216,12 @@ impl CalculateZakat for LivestockAssets {
                 LivestockType::Camel => "Camel",
             };
             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigError,
                 reason_key: "error-price-zero".to_string(),
                 args: Some(std::collections::HashMap::from([("animal".to_string(), animal_str.to_string())])), 
                 source_label: self.label.clone(),
-                asset_id: None,
                 suggestion: Some(format!("Set a price for {} using prices().", animal_str)),
+                ..Default::default()
             })));
         }
 

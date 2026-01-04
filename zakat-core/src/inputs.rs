@@ -48,10 +48,8 @@ macro_rules! impl_into_zakat_decimal_float {
                         field: "fractional".to_string(),
                         value: s,
                         reason_key: "error-invalid-float".to_string(),
-                        args: None,
-                        source_label: None,
-                        asset_id: None,
                         suggestion: Some("Ensure you are using a valid number format (e.g., 1000.50).".to_string()),
+                        ..Default::default()
                     })))
                 }
             }
@@ -121,9 +119,8 @@ pub fn sanitize_numeric_string(s: &str) -> Result<Cow<'_, str>, ZakatError> {
             value: format!("{}...", &s[..std::cmp::min(s.len(), 20)]),
             reason_key: "error-input-too-long".to_string(),
             args: Some(std::collections::HashMap::from([("max".to_string(), MAX_INPUT_LEN.to_string())])),
-            source_label: None,
-            asset_id: None,
             suggestion: Some(format!("Maximum input length is {} characters.", MAX_INPUT_LEN)),
+            ..Default::default()
         })));
     }
 
@@ -244,9 +241,8 @@ impl IntoZakatDecimal for &str {
             value: self.to_string(),
             reason_key: "error-parse-error".to_string(),
             args: Some(std::collections::HashMap::from([("details".to_string(), e.to_string())])),
-            source_label: None,
-            asset_id: None,
             suggestion: Some("Ensure you are using a valid number format (e.g., 1000.50). Remove symbols like '$' if present.".to_string()),
+            ..Default::default()
         })))
     }
 }
@@ -259,9 +255,8 @@ impl IntoZakatDecimal for String {
             value: self.clone(),
             reason_key: "error-parse-error".to_string(),
             args: Some(std::collections::HashMap::from([("details".to_string(), e.to_string())])),
-            source_label: None,
-            asset_id: None,
             suggestion: Some("Ensure you are using a valid number format (e.g., 1000.50). Remove symbols like '$' if present.".to_string()),
+            ..Default::default()
         })))
     }
 }
@@ -328,9 +323,8 @@ impl IntoZakatDecimal for LocalizedInput<'_> {
                 value: format!("{}...", &self.value[..std::cmp::min(self.value.len(), 20)]),
                 reason_key: "error-input-too-long".to_string(),
                 args: Some(std::collections::HashMap::from([("max".to_string(), MAX_INPUT_LEN.to_string())])),
-                source_label: None,
-                asset_id: None,
                 suggestion: Some(format!("Maximum input length is {} characters.", MAX_INPUT_LEN)),
+                ..Default::default()
             })));
         }
 
@@ -370,9 +364,8 @@ impl IntoZakatDecimal for LocalizedInput<'_> {
                 ("locale".to_string(), format!("{:?}", self.locale)), 
                 ("details".to_string(), e.to_string())
             ])),
-            source_label: None,
-            asset_id: None,
             suggestion: Some("Ensure you are using a valid number format (e.g., 1000.50). Remove symbols like '$' if present.".to_string()),
+            ..Default::default()
         })))
     }
 }

@@ -147,20 +147,20 @@ impl CalculateZakat for BusinessZakat {
         
         if config.gold_price_per_gram <= Decimal::ZERO && !needs_silver {
             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigError,
                 reason_key: "error-gold-price-required".to_string(),
-                args: None,
                 source_label: self.label.clone(),
-                asset_id: None,
                 suggestion: Some("Run with --gold-price X or set ZAKAT_GOLD_PRICE env var.".to_string()),
+                ..Default::default()
             })));
         }
         if needs_silver && config.silver_price_per_gram <= Decimal::ZERO {
             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigError,
                 reason_key: "error-silver-price-required".to_string(),
-                args: None,
                 source_label: self.label.clone(),
-                asset_id: None,
                 suggestion: Some("Run with --silver-price X or set ZAKAT_SILVER_PRICE env var.".to_string()),
+                ..Default::default()
             })));
         }
         

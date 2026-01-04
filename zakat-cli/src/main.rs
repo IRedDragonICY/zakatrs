@@ -34,6 +34,7 @@ use zakat_providers::{BestEffortPriceProvider, Prices, PriceProvider};
 use zakat_providers::BinancePriceProvider;
 
 mod wizard;
+mod config_loader;
 
 /// Interactive Zakat Calculator CLI
 #[derive(Parser, Debug)]

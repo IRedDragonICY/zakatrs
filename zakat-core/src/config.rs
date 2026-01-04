@@ -178,11 +178,10 @@ impl std::str::FromStr for ZakatConfig {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         serde_json::from_str(s)
             .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigError,
                 reason_key: "error-parse-json".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Ensure the JSON is valid and matches the ZakatConfig schema.".to_string()),
+                ..Default::default()
             })))
     }
 }
@@ -337,20 +336,18 @@ impl ZakatConfig {
     pub fn validate(&self) -> Result<(), ZakatError> {
         if self.gold_price_per_gram <= Decimal::ZERO {
             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigMissing,
                 reason_key: "error-config-gold-positive".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Run with --gold-price X or set ZAKAT_GOLD_PRICE env var.".to_string()),
+                ..Default::default()
             })));
         }
         if self.silver_price_per_gram <= Decimal::ZERO {
             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigMissing,
                 reason_key: "error-config-silver-positive".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Run with --silver-price X or set ZAKAT_SILVER_PRICE env var.".to_string()),
+                ..Default::default()
             })));
         }
 
@@ -367,41 +364,39 @@ impl ZakatConfig {
         
         if self.cash_nisab_standard == NisabStandard::Gold && self.gold_price_per_gram <= Decimal::ZERO {
              return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                 code: crate::types::ZakatErrorCode::ConfigMissing,
                  reason_key: "error-config-gold-positive".to_string(),
-                 args: None,
-                 source_label: None,
-                asset_id: None,
                 suggestion: Some("Run with --gold-price X or set ZAKAT_GOLD_PRICE env var.".to_string()),
+                 ..Default::default()
              })));
         }
 
         if self.cash_nisab_standard == NisabStandard::Silver && self.silver_price_per_gram <= Decimal::ZERO {
              return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                 code: crate::types::ZakatErrorCode::ConfigMissing,
                  reason_key: "error-config-silver-positive".to_string(),
-                 args: None,
-                 source_label: None,
-                asset_id: None,
                 suggestion: Some("Run with --silver-price X or set ZAKAT_SILVER_PRICE env var.".to_string()),
+                 ..Default::default()
              })));
         }
 
         if self.cash_nisab_standard == NisabStandard::LowerOfTwo {
             if self.gold_price_per_gram <= Decimal::ZERO {
                 return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                    code: crate::types::ZakatErrorCode::ConfigMissing,
                     reason_key: "error-gold-price-required".to_string(),
-                    args: None,
                     source_label: Some("ZakatConfig validation".to_string()),
-                    asset_id: None,
                     suggestion: Some("Run with --gold-price X or set ZAKAT_GOLD_PRICE env var.".to_string()),
+                    ..Default::default()
                 })));
             }
             if self.silver_price_per_gram <= Decimal::ZERO {
                 return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                    code: crate::types::ZakatErrorCode::ConfigMissing,
                     reason_key: "error-silver-price-required".to_string(),
-                    args: None,
                     source_label: Some("ZakatConfig validation".to_string()),
-                    asset_id: None,
                     suggestion: Some("Run with --silver-price X or set ZAKAT_SILVER_PRICE env var.".to_string()),
+                    ..Default::default()
                 })));
             }
         }
@@ -415,36 +410,36 @@ impl ZakatConfig {
         debug!("Loading configuration from environment variables");
         let gold_str = env::var("ZAKAT_GOLD_PRICE")
             .map_err(|_| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigMissing,
                 reason_key: "error-env-var-missing".to_string(),
                 args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_GOLD_PRICE".to_string())])),
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Set ZAKAT_GOLD_PRICE environment variable.".to_string()),
+                ..Default::default()
             })))?;
         let silver_str = env::var("ZAKAT_SILVER_PRICE")
             .map_err(|_| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigMissing,
                 reason_key: "error-env-var-missing".to_string(),
                 args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_SILVER_PRICE".to_string())])),
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Set ZAKAT_SILVER_PRICE environment variable.".to_string()),
+                ..Default::default()
             })))?;
 
         let gold_price = gold_str.trim().parse::<Decimal>()
             .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::InvalidInput,
                 reason_key: "error-env-var-invalid".to_string(),
                 args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_GOLD_PRICE".to_string())])),
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Ensure ZAKAT_GOLD_PRICE is a valid decimal number.".to_string()),
+                ..Default::default()
             })))?;
         let silver_price = silver_str.trim().parse::<Decimal>()
             .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::InvalidInput,
                 reason_key: "error-env-var-invalid".to_string(),
                 args: Some(std::collections::HashMap::from([("name".to_string(), "ZAKAT_SILVER_PRICE".to_string())])),
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Ensure ZAKAT_SILVER_PRICE is a valid decimal number.".to_string()),
+                ..Default::default()
             })))?;
 
         Ok(Self {
@@ -458,20 +453,18 @@ impl ZakatConfig {
     pub fn try_from_json(path: &str) -> Result<Self, ZakatError> {
         let content = fs::read_to_string(path)
             .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigError,
                 reason_key: "error-read-file".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Ensure the file path is correct and the file exists.".to_string()),
+                ..Default::default()
             })))?;
         
         let config: ZakatConfig = serde_json::from_str(&content)
             .map_err(|_e| ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigError,
                 reason_key: "error-parse-json".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Ensure the JSON is valid and matches the ZakatConfig schema.".to_string()),
+                ..Default::default()
             })))?;
             
         config.validate()?;

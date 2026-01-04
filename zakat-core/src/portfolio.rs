@@ -207,21 +207,22 @@ impl PortfolioResult {
         match self.status {
             PortfolioStatus::Complete => Ok(self),
             PortfolioStatus::Partial => Err(ZakatError::CalculationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::CalculationError,
                 reason_key: "error-portfolio-incomplete".to_string(),
                 args: Some(std::collections::HashMap::from([
                     ("failed".to_string(), self.items_failed.to_string()),
                     ("attempted".to_string(), self.items_attempted.to_string())
                 ])), 
                 source_label: Some("Portfolio".to_string()),
-                asset_id: None,
                 suggestion: Some("Check individual asset errors and retry.".to_string()),
+                ..Default::default()
             }))),
             PortfolioStatus::Failed => Err(ZakatError::CalculationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::CalculationError,
                 reason_key: "error-portfolio-failed".to_string(), 
-                args: None,
                 source_label: Some("Portfolio".to_string()),
-                asset_id: None,
                 suggestion: Some("All asset calculations failed. Check configuration.".to_string()),
+                ..Default::default()
             }))),
         }
     }
@@ -278,13 +279,12 @@ impl ZakatPortfolio {
             Ok(())
         } else {
             Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+                code: crate::types::ZakatErrorCode::AssetNotFound,
                 field: "asset_id".to_string(),
                 value: id.to_string(),
                 reason_key: "error-asset-not-found".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Asset with this ID does not exist in the portfolio.".to_string()),
+                ..Default::default()
             })))
         }
     }

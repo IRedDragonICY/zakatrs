@@ -23,10 +23,9 @@ impl Validator {
                     field: field.to_string(),
                     value: "negative".to_string(),
                     reason_key: "error-negative-value".to_string(),
-                    args: None,
                     source_label: source_label.clone(),
-                    asset_id: None,
                     suggestion: Some("Zakat inputs must be positive. Did you mean to subtract this value manually?".to_string()),
+                    ..Default::default()
                 })));
             }
         }
@@ -43,10 +42,9 @@ impl Validator {
             field: field.to_string(),
             value: "None".to_string(),
             reason_key: "error-type-required".to_string(),
-            args: None,
             source_label,
-            asset_id: None,
             suggestion: Some("This field is required and cannot be empty.".to_string()),
+            ..Default::default()
         })))
     }
 }

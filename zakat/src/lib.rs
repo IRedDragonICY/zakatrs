@@ -319,7 +319,9 @@ pub mod wasm_helpers {
                         asset.calculate_zakat(&config)
                     },
                     Err(e) => Err(zakat_core::types::ZakatError::InvalidInput(Box::new(zakat_core::types::InvalidInputDetails {
-                        field: "input".to_string(), value: e.to_string(), reason_key: "parse_error".to_string(), args: None, source_label: None, asset_id: None, suggestion: None
+                        code: zakat_core::types::ZakatErrorCode::InvalidInput,
+                        field: "input".to_string(), value: e.to_string(), reason_key: "parse_error".to_string(),
+                        ..Default::default()
                     })))
                 }
             },
@@ -337,7 +339,9 @@ pub mod wasm_helpers {
                         asset.calculate_zakat(&config)
                     },
                     Err(e) => Err(zakat_core::types::ZakatError::InvalidInput(Box::new(zakat_core::types::InvalidInputDetails {
-                        field: "input".to_string(), value: e.to_string(), reason_key: "parse_error".to_string(), args: None, source_label: None, asset_id: None, suggestion: None
+                        code: zakat_core::types::ZakatErrorCode::InvalidInput,
+                        field: "input".to_string(), value: e.to_string(), reason_key: "parse_error".to_string(),
+                        ..Default::default()
                     })))
                 }
             },

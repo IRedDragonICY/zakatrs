@@ -29,11 +29,11 @@ impl PriceProvider for MultiSourcePriceProvider {
     async fn get_prices(&self) -> Result<Prices, ZakatError> {
         if self.providers.is_empty() {
              return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: zakat_core::types::ZakatErrorCode::ConfigError,
                 reason_key: "no_providers_configured".to_string(),
-                args: None,
                 source_label: Some("MultiSourcePriceProvider".to_string()),
-                asset_id: None,
                 suggestion: Some("Add at least one provider to the chain.".to_string()),
+                ..Default::default()
             })));
         }
 

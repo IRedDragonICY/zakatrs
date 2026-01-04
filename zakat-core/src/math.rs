@@ -48,11 +48,10 @@ impl ZakatDecimal {
         let other_dec = other.into();
         if other_dec.is_zero() {
              return Err(ZakatError::CalculationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::CalculationOverflow,
                 reason_key: "error-division-zero".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Cannot divide by zero.".to_string()),
+                ..Default::default()
             })));
         }
         self.0.checked_div(other_dec)

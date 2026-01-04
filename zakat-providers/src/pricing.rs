@@ -43,10 +43,8 @@ impl Prices {
                 field: "prices".to_string(),
                 value: "negative".to_string(),
                 reason_key: "error-prices-negative".to_string(),
-                args: None,
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("Prices must be positive values.".to_string()),
+                ..Default::default()
             })));
         }
 
@@ -295,11 +293,11 @@ impl PriceProvider for FailoverPriceProvider {
     async fn get_prices(&self) -> Result<Prices, ZakatError> {
         if self.providers.is_empty() {
             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: zakat_core::types::ZakatErrorCode::ConfigError,
                 reason_key: "error-no-price-providers".to_string(),
-                args: None,
                 source_label: Some("FailoverPriceProvider".to_string()),
-                asset_id: None,
                 suggestion: Some("Add at least one price provider using add_provider().".to_string()),
+                ..Default::default()
             })));
         }
         
@@ -548,11 +546,11 @@ impl PriceProvider for FailoverPriceProvider {
     async fn get_prices(&self) -> Result<Prices, ZakatError> {
         if self.providers.is_empty() {
             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: zakat_core::types::ZakatErrorCode::ConfigError,
                 reason_key: "error-no-price-providers".to_string(),
-                args: None,
                 source_label: Some("FailoverPriceProvider".to_string()),
-                asset_id: None,
                 suggestion: Some("Add at least one price provider.".to_string()),
+                ..Default::default()
             })));
         }
         
@@ -846,11 +844,11 @@ impl PriceProvider for BinancePriceProvider {
             
         let price_per_ounce = rust_decimal::Decimal::from_str_exact(&ticker.price)
             .map_err(|e| ZakatError::CalculationError(Box::new(ErrorDetails { 
+                code: zakat_core::types::ZakatErrorCode::CalculationError,
                 reason_key: "error-calculation-failed".to_string(),
                 args: Some(std::collections::HashMap::from([("details".to_string(), format!("Failed to parse price decimal: {}", e))])),
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("The price API returned an invalid number format.".to_string()),
+                ..Default::default()
             })))?;
             
         let gold_per_gram = price_per_ounce / OUNCE_TO_GRAM;
@@ -920,11 +918,11 @@ impl PriceProvider for BinancePriceProvider {
             
         let price_per_ounce = rust_decimal::Decimal::from_str_exact(&ticker.price)
             .map_err(|e| ZakatError::CalculationError(Box::new(ErrorDetails { 
+                code: zakat_core::types::ZakatErrorCode::CalculationError,
                 reason_key: "error-calculation-failed".to_string(),
                 args: Some(std::collections::HashMap::from([("details".to_string(), format!("Failed to parse price decimal: {}", e))])),
-                source_label: None,
-                asset_id: None,
                 suggestion: Some("The price API returned an invalid number format.".to_string()),
+                ..Default::default()
             })))?;
             
         let gold_per_gram = price_per_ounce / OUNCE_TO_GRAM;

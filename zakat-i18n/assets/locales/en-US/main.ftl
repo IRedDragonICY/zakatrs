@@ -83,3 +83,72 @@ error-portfolio-incomplete = Portfolio calculation incomplete. { $failed }/{ $at
 error-portfolio-failed = Portfolio calculation failed completely.
 error-asset-not-found = Asset with ID not found.
 error-prices-negative = Prices must be non-negative.
+
+# CLI Prompts and Messages
+cli-title = ZAKAT CALCULATOR CLI
+cli-using-prices = Using prices
+cli-gold = Gold
+cli-silver = Silver
+cli-calculating = Calculating Zakat...
+cli-may-allah-accept = May Allah accept your Zakat!
+cli-no-assets = No assets added. Exiting.
+cli-tip-wizard = Tip: Run with --wizard for a guided step-by-step mode.
+cli-loading-portfolio = Loading portfolio from { $path }...
+cli-save-snapshot = Save calculation snapshot for audit?
+cli-snapshot-saved = Snapshot saved to: { $filename }
+cli-offline-mode = Running in offline mode with static prices.
+cli-fetching-prices = Fetching live prices...
+cli-prices-success = Live prices fetched successfully!
+cli-using-fallback = Using fallback prices.
+
+# Menu Options
+menu-title = Menu:
+menu-add-asset = Add Asset
+menu-edit-asset = Edit Asset
+menu-save-portfolio = Save Portfolio
+menu-load-portfolio = Load Portfolio
+menu-calculate-exit = Calculate & Exit
+menu-cancel = Cancel
+
+# Asset Types
+asset-type-business = Business Assets
+asset-type-gold = Gold
+asset-type-silver = Silver
+asset-type-cash = Cash/Savings
+asset-type-investments = Investments
+asset-type-agriculture = Agriculture
+asset-type-select = Select asset type:
+
+# Form Prompts
+form-asset-label = Asset label
+form-cash-on-hand = Cash on hand ($):
+form-inventory-value = Inventory value ($):
+form-receivables = Accounts receivable ($):
+form-liabilities = Liabilities/debts due now ($):
+form-weight-grams = Weight in grams:
+form-total-cash = Total cash/savings ($):
+form-market-value = Current market value ($):
+form-harvest-weight = Harvest weight in kg:
+form-irrigated = Was it irrigated artificially (vs rain-fed)?
+form-filename-save = Filename to save (e.g. my_zakat.json):
+form-filename-load = Filename to load:
+
+# Status Messages
+msg-asset-added = Asset added successfully!
+msg-asset-skipped = Skipped asset entry.
+msg-asset-updated = Asset updated successfully!
+msg-edit-cancelled = Edit cancelled.
+msg-portfolio-saved = Portfolio saved to: { $filename }
+msg-portfolio-loaded = Portfolio loaded successfully!
+msg-no-assets-to-edit = No assets in portfolio to edit.
+
+# Result Labels
+result-total-zakat = TOTAL ZAKAT DUE:
+result-total-assets = Total Assets:
+result-status = Status:
+result-payable = PAYABLE
+result-exempt = EXEMPT
+result-failed = FAILED
+result-pay-rate = Pay 2.5%
+result-sadaqah = Sadaqah
+

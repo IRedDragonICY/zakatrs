@@ -168,10 +168,10 @@ impl PreciousMetals {
                         field: "purity".to_string(),
                         value: v.to_string(),
                         reason_key: "error-invalid-purity".to_string(),
-                        args: None,
                         source_label: self.label.clone(),
                         asset_id: Some(self.id),
                         suggestion: Some("Purity must be 1-24 for Gold or 1-1000 for Silver.".to_string()),
+                        ..Default::default()
                     })));
                 } else {
                     self.purity = v;
@@ -232,10 +232,10 @@ impl CalculateZakat for PreciousMetals {
                 field: "stone_weight_grams".to_string(),
                 value: self.stone_weight_grams.to_string(),
                 reason_key: "error-stones-exceed-weight".to_string(),
-                args: None,
                 source_label: self.label.clone(),
                 asset_id: Some(self.id),
                 suggestion: Some("Stone weight cannot exceed total weight.".to_string()),
+                ..Default::default()
             })));
         }
 
@@ -252,10 +252,9 @@ impl CalculateZakat for PreciousMetals {
                         field: "purity".to_string(),
                         value: self.purity.to_string(),
                         reason_key: "error-gold-purity".to_string(),
-                        args: None,
                         source_label: self.label.clone(),
-                        asset_id: None,
                         suggestion: Some("Gold purity must be 1-24 karats.".to_string()),
+                        ..Default::default()
                     })));
                 }
             },
@@ -266,10 +265,9 @@ impl CalculateZakat for PreciousMetals {
                 field: "metal_type".to_string(),
                 value: format!("{:?}", metal_type),
                 reason_key: "error-type-invalid".to_string(),
-                args: None, 
                 source_label: self.label.clone(),
-                asset_id: None,
                 suggestion: Some("Metal type must be Gold or Silver.".to_string()),
+                ..Default::default()
             }))),
         };
 
@@ -303,11 +301,11 @@ impl CalculateZakat for PreciousMetals {
 
         if price_per_gram <= Decimal::ZERO {
             return Err(ZakatError::ConfigurationError(Box::new(ErrorDetails {
+                code: crate::types::ZakatErrorCode::ConfigError,
                 reason_key: "error-price-required".to_string(),
-                args: None,
                 source_label: self.label.clone(),
-                asset_id: None,
                 suggestion: Some("Run with --gold-price X or set ZAKAT_GOLD_PRICE env var.".to_string()),
+                ..Default::default()
             })));
         }
 

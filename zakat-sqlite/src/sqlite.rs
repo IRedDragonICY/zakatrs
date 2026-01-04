@@ -156,6 +156,7 @@ impl LedgerStore for SqliteStore {
 
 fn make_serialize_error(field: &str, error: &str) -> ZakatError {
     ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+        code: zakat_core::types::ZakatErrorCode::InvalidInput,
         field: field.to_string(),
         value: "serialize".to_string(),
         reason_key: "error-serialize".to_string(),
@@ -163,13 +164,13 @@ fn make_serialize_error(field: &str, error: &str) -> ZakatError {
             ("error".to_string(), error.to_string()),
         ])),
         source_label: Some("SqliteStore".to_string()),
-        asset_id: None,
-        suggestion: None,
+        ..Default::default()
     }))
 }
 
 fn make_parse_error(field: &str, value: &str, error: &str) -> ZakatError {
     ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+        code: zakat_core::types::ZakatErrorCode::InvalidInput,
         field: field.to_string(),
         value: value.to_string(),
         reason_key: "error-parse".to_string(),
@@ -177,8 +178,7 @@ fn make_parse_error(field: &str, value: &str, error: &str) -> ZakatError {
             ("error".to_string(), error.to_string()),
         ])),
         source_label: Some("SqliteStore".to_string()),
-        asset_id: None,
-        suggestion: None,
+        ..Default::default()
     }))
 }
 

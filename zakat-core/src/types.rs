@@ -331,6 +331,29 @@ impl LivestockDueItem {
         };
         age_key.to_string()
     }
+    
+    /// Returns the default English name for this livestock age/kind.
+    /// Use `translation_key()` for i18n support.
+    pub fn default_name(&self) -> &'static str {
+        match self.age {
+            LivestockAge::BintMakhad => "Bint Makhad",
+            LivestockAge::BintLabun => "Bint Labun",
+            LivestockAge::Hiqqah => "Hiqqah",
+            LivestockAge::Jazaah => "Jaza'ah",
+            LivestockAge::Tabi => "Tabi'",
+            LivestockAge::Musinnah => "Musinnah",
+            LivestockAge::Jadha => match self.kind {
+                LivestockKind::Sheep => "Sheep",
+                LivestockKind::Goat => "Goat",
+                _ => "Sheep/Goat",
+            },
+        }
+    }
+    
+    /// Formats this item as "{count} {name}" using the default name.
+    pub fn format_default(&self) -> String {
+        format!("{} {}", self.count, self.default_name())
+    }
 }
 
 /// Represents the type of Zakat payment due.
@@ -363,27 +386,13 @@ pub enum PaymentPayload {
 
 impl PaymentPayload {
     /// Generates a human-readable description string from the livestock payment.
-    /// Use this for display purposes; for i18n, iterate over `heads_due` directly.
+    /// Use this for display purposes; for i18n, iterate over `heads_due` directly
+    /// and use `LivestockDueItem::translation_key()`.
     pub fn livestock_description(&self) -> Option<String> {
         match self {
             PaymentPayload::Livestock { heads_due } => {
                 let parts: Vec<String> = heads_due.iter()
-                    .map(|item| {
-                        let name = match item.age {
-                            LivestockAge::BintMakhad => "Bint Makhad",
-                            LivestockAge::BintLabun => "Bint Labun",
-                            LivestockAge::Hiqqah => "Hiqqah",
-                            LivestockAge::Jazaah => "Jaza'ah",
-                            LivestockAge::Tabi => "Tabi'",
-                            LivestockAge::Musinnah => "Musinnah",
-                            LivestockAge::Jadha => match item.kind {
-                                LivestockKind::Sheep => "Sheep",
-                                LivestockKind::Goat => "Goat",
-                                _ => "Sheep/Goat",
-                            },
-                        };
-                        format!("{} {}", item.count, name)
-                    })
+                    .map(|item| item.format_default())
                     .collect();
                 Some(parts.join(", "))
             }
@@ -1019,8 +1028,73 @@ impl std::fmt::Display for ZakatDetails {
     }
 }
 
+// =============================================================================
+// Diagnostic Error Codes (Machine-readable for FFI consumers)
+// =============================================================================
+
+/// Standardized error codes for machine-readable error handling.
+///
+/// These codes enable frontends (React, Flutter, etc.) to programmatically
+/// identify and handle error types without parsing error messages.
+///
+/// # Example
+/// ```rust,ignore
+/// match error.error_code() {
+///     ZakatErrorCode::InvalidInput => show_validation_error(),
+///     ZakatErrorCode::BelowNisab => show_exempt_message(),
+///     _ => show_generic_error(),
+/// }
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, schemars::JsonSchema)]
+#[typeshare::typeshare]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ZakatErrorCode {
+    /// Invalid input value provided (e.g., negative weight, invalid purity)
+    #[default]
+    InvalidInput,
+    /// Required configuration field is missing (e.g., gold/silver price)
+    ConfigMissing,
+    /// Numeric overflow during calculation
+    CalculationOverflow,
+    /// Network-related error (e.g., fetching live prices)
+    NetworkError,
+    /// Requested asset was not found in portfolio
+    AssetNotFound,
+    /// Hawl (holding period) requirement not met
+    HawlNotMet,
+    /// Network assets below Nisab threshold
+    BelowNisab,
+    /// General calculation error
+    CalculationError,
+    /// Multiple validation errors occurred
+    MultipleErrors,
+    /// Configuration error (not just missing, but invalid)
+    ConfigError,
+}
+
+impl std::fmt::Display for ZakatErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let code = match self {
+            ZakatErrorCode::InvalidInput => "INVALID_INPUT",
+            ZakatErrorCode::ConfigMissing => "CONFIG_MISSING",
+            ZakatErrorCode::CalculationOverflow => "CALCULATION_OVERFLOW",
+            ZakatErrorCode::NetworkError => "NETWORK_ERROR",
+            ZakatErrorCode::AssetNotFound => "ASSET_NOT_FOUND",
+            ZakatErrorCode::HawlNotMet => "HAWL_NOT_MET",
+            ZakatErrorCode::BelowNisab => "BELOW_NISAB",
+            ZakatErrorCode::CalculationError => "CALCULATION_ERROR",
+            ZakatErrorCode::MultipleErrors => "MULTIPLE_ERRORS",
+            ZakatErrorCode::ConfigError => "CONFIG_ERROR",
+        };
+        write!(f, "{}", code)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct ErrorDetails {
+    /// Machine-readable error code for programmatic handling.
+    #[serde(default)]
+    pub code: ZakatErrorCode,
     pub reason_key: String,
     pub args: Option<std::collections::HashMap<String, String>>,
     pub source_label: Option<String>,
@@ -1031,6 +1105,9 @@ pub struct ErrorDetails {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 pub struct InvalidInputDetails {
+    /// Machine-readable error code for programmatic handling.
+    #[serde(default)]
+    pub code: ZakatErrorCode,
     pub field: String,
     pub value: String,
     pub reason_key: String,
@@ -1074,19 +1151,37 @@ pub enum ZakatError {
 }
 
 impl ZakatError {
-    /// Returns a standardized error code for FFI consumers.
+    /// Returns the structured error code enum for programmatic handling.
+    ///
+    /// This is preferred over `code()` for new code as it provides type safety
+    /// and enables exhaustive pattern matching.
+    ///
+    /// # Example
+    /// ```rust,ignore
+    /// match err.error_code() {
+    ///     ZakatErrorCode::InvalidInput => handle_validation(),
+    ///     ZakatErrorCode::BelowNisab => show_exempt_message(),
+    ///     _ => handle_generic(),
+    /// }
+    /// ```
+    pub fn error_code(&self) -> ZakatErrorCode {
+        match self {
+            ZakatError::CalculationError(d) => d.code,
+            ZakatError::InvalidInput(d) => d.code,
+            ZakatError::ConfigurationError(d) => d.code,
+            ZakatError::MissingConfig { .. } => ZakatErrorCode::ConfigMissing,
+            ZakatError::Overflow { .. } => ZakatErrorCode::CalculationOverflow,
+            ZakatError::MultipleErrors(_) => ZakatErrorCode::MultipleErrors,
+            ZakatError::NetworkError(_) => ZakatErrorCode::NetworkError,
+        }
+    }
+
+    /// Returns a standardized error code string for FFI consumers.
+    ///
+    /// **Deprecated**: Use `error_code()` for new code to get the typed enum.
     ///
     /// These codes are used by all FFI bindings (Python, Dart, WASM) to
     /// programmatically identify error types without parsing error messages.
-    ///
-    /// # Error Codes
-    /// - `CALCULATION_ERROR`: Error during calculation logic
-    /// - `INVALID_INPUT`: Invalid input value provided
-    /// - `CONFIG_ERROR`: Configuration error (e.g., missing prices)
-    /// - `MISSING_CONFIG`: Required configuration field is missing
-    /// - `OVERFLOW`: Numeric overflow during calculation
-    /// - `MULTIPLE_ERRORS`: Multiple validation errors occurred
-    /// - `NETWORK_ERROR`: Network-related error (e.g., fetching prices)
     pub fn code(&self) -> &'static str {
         match self {
             ZakatError::CalculationError(_) => "CALCULATION_ERROR",
@@ -1403,52 +1498,54 @@ impl From<ZakatError> for FfiZakatError {
     fn from(err: ZakatError) -> Self {
         // Use default translator for message
         let message = err.report_default();
+        // Use the enum's Display impl for consistent code strings
+        let code = err.error_code().to_string();
         
         match err {
             ZakatError::CalculationError(details) => FfiZakatError {
-                code: "CALCULATION_ERROR".to_string(),
+                code,
                 message,
                 field: None,
                 hint: details.suggestion,
                 source_label: details.source_label,
             },
             ZakatError::InvalidInput(details) => FfiZakatError {
-                code: "INVALID_INPUT".to_string(),
+                code,
                 message,
                 field: Some(details.field),
                 hint: details.suggestion.or(Some(details.value)),
                 source_label: details.source_label,
             },
             ZakatError::ConfigurationError(details) => FfiZakatError {
-                code: "CONFIG_ERROR".to_string(),
+                code,
                 message,
                 field: None,
                 hint: details.suggestion,
                 source_label: details.source_label,
             },
             ZakatError::MissingConfig { field, source_label, .. } => FfiZakatError {
-                code: "MISSING_CONFIG".to_string(),
+                code,
                 message,
                 field: Some(field),
                 hint: None,
                 source_label,
             },
             ZakatError::Overflow { operation, source_label, .. } => FfiZakatError {
-                code: "OVERFLOW".to_string(),
+                code,
                 message,
                 field: Some(operation),
                 hint: None,
                 source_label,
             },
-            ZakatError::MultipleErrors(errs) => FfiZakatError {
-                code: "MULTIPLE_ERRORS".to_string(),
+            ZakatError::MultipleErrors(ref errs) => FfiZakatError {
+                code,
                 message: format!("{} errors occurred: {}", errs.len(), message),
                 field: None,
                 hint: None,
                 source_label: None,
             },
             ZakatError::NetworkError(_) => FfiZakatError {
-                code: "NETWORK_ERROR".to_string(),
+                code,
                 message,
                 field: None,
                 hint: None,
@@ -1474,6 +1571,60 @@ impl From<ZakatError> for wasm_bindgen::JsValue {
         let ffi_err: FfiZakatError = err.into();
         ffi_err.into()
     }
+}
+
+// =============================================================================
+// Telemetry / Audit Hooks (Task 5: CalculationObserver)
+// =============================================================================
+
+/// A trait for observing Zakat calculation events.
+///
+/// Implementations can be used for:
+/// - Logging/auditing calculation steps
+/// - Telemetry and analytics
+/// - Debugging calculation flows
+/// - Custom reporting
+///
+/// # Example
+/// ```rust,ignore
+/// struct LoggingObserver;
+///
+/// impl CalculationObserver for LoggingObserver {
+///     fn on_step(&self, step: &CalculationStep) {
+///         println!("Step: {:?} = {}", step.label, step.value);
+///     }
+///
+///     fn on_result(&self, details: &ZakatDetails) {
+///         println!("Result: {} due", details.zakat_due);
+///     }
+/// }
+/// ```
+pub trait CalculationObserver: Send + Sync {
+    /// Called for each calculation step.
+    fn on_step(&self, step: &CalculationStep);
+    
+    /// Called when a warning is generated.
+    fn on_warning(&self, warning: &CalculationWarning) {
+        let _ = warning; // Default: no-op
+    }
+    
+    /// Called when calculation is complete with full result.
+    fn on_result(&self, details: &ZakatDetails) {
+        let _ = details; // Default: no-op
+    }
+    
+    /// Called when an error occurs during calculation.
+    fn on_error(&self, error: &ZakatError) {
+        let _ = error; // Default: no-op
+    }
+}
+
+/// A no-op observer that does nothing.
+/// Used as default when no observer is configured.
+pub struct NoOpObserver;
+
+impl CalculationObserver for NoOpObserver {
+    fn on_step(&self, _step: &CalculationStep) {}
 }
 
 #[cfg(test)]

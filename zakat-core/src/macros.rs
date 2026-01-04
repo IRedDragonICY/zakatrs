@@ -580,10 +580,9 @@ macro_rules! zakat_ffi_export {
                                     field: stringify!($field).to_string(),
                                     value: self.$field.clone(),
                                     reason_key: "error-parse".to_string(),
-                                    args: None,
                                     source_label: self.label.clone(),
-                                    asset_id: None,
                                     suggestion: Some("Ensure the value is a valid number format.".to_string()),
+                                    ..Default::default()
                                  })))?,
                          )*
                          // Common fields
@@ -592,10 +591,9 @@ macro_rules! zakat_ffi_export {
                                 field: "liabilities".to_string(),
                                 value: self.liabilities_due_now.clone(),
                                 reason_key: "error-parse".to_string(),
-                                args: None,
                                 source_label: self.label.clone(),
-                                asset_id: None,
                                 suggestion: Some("Ensure the value is a valid number format.".to_string()),
+                                ..Default::default()
                              })))?,
                          named_liabilities: Vec::new(),
                          hawl_satisfied: self.hawl_satisfied,

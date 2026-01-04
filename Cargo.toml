@@ -48,7 +48,7 @@ paste = "1.0"
 
 # Async dependencies
 async-trait = "0.1.89"
-tokio = { version = "1.48.0" }
+tokio = { version = "1.49.0" }
 futures = "0.3.31"
 
 # i18n dependencies

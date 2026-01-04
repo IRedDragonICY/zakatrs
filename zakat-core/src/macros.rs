@@ -146,6 +146,14 @@ macro_rules! zakat_asset {
             /// - **Long-Term Debt**: Only the upcoming year's payments (12 months) are deductible.
             #[allow(deprecated)]
             pub fn total_liabilities(&self) -> rust_decimal::Decimal {
+                // Emit deprecation warning if legacy field is used
+                if self.liabilities_due_now > rust_decimal::Decimal::ZERO {
+                    tracing::warn!(
+                        amount = %self.liabilities_due_now,
+                        "liabilities_due_now is deprecated. Use add_liability() for granular tracking."
+                    );
+                }
+
                 let named_sum: rust_decimal::Decimal = self.named_liabilities.iter().map(|l| {
                     match l.kind {
                         $crate::types::LiabilityType::Immediate => l.amount,

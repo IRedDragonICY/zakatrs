@@ -69,7 +69,7 @@ crate::zakat_ffi_export! {
     pub struct PreciousMetals {
         pub weight_grams: Decimal,
         pub metal_type: Option<WealthType>,
-        pub purity: u32,
+        pub purity: Decimal,
         pub usage: JewelryUsage,
         pub stone_weight_grams: Decimal,
         pub gender: Option<Gender>,
@@ -83,7 +83,7 @@ impl Default for PreciousMetals {
         Self {
             weight_grams: Decimal::ZERO,
             metal_type: None,
-            purity: 24,
+            purity: Decimal::from(24),
             usage: JewelryUsage::Investment,
             stone_weight_grams: Decimal::ZERO,
             gender: None,
@@ -157,21 +157,27 @@ impl PreciousMetals {
 
     /// Sets gold purity in Karat (1-24) or Silver purity (1-1000).
     ///
+    /// Accepts any type that can be converted to Decimal.
     /// If purity is 0 or greater than 1000, the error is collected.
     /// Specific bounds (24 for Gold) are checked during calculation/validation.
-    pub fn purity(mut self, purity: u32) -> Self {
-        if purity == 0 || purity > 1000 {
-            self._input_errors.push(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
-                field: "purity".to_string(),
-                value: purity.to_string(),
-                reason_key: "error-invalid-purity".to_string(),
-                args: None,
-                source_label: self.label.clone(),
-                asset_id: Some(self.id),
-                suggestion: Some("Purity must be 1-24 for Gold or 1-1000 for Silver.".to_string()),
-            })));
-        } else {
-            self.purity = purity;
+    pub fn purity(mut self, purity: impl IntoZakatDecimal) -> Self {
+        match purity.into_zakat_decimal() {
+            Ok(v) => {
+                if v <= Decimal::ZERO || v > Decimal::from(1000) {
+                    self._input_errors.push(ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+                        field: "purity".to_string(),
+                        value: v.to_string(),
+                        reason_key: "error-invalid-purity".to_string(),
+                        args: None,
+                        source_label: self.label.clone(),
+                        asset_id: Some(self.id),
+                        suggestion: Some("Purity must be 1-24 for Gold or 1-1000 for Silver.".to_string()),
+                    })));
+                } else {
+                    self.purity = v;
+                }
+            }
+            Err(e) => self._input_errors.push(e),
         }
         self
     }
@@ -241,7 +247,7 @@ impl CalculateZakat for PreciousMetals {
         // 3. Validate purity range based on metal type
         match metal_type {
             WealthType::Gold => {
-                if self.purity > 24 {
+                if self.purity > Decimal::from(24) {
                     return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
                         field: "purity".to_string(),
                         value: self.purity.to_string(),
@@ -370,11 +376,13 @@ impl PreciousMetals {
     /// Returns (effective_weight, trace_steps_for_purity_adjustment)
     fn normalize_purity(&self, metal_type: &WealthType, base_weight: Decimal) -> Result<(ZakatDecimal, Vec<CalculationStep>), ZakatError> {
         let mut trace_steps = Vec::new();
+        let purity_24 = Decimal::from(24);
+        let purity_1000 = Decimal::from(1000);
         
-        let effective_weight = if *metal_type == WealthType::Gold && self.purity < 24 {
+        let effective_weight = if *metal_type == WealthType::Gold && self.purity < purity_24 {
             // Gold: weight * (karat / 24)
-            let purity_ratio = ZakatDecimal::new(Decimal::from(self.purity))
-                .safe_div(Decimal::from(24))?
+            let purity_ratio = ZakatDecimal::new(self.purity)
+                .safe_div(purity_24)?
                 .with_source(self.label.clone());
             let weight = ZakatDecimal::new(base_weight)
                 .safe_mul(*purity_ratio)?
@@ -389,10 +397,10 @@ impl PreciousMetals {
             trace_steps.push(CalculationStep::result("step-effective-weight", "Effective 24K Weight", *weight));
             
             weight
-        } else if *metal_type == WealthType::Silver && self.purity < 1000 {
+        } else if *metal_type == WealthType::Silver && self.purity < purity_1000 {
             // Silver: weight * (purity / 1000)
-            let purity_ratio = ZakatDecimal::new(Decimal::from(self.purity))
-                .safe_div(Decimal::from(1000))?
+            let purity_ratio = ZakatDecimal::new(self.purity)
+                .safe_div(purity_1000)?
                 .with_source(self.label.clone());
             let weight = ZakatDecimal::new(base_weight)
                 .safe_mul(*purity_ratio)?

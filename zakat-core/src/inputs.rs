@@ -129,10 +129,10 @@ pub fn sanitize_numeric_string(s: &str) -> Result<Cow<'_, str>, ZakatError> {
 
     let trimmed = s.trim();
     
-    // Fast path: Check if the string is already clean (only ASCII digits, '.', '-')
+    // Fast path: Check if the string is already clean (only ASCII digits, '.', '-', scientific notation)
     // If so, return borrowed reference without any allocation
     let needs_sanitization = trimmed.chars().any(|c| {
-        !matches!(c, '0'..='9' | '.' | '-')
+        !matches!(c, '0'..='9' | '.' | '-' | 'e' | 'E' | '+')
     });
     
     if !needs_sanitization {
@@ -151,8 +151,8 @@ pub fn sanitize_numeric_string(s: &str) -> Result<Cow<'_, str>, ZakatError> {
             '\u{0660}'..='\u{0669}' => buffer.push(char::from_u32(c as u32 - 0x0660 + '0' as u32).unwrap_or(c)),
             '\u{06F0}'..='\u{06F9}' => buffer.push(char::from_u32(c as u32 - 0x06F0 + '0' as u32).unwrap_or(c)),
             
-            // Allowed characters
-            '0'..='9' | '-' | '.' => {
+            // Allowed characters (including scientific notation)
+            '0'..='9' | '-' | '.' | 'e' | 'E' | '+' => {
                 if c == '.' {
                     last_dot_index = Some(buffer.len());
                 }

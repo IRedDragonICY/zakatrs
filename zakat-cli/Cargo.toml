@@ -38,3 +38,4 @@ chrono = { workspace = true }
 # Pretty printing
 tabled = { version = "0.18", features = ["ansi"] }
 colored = "3.0"
+indicatif = "0.17"

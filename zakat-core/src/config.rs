@@ -15,10 +15,31 @@ use tracing::{instrument, debug};
 
 use crate::madhab::{Madhab, NisabStandard, ZakatStrategy};
 
+/// Controls validation strictness for Fiqh compliance.
+///
+/// This mode affects how the library handles missing data, edge cases,
+/// and approximations during Zakat calculations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ZakatMode {
+    /// Strict Fiqh compliance - all validations enforced.
+    /// 
+    /// Use this mode when you need precise, auditable calculations.
+    /// Missing required data will result in errors.
+    #[default]
+    Strict,
+    /// Permissive estimation - allows approximations and missing data.
+    /// 
+    /// Use this mode for quick estimates or when exact data is unavailable.
+    /// Missing optional data uses safe defaults, unknown dates assume Hawl satisfied.
+    Permissive,
+}
+
 /// Default strategy for serde deserialization.
 fn default_strategy() -> Arc<dyn ZakatStrategy> {
     Arc::new(Madhab::default())
 }
+
 
 /// Networking configuration for external API calls
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -100,6 +121,11 @@ pub struct ZakatConfig {
     /// Network configuration for external API calls.
     #[serde(default)]
     pub networking: NetworkConfig,
+
+    /// Validation mode controlling strictness of Fiqh compliance.
+    /// Defaults to `Strict` for production use.
+    #[serde(default)]
+    pub mode: ZakatMode,
 }
 
 fn default_locale_code() -> String {
@@ -120,6 +146,7 @@ impl std::fmt::Debug for ZakatConfig {
             .field("cash_nisab_standard", &self.cash_nisab_standard)
             .field("locale_code", &self.locale_code)
             .field("currency_code", &self.currency_code)
+            .field("mode", &self.mode)
             .finish()
     }
 }
@@ -139,6 +166,7 @@ impl Default for ZakatConfig {
             locale_code: default_locale_code(),
             currency_code: default_currency_code(),
             networking: NetworkConfig::default(),
+            mode: ZakatMode::default(),
         }
     }
 }
@@ -559,6 +587,20 @@ impl ZakatConfig {
     pub fn with_nisab_standard(mut self, standard: NisabStandard) -> Self {
         self.cash_nisab_standard = standard;
         self
+    }
+
+    /// Sets the validation mode (Strict or Permissive).
+    /// 
+    /// - `Strict`: Enforces all Fiqh validations, errors on missing data.
+    /// - `Permissive`: Allows approximations, uses safe defaults for missing data.
+    pub fn with_mode(mut self, mode: ZakatMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    /// Returns `true` if running in permissive estimation mode.
+    pub fn is_permissive(&self) -> bool {
+        self.mode == ZakatMode::Permissive
     }
 
     // Getters

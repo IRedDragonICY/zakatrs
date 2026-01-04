@@ -262,6 +262,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Fetches prices using BestEffortPriceProvider
 async fn get_prices(args: &Args) -> Result<Prices, Box<dyn std::error::Error>> {
+    use indicatif::{ProgressBar, ProgressStyle};
+    
     // Default fallback prices
     let fallback = Prices::new(
         args.gold_price.unwrap_or(dec!(85)),
@@ -273,8 +275,15 @@ async fn get_prices(args: &Args) -> Result<Prices, Box<dyn std::error::Error>> {
         return Ok(fallback);
     }
 
-    // Try to fetch live prices
-    println!("{}", "🌐 Fetching live prices...".bright_blue());
+    // Create a spinner for visual feedback
+    let spinner = ProgressBar::new_spinner();
+    spinner.set_style(
+        ProgressStyle::default_spinner()
+            .template("{spinner:.green} {msg}")
+            .unwrap()
+    );
+    spinner.set_message("Fetching live prices...");
+    spinner.enable_steady_tick(std::time::Duration::from_millis(100));
 
     #[cfg(feature = "live-pricing")]
     {
@@ -286,7 +295,7 @@ async fn get_prices(args: &Args) -> Result<Prices, Box<dyn std::error::Error>> {
         match provider.get_prices().await {
             Ok(prices) => {
                 if prices.gold_per_gram > Decimal::ZERO {
-                    println!("{}", "✓ Live prices fetched successfully!".green());
+                    spinner.finish_with_message("✓ Live prices fetched successfully!");
                     // If silver price is zero (Binance doesn't support silver), use fallback
                     let final_silver = if prices.silver_per_gram.is_zero() {
                         warn!("Silver price is zero from provider, using fallback silver price");
@@ -303,7 +312,7 @@ async fn get_prices(args: &Args) -> Result<Prices, Box<dyn std::error::Error>> {
         }
     }
 
-    println!("{}", "⚠ Using fallback prices.".yellow());
+    spinner.finish_with_message("⚠ Using fallback prices.");
     Ok(fallback)
 }
 

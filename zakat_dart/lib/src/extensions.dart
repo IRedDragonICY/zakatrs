@@ -38,3 +38,40 @@ extension NullableFrbDecimalToDecimal on FrbDecimal? {
     return this!.toDecimal();
   }
 }
+
+/// Extensions to convert Dart's [double] to [FrbDecimal] directly.
+/// 
+/// Example:
+/// ```dart
+/// final price = 85.5.toFrb();
+/// ```
+extension DoubleToFrbDecimal on double {
+  /// Convert Dart [double] to Rust [FrbDecimal].
+  FrbDecimal toFrb() {
+    return FrbDecimal.fromString(s: toString());
+  }
+}
+
+/// Extensions to convert Dart's [int] to [FrbDecimal] directly.
+/// 
+/// Example:
+/// ```dart
+/// final count = 1000.toFrb();
+/// ```
+extension IntToFrbDecimal on int {
+  /// Convert Dart [int] to Rust [FrbDecimal].
+  FrbDecimal toFrb() {
+    return FrbDecimal.fromString(s: toString());
+  }
+}
+
+/// Extensions for [num] to [FrbDecimal] conversion.
+/// 
+/// Useful when the type could be either int or double.
+extension NumToFrbDecimal on num {
+  /// Convert any Dart [num] to Rust [FrbDecimal].
+  FrbDecimal toFrb() {
+    return FrbDecimal.fromString(s: toString());
+  }
+}
+

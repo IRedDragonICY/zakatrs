@@ -34,6 +34,7 @@ fn main() -> Result<()> {
     match task.as_str() {
         "build-all" => build_all()?,
         "build-wasm" => build_wasm()?,
+        "build-go" => build_go()?,
         "sync-versions" => sync_versions()?,
         "publish-all" => publish_all(None)?,
         "publish-crates" => publish_all(Some("crates"))?,
@@ -67,6 +68,7 @@ USAGE:
 COMMANDS:
     build-all       Build all targets (Rust, Python, WASM, Dart)
     build-wasm      Build WASM target only
+    build-go        Build Go bindings via UniFFI
     sync-versions   Synchronize versions across all package manifests
     test            Run Rust tests only
     test-all        Run full compliance test suite (Rust + Python + Dart + WASM)
@@ -567,6 +569,114 @@ fn build_wasm() -> Result<()> {
     copy_dir_recursive(&root.join("docs"), &root.join("pkg/docs"))?;
     
     println!("  ✅ WASM build complete!");
+    Ok(())
+}
+
+// =============================================================================
+// Task: build-go
+// =============================================================================
+
+/// Build Go bindings via UniFFI
+///
+/// This function:
+/// 1. Builds zakat-core as a cdylib with uniffi feature
+/// 2. Runs uniffi-bindgen-go to generate Go bindings
+/// 3. Copies the generated files and library to zakat_go/
+fn build_go() -> Result<()> {
+    println!("\n🐹 Building Go Bindings via UniFFI...\n");
+    let root = project_root()?;
+    let zakat_core_dir = root.join("zakat-core");
+    let go_dir = root.join("zakat_go");
+    
+    // Ensure zakat_go directory exists
+    fs::create_dir_all(&go_dir)?;
+    
+    // Step 1: Build zakat-core as cdylib with uniffi feature
+    println!("  🏗️  Building zakat-core as cdylib...");
+    run_cmd_in_dir(&zakat_core_dir, "cargo", &[
+        "build", 
+        "--release", 
+        "--features", "uniffi",
+    ])?;
+    
+    // Determine library name based on platform
+    #[cfg(target_os = "windows")]
+    let lib_name = "zakat_core.dll";
+    #[cfg(target_os = "macos")]
+    let lib_name = "libzakat_core.dylib";
+    #[cfg(target_os = "linux")]
+    let lib_name = "libzakat_core.so";
+    #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
+    let lib_name = "libzakat_core.so"; // Fallback
+    
+    let lib_src = root.join("target").join("release").join(lib_name);
+    let lib_dst = go_dir.join(lib_name);
+    
+    // Step 2: Check for uniffi-bindgen-go
+    println!("  🔧 Checking for uniffi-bindgen-go...");
+    if !command_exists("uniffi-bindgen-go") {
+        println!("  ⚠️  uniffi-bindgen-go not found in PATH.");
+        println!("     Install it with:");
+        println!("       go install github.com/ArcticIcePak/uniffi-bindgen-go/bindgen@latest");
+        println!("     Or from NordSecurity:");
+        println!("       git clone https://github.com/NordSecurity/uniffi-bindgen-go");
+        println!("       cd uniffi-bindgen-go && go install ./bindgen");
+        println!();
+        println!("  📦 Skipping binding generation. Copying library only...");
+        
+        // Still copy the library
+        if lib_src.exists() {
+            copy_file(&lib_src, &lib_dst)?;
+            println!("  ✅ Library copied: {}", lib_dst.display());
+        } else {
+            println!("  ⚠️  Library not found: {}", lib_src.display());
+        }
+        
+        println!("\n  ⚠️  Go build partially complete - bindings not generated.");
+        println!("  💡 After installing uniffi-bindgen-go, run this command again.");
+        return Ok(());
+    }
+    
+    // Step 3: Generate Go bindings
+    println!("  🔄 Generating Go bindings...");
+    
+    // Find the .udl file or use the library directly
+    let udl_path = zakat_core_dir.join("src").join("zakat_core.udl");
+    
+    if udl_path.exists() {
+        // Generate from UDL file
+        run_cmd_in_dir(&go_dir, "uniffi-bindgen-go", &[
+            udl_path.to_string_lossy().as_ref(),
+            "--library", lib_src.to_string_lossy().as_ref(),
+            "--out-dir", ".",
+        ])?;
+    } else {
+        // Generate from library directly (scaffolding mode)
+        println!("  📝 No .udl file found, generating from library scaffolding...");
+        run_cmd_in_dir(&go_dir, "uniffi-bindgen-go", &[
+            "--library", lib_src.to_string_lossy().as_ref(),
+            "--out-dir", ".",
+        ])?;
+    }
+    
+    // Step 4: Copy the library
+    println!("  📦 Copying dynamic library...");
+    if lib_src.exists() {
+        copy_file(&lib_src, &lib_dst)?;
+    } else {
+        println!("  ⚠️  Library not found at: {}", lib_src.display());
+        println!("     Build may have failed or produced a different output.");
+    }
+    
+    // Step 5: Copy documentation
+    println!("  📚 Syncing documentation...");
+    copy_file(&root.join("README.md"), &go_dir.join("README.md"))?;
+    copy_file(&root.join("LICENSE"), &go_dir.join("LICENSE"))?;
+    
+    println!("\n  ✅ Go build complete!");
+    println!("  📁 Output: zakat_go/");
+    println!("  💡 To test: cd zakat_go && go test -v ./...");
+    
     Ok(())
 }
 
@@ -1229,8 +1339,32 @@ fn run_all_tests() -> Result<()> {
         }
     }
 
-    // Step 5: Run WASM/TypeScript tests (compliance suite)
-    println!("\n🕸️  Step 5: Running WASM/TypeScript Tests...");
+    // Step 5: Run Go compliance tests
+    println!("\n🐹 Step 5: Running Go Compliance Tests...");
+    println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+    
+    let go_dir = root.join("zakat_go");
+    if go_dir.exists() && command_exists("go") {
+        match run_cmd_in_dir(&go_dir, "go", &["test", "-v", "./"]) {
+            Ok(_) => {
+                println!("  ✅ Go compliance tests passed!");
+                success_count += 1;
+            }
+            Err(e) => {
+                println!("  ❌ Go compliance tests failed: {}", e);
+                fail_count += 1;
+            }
+        }
+    } else {
+        if !go_dir.exists() {
+            println!("  ⚠️ zakat_go directory not found. Run 'cargo xtask build-go' first.");
+        } else {
+            println!("  ⚠️ go not found. Skipping Go tests.");
+        }
+    }
+
+    // Step 6: Run WASM/TypeScript tests (compliance suite)
+    println!("\n🕸️  Step 6: Running WASM/TypeScript Tests...");
     println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     
     let pkg_dir = root.join("pkg");

@@ -19,6 +19,7 @@
 //! - `zakat_dart/test/generated_compliance_test.dart` (Native Dart tests)
 
 mod gen_dart;
+mod gen_go;
 mod gen_python;
 mod scenarios;
 mod schema;
@@ -117,10 +118,25 @@ fn main() {
         }
     }
 
+    // ========================================================================
+    // Generate Native Go Tests
+    // ========================================================================
+    println!("\n🐹 Generating native Go test file...");
+    let go_output_path = Path::new("zakat_go/compliance_test.go");
+    match gen_go::generate_go_tests(&suite.cases, go_output_path) {
+        Ok(()) => {
+            println!("✅ Generated: {}", go_output_path.display());
+        }
+        Err(e) => {
+            eprintln!("❌ Failed to generate Go tests: {}", e);
+        }
+    }
+
     println!("\n🎉 Done! Run polyglot tests with:");
     println!("   • Python (JSON):     pytest tests/py/test_compliance.py");
     println!("   • Python (Native):   pytest tests/py/test_generated_compliance.py");
     println!("   • Dart (JSON):       cd zakat_dart && flutter test test/compliance_test.dart");
     println!("   • Dart (Native):     cd zakat_dart && flutter test test/generated_compliance_test.dart");
+    println!("   • Go (Native):       cd zakat_go && go test -v ./...");
     println!("   • TS:                npm test (in pkg/)");
 }

@@ -1,5 +1,28 @@
 # Changelog
 
+## [1.2.1] - 2026-01-04
+
+### Features (Comprehensive Update)
+
+- **Fiqh Compliance & Validation**:
+    - **Zakat Modes**: Added `ZakatMode` (Strict vs Permissive) to `config.rs` to control validation strictness.
+    - **Purity Refactor**: Changed `PreciousMetals.purity` from `u32` to `Decimal` (supporting fractional values like 21.6K) and improved validation (1-24K for Gold).
+    - **Unified Liabilities**: Deprecated `liabilities_due_now` in favor of itemized `named_liabilities`, with runtime warnings for legacy usage.
+
+- **Developer Experience (DX)**:
+    - **Ledger Insights**: Added `explain()` method to `LedgerZakatResult` for human-readable Hawl status breakdowns.
+    - **Hawl Logging**: Added `INFO` level logging when Hawl breaches occur (balance drops below Nisab).
+    - **Dart Interop**: Added `.toFrb()` extension methods for Dart `double`, `int`, and `num` for easier FFI conversion.
+    - **CLI UX**: Added `indicatif` progress spinner for live price fetching in `zakat-cli`.
+
+- **Input Handling**:
+    - **Scientific Notation**: Enhanced input sanitization to support scientific notation (e.g., `1.5e6`, `2E-3`).
+
+### Fixed
+- **Python Publishing**: Fixed source distribution (sdist) build failure on PyPI by explicitly including all workspace member crates in `pyproject.toml`.
+
+---
+
 ## [1.2.0] - 2026-01-04
 
 ### Features

@@ -127,6 +127,22 @@ data class CustomAsset (
 	val wealthTypeName: String
 )
 
+/// Specifies the nature of a liability for Fiqh deduction purposes.
+/// 
+/// Most schools of Fiqh allow deducting immediate debts from zakatable wealth.
+/// For long-term debts, modern consensus often restricts deduction to the upcoming year's payments.
+@Serializable
+enum class LiabilityType(val string: String) {
+	/// Dayn al-Hal: Immediate debt due soon (fully deductible).
+	@SerialName("immediate")
+	Immediate("immediate"),
+	/// Dayn al-Mu'ajjal: Long-term debt (e.g., mortgages, car loans).
+	/// Only the current year's (12 months) payments are deductible to prevent
+	/// zeroing out zakat liability with massive long-term principal.
+	@SerialName("longTerm")
+	LongTerm("longTerm"),
+}
+
 /// Represents a named liability that can be deducted from Zakat calculations.
 /// 
 /// # Example
@@ -141,8 +157,12 @@ data class CustomAsset (
 data class Liability (
 	/// Description of the liability (e.g., "Credit Card", "Mortgage")
 	val description: String,
-	/// Amount of the liability
-	val amount: string
+	/// Amount of the liability (Total outstanding balance)
+	val amount: string,
+	/// Type of liability (Immediate vs LongTerm)
+	val kind: LiabilityType? = null,
+	/// For LongTerm debts: Monthly payment amount to calculate annual cap.
+	val monthlyPayment: string? = null
 )
 
 /// Represents the age category of livestock for Zakat purposes.
@@ -253,7 +273,10 @@ data class ZakatConfig (
 	/// Currency code (e.g., "USD", "SAR").
 	val currencyCode: String,
 	/// Network configuration for external API calls.
-	val networking: NetworkConfig? = null
+	val networking: NetworkConfig? = null,
+	/// Validation mode controlling strictness of Fiqh compliance.
+	/// Defaults to `Strict` for production use.
+	val mode: ZakatMode? = null
 )
 
 /// Helper enum to categorize wealth types

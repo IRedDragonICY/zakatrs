@@ -246,7 +246,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.version }}
           name: "Zakat Go Library ${{ steps.version.outputs.version }}"
           body: |
-            ## 🐹 Zakat Go Library
+            ## Zakat Go Library
             
             Native libraries for the zakatrs Go bindings.
             
@@ -311,14 +311,14 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: nightly
-          name: "🌙 Nightly Build"
+          name: "Nightly Build"
           body: |
-            ## 🌙 Nightly Build
+            ## Nightly Build
             
             **Commit:** ${{ github.sha }}
             **Built:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
             
-            ⚠️ **This is an unstable nightly build. Use at your own risk.**
+            **Warning:** This is an unstable nightly build. Use at your own risk.
             
             ```sh
             go get github.com/IRedDragonICY/zakatrs/zakat_go@${{ github.sha }}

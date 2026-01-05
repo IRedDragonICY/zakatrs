@@ -32,6 +32,7 @@ pub struct CliConfig {
     pub offline: Option<bool>,
 }
 
+#[allow(dead_code)]
 impl CliConfig {
     /// Returns the platform-specific configuration directory.
     /// - Linux: ~/.config/zakat/

@@ -521,6 +521,7 @@ macro_rules! zakat_ffi_export {
                          // Common fields
                          liabilities_due_now: <rust_decimal::Decimal as FromFfiString>::from_ffi_string(&asset.liabilities_due_now)
                              .map_err(|e| crate::kotlin::KotlinZakatError::ParseError { field: "liabilities".into(), message: e.to_string() })?,
+                         named_liabilities: Vec::new(),
                          hawl_satisfied: asset.hawl_satisfied,
                          label: asset.label,
                          id: <uuid::Uuid as FromFfiString>::from_ffi_string(&asset.id)

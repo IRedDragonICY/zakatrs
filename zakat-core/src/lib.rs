@@ -38,4 +38,8 @@ pub use traits::AsyncCalculateZakat;
 pub mod python;
 
 #[cfg(feature = "uniffi")]
+pub mod kotlin;
+
+#[cfg(feature = "uniffi")]
 uniffi::setup_scaffolding!();
+

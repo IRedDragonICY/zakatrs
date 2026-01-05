@@ -62,6 +62,26 @@ jobs:
         with:
           targets: ${{ matrix.target }}
       
+      # Rust/Cargo cache
+      - name: Cache Cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-registry-
+      
+      - name: Cache Cargo build
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ runner.os }}-${{ matrix.target }}-cargo-release-uniffi-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('zakat-core/**/*.rs') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ matrix.target }}-cargo-release-uniffi-${{ hashFiles('**/Cargo.lock') }}-
+            ${{ runner.os }}-${{ matrix.target }}-cargo-release-uniffi-
+      
       - name: Build zakat-core (cdylib)
         run: |
           cd zakat-core
@@ -97,12 +117,21 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.21'
+          cache: true
+          cache-dependency-path: zakat_go/go.sum
       
       - name: Download Linux library
         uses: actions/download-artifact@v4
         with:
           name: libzakat_core-linux-x64.so
           path: zakat_go/
+      
+      # Cache Go binaries
+      - name: Cache Go bin
+        uses: actions/cache@v4
+        with:
+          path: ~/go/bin
+          key: ${{ runner.os }}-go-bin-uniffi-bindgen-go
       
       - name: Install uniffi-bindgen-go
         run: |

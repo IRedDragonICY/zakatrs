@@ -322,8 +322,11 @@ macro_rules! zakat_ffi_export {
                             
                             // Common fields
                             "liabilities_due_now" | "liabilities" => {
-                                self.inner.liabilities_due_now = Decimal::from_str(&val_str)
-                                    .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid liabilities: {}", e)))?;
+                                #[allow(deprecated)]
+                                {
+                                    self.inner.liabilities_due_now = Decimal::from_str(&val_str)
+                                        .map_err(|e| PyErr::new::<pyo3::exceptions::PyValueError, _>(format!("Invalid liabilities: {}", e)))?;
+                                }
                             }
                             "hawl_satisfied" | "hawl" => {
                                 if let Ok(b) = value.extract::<bool>() {
@@ -352,6 +355,7 @@ macro_rules! zakat_ffi_export {
                 )*
 
                 #[getter]
+                #[allow(deprecated)]
                 pub fn liabilities_due_now(&self) -> String {
                     self.inner.liabilities_due_now.to_string()
                 }
@@ -424,6 +428,7 @@ macro_rules! zakat_ffi_export {
                     )*
                     
                     #[wasm_bindgen(setter)]
+                    #[allow(deprecated)]
                     pub fn set_liabilities_due_now(&mut self, val: &str) -> Result<(), JsError> {
                          self.inner.liabilities_due_now = Decimal::from_str(val)
                             .map_err(|e| JsError::new(&format!("Invalid liabilities: {}", e)))?;
@@ -436,6 +441,7 @@ macro_rules! zakat_ffi_export {
             impl $name {
                  // --- Common Fields Getters (Setters handled above or separately) ---
                 #[wasm_bindgen(getter)]
+                #[allow(deprecated)]
                 pub fn liabilities_due_now(&self) -> String {
                     self.inner.liabilities_due_now.to_string()
                 }
@@ -493,6 +499,7 @@ macro_rules! zakat_ffi_export {
             }
 
             impl From<super::$name> for $name {
+                #[allow(deprecated)]
                 fn from(src: super::$name) -> Self {
                     Self {
                         $(
@@ -509,6 +516,7 @@ macro_rules! zakat_ffi_export {
             paste::paste! {
                 #[uniffi::export]
                 pub fn [<calculate_ $name:snake>](asset: $name, config: &crate::kotlin::KotlinConfigWrapper) -> Result<crate::types::FfiZakatDetails, crate::kotlin::KotlinZakatError> {
+                     #[allow(deprecated)]
                      let inner = super::$name {
                          // User fields
                          $(

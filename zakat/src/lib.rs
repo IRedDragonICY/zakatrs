@@ -181,7 +181,7 @@ pub use zakat_sqlite::{SqliteStore, LedgerStore, JsonFileStore};
 // WASM Helper for compatibility with test suite
 #[cfg(feature = "wasm")]
 pub mod wasm_helpers {
-    use super::*;
+
     use wasm_bindgen::prelude::*;
     use serde::{Deserialize, Serialize};
     use rust_decimal::Decimal;

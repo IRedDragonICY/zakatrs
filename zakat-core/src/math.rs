@@ -1,6 +1,6 @@
 use rust_decimal::Decimal;
 use crate::types::ZakatError; // Removed ErrorDetails as it was unused
-use std::ops::Deref;
+
 
 /// A wrapper around `Decimal` that provides safe arithmetic operations with automatic
 /// `ZakatError::Overflow` generation.

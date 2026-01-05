@@ -19,6 +19,22 @@ pub struct DailyBalance {
     pub is_above_nisab: bool,
 }
 
+/// Represents a snapshot of the ledger at a specific point in time.
+/// Used to optimize timeline simulation by avoiding replay from Day 0.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerSnapshot {
+    pub date: NaiveDate,
+    pub balance: Decimal,
+}
+
+impl LedgerSnapshot {
+    pub fn new(date: NaiveDate, balance: Decimal) -> Self {
+        Self { date, balance }
+    }
+}
+
+
+
 /// Simulates a timeline of daily balances from ledger events.
 ///
 /// Uses time-jumping optimization to skip days with no changes.
@@ -27,6 +43,7 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
     price_provider: &P,
     start_date: NaiveDate,
     end_date: NaiveDate,
+    snapshot: Option<LedgerSnapshot>,
 ) -> Result<Vec<DailyBalance>, ZakatError> {
     if start_date > end_date {
         return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
@@ -43,15 +60,37 @@ pub fn simulate_timeline<P: HistoricalPriceProvider>(
     let mut timeline = Vec::new();
     let mut current_balance = Decimal::ZERO;
     
+    // We use an index instead of an iterator for batch processing
+    let mut current_event_idx = 0;
+    
+    // Initialize state from snapshot if available
+    if let Some(ref snap) = snapshot {
+        if snap.date >= start_date {
+             return Err(ZakatError::InvalidInput(Box::new(InvalidInputDetails { 
+                code: zakat_core::types::ZakatErrorCode::InvalidInput,
+                field: "snapshot".to_string(), 
+                value: snap.date.to_string(), 
+                reason_key: "error-snapshot-future".to_string(),
+                source_label: Some("simulate_timeline".to_string()),
+                suggestion: Some("Snapshot date must be before start_date.".to_string()),
+                ..Default::default()
+            })));
+        }
+        current_balance = snap.balance;
+    }
+    
     // Ensure events are sorted by date
     let mut sorted_events = events;
     sorted_events.sort_by_key(|e| e.date);
     
+    // Fast-forward event index past the snapshot date if needed
+    if let Some(ref snap) = snapshot {
+        let snap_date = snap.date;
+        // Skip all events that happened on or before the snapshot date
+        current_event_idx = sorted_events.partition_point(|e| e.date <= snap_date);
+    }
+    
     let mut current_date = start_date;
-    
-    // We use an index instead of an iterator for batch processing
-    let mut current_event_idx = 0;
-    
     let mut current_nisab;
 
     while current_date <= end_date {
@@ -180,7 +219,7 @@ mod tests {
         let mut prices = InMemoryPriceHistory::new();
         prices.add_price(start_date, dec!(1000)); 
         
-        let timeline = simulate_timeline(events, &prices, start_date, end_date).expect("Simulation failed");
+        let timeline = simulate_timeline(events, &prices, start_date, end_date, None).expect("Simulation failed");
         
         let day_jan_1 = timeline.iter().find(|d| d.date == start_date).unwrap();
         assert!(day_jan_1.is_above_nisab);

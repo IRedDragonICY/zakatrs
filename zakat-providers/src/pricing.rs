@@ -654,6 +654,8 @@ pub struct NetworkConfig {
     pub timeout_seconds: u64,
     #[cfg(not(target_arch = "wasm32"))]
     pub binance_api_ip: Option<std::net::IpAddr>,
+    #[cfg(not(target_arch = "wasm32"))]
+    pub dns_over_https_url: Option<String>,
 }
 
 impl Default for NetworkConfig {
@@ -662,6 +664,8 @@ impl Default for NetworkConfig {
             timeout_seconds: 10,
             #[cfg(not(target_arch = "wasm32"))]
             binance_api_ip: None,
+            #[cfg(not(target_arch = "wasm32"))]
+            dns_over_https_url: None, // Defaults to cloudflare if not set
         }
     }
 }
@@ -701,9 +705,6 @@ pub struct BinancePriceProvider {
 impl BinancePriceProvider {
     /// Maximum failures before circuit breaker trips to hardcoded IP
     const CIRCUIT_BREAKER_THRESHOLD: usize = 3;
-    
-    /// Hardcoded Binance API IP (Cloudfront edge)
-    const BINANCE_FALLBACK_IP: std::net::IpAddr = std::net::IpAddr::V4(std::net::Ipv4Addr::new(18, 64, 23, 181));
 
     /// Creates a new provider with resilient connection logic.
     pub fn new(config: &NetworkConfig) -> Self {
@@ -723,7 +724,7 @@ impl BinancePriceProvider {
         }
     }
     
-    /// 3-tier DNS resolution: System DNS -> DoH -> Hardcoded IP
+    /// 3-tier DNS resolution: System DNS -> DoH -> Fail
     fn resolve_with_fallback(config: &NetworkConfig) -> Option<std::net::IpAddr> {
         // If user provided an explicit IP, use it directly
         if let Some(ip) = config.binance_api_ip {
@@ -742,24 +743,24 @@ impl BinancePriceProvider {
         
         tracing::warn!("Standard DNS failed for api.binance.com, trying DoH...");
         
-        // Tier 2: DNS-over-HTTPS (DoH) via Cloudflare
-        if let Some(ip) = Self::resolve_via_doh("api.binance.com") {
+        // Tier 2: DNS-over-HTTPS (DoH)
+        let doh_url = config.dns_over_https_url.as_deref().unwrap_or("https://cloudflare-dns.com/dns-query");
+        if let Some(ip) = Self::resolve_via_doh("api.binance.com", doh_url) {
             tracing::info!("DoH resolved Binance API: {}", ip);
             return Some(ip);
         }
         
-        tracing::warn!("DoH resolution failed, using hardcoded fallback IP");
-        
-        // Tier 3: Hardcoded fallback
-        Some(Self::BINANCE_FALLBACK_IP)
+        tracing::warn!("DoH resolution failed. No fallback IP available (security/maintenance risk removed).");
+        None
     }
     
-    /// Resolves a domain via DNS-over-HTTPS (Cloudflare 1.1.1.1)
-    fn resolve_via_doh(domain: &str) -> Option<std::net::IpAddr> {
+    /// Resolves a domain via DNS-over-HTTPS
+    fn resolve_via_doh(domain: &str, doh_endpoint: &str) -> Option<std::net::IpAddr> {
         // Using blocking HTTP call since this runs during initialization
         // (before async runtime is started in typical usage)
         let url = format!(
-            "https://cloudflare-dns.com/dns-query?name={}&type=A",
+            "{}?name={}&type=A",
+            doh_endpoint,
             domain
         );
         
@@ -837,6 +838,23 @@ impl PriceProvider for BinancePriceProvider {
             attempts += 1;
             match self.client.get(url).send().await {
                 Ok(resp) => {
+                    if resp.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
+                        let retry_after = resp.headers()
+                            .get(reqwest::header::RETRY_AFTER)
+                            .and_then(|val| val.to_str().ok())
+                            .and_then(|s| s.parse::<u64>().ok())
+                            .unwrap_or(60); // Default 60s if parse fails
+                        
+                        let wait_time = std::time::Duration::from_secs(retry_after.min(60)); // Cap at 60s
+                        tracing::warn!("Binance 429 Too Many Requests. Waiting {:?} before retry...", wait_time);
+                        tokio::time::sleep(wait_time).await;
+                        // Don't count as an attempt failure necessarily, or just continue loop? 
+                        // Instructions say "parse Retry-After... sleep... before retrying".
+                        // Logic below will consume an attempt if we continue.
+                        // Let's decrement attempts so we don't exhaust retries on forced waits, 
+                        // OR just respect the loop. Let's start fresh retry.
+                        continue;
+                    }
                     self.record_success();
                     break resp;
                 }

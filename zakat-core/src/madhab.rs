@@ -9,8 +9,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use std::str::FromStr;
+
 use crate::types::ZakatError; // Removed ErrorDetails as it is unused in the snippet or I will use simple implementation
+
 
 // ... rest of file (Actually I should probably implement it properly)
 

@@ -52,7 +52,7 @@ impl LedgerAsset {
 impl CalculateZakat for LedgerAsset {
     fn calculate_zakat<C: ZakatConfigArgument>(&self, _config: C) -> Result<ZakatDetails, ZakatError> {
         // Run simulation
-        let timeline = simulate_timeline(self.events.clone(), &self.prices, self.start_date, self.end_date)?;
+        let timeline = simulate_timeline(self.events.clone(), &self.prices, self.start_date, self.end_date, None)?;
         
         // Run analyzer
         let result = analyze_hawl(&timeline);

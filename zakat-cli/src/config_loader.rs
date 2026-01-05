@@ -12,6 +12,7 @@ use tracing::{debug, warn};
 /// CLI Configuration structure loaded from TOML file.
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
+#[allow(dead_code)]
 pub struct CliConfig {
     /// Default gold price per gram.
     pub gold_price: Option<Decimal>,

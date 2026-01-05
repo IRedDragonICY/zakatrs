@@ -285,7 +285,7 @@ impl ZakatDetails {
     }
 
     #[getter]
-    fn structured_warnings(&self, py: Python<'_>) -> PyResult<PyObject> {
+    fn structured_warnings(&self, py: Python<'_>) -> PyResult<Py<PyAny>> {
         use pyo3::types::{PyDict, PyList};
         let list = PyList::empty(py);
         for w in &self.inner.structured_warnings {

@@ -862,6 +862,7 @@ impl ZakatDetails {
     }
 
     /// Creates ZakatDetails with a custom calculation breakdown.
+    #[allow(deprecated)]
     pub fn with_breakdown(
         total_assets: Decimal,
         liabilities_due_now: Decimal,

@@ -33,7 +33,7 @@ impl SqliteStore {
             .map_err(|e| ZakatError::NetworkError(format!("SQLite connection error: {}", e)))?;
 
         let store = Self { pool };
-        store.run_migrations().await?;
+        store.migrate().await?;
         Ok(store)
     }
 
@@ -45,22 +45,44 @@ impl SqliteStore {
     }
 
     /// Runs database migrations to ensure the schema exists.
-    async fn run_migrations(&self) -> Result<(), ZakatError> {
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS ledger_events (
-                id TEXT PRIMARY KEY NOT NULL,
-                date TEXT NOT NULL,
-                amount TEXT NOT NULL,
-                asset_type TEXT NOT NULL,
-                transaction_type TEXT NOT NULL,
-                description TEXT
+    pub async fn migrate(&self) -> Result<(), ZakatError> {
+        // 1. Create migrations table
+        sqlx::query("CREATE TABLE IF NOT EXISTS _migrations (version INTEGER PRIMARY KEY)")
+            .execute(&self.pool)
+            .await
+            .map_err(|e| ZakatError::NetworkError(format!("Migration init error: {}", e)))?;
+
+        // 2. Get current version
+        let current_version: Option<i32> = sqlx::query_scalar("SELECT MAX(version) FROM _migrations")
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(|e| ZakatError::NetworkError(format!("Migration version check error: {}", e)))?;
+            
+        let version = current_version.unwrap_or(0);
+
+        // 3. Apply migrations
+        if version < 1 {
+            sqlx::query(
+                r#"
+                CREATE TABLE IF NOT EXISTS ledger_events (
+                    id TEXT PRIMARY KEY NOT NULL,
+                    date TEXT NOT NULL,
+                    amount TEXT NOT NULL,
+                    asset_type TEXT NOT NULL,
+                    transaction_type TEXT NOT NULL,
+                    description TEXT
+                )
+                "#,
             )
-            "#,
-        )
-        .execute(&self.pool)
-        .await
-        .map_err(|e| ZakatError::NetworkError(format!("SQLite migration error: {}", e)))?;
+            .execute(&self.pool)
+            .await
+            .map_err(|e| ZakatError::NetworkError(format!("Migration v1 error: {}", e)))?;
+            
+            sqlx::query("INSERT INTO _migrations (version) VALUES (1)")
+                .execute(&self.pool)
+                .await
+                .map_err(|e| ZakatError::NetworkError(format!("Migration v1 version update error: {}", e)))?;
+        }
 
         Ok(())
     }

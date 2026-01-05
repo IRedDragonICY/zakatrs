@@ -6,6 +6,9 @@ use flutter_rust_bridge::frb;
 use rust_decimal::prelude::*;
 use anyhow::Result;
 
+// Re-export core FFI error type for structured error handling in Dart
+pub use zakat::types::FfiZakatError;
+
 // ============================================================================
 // FrbDecimal - Decimal wrapper for FFI
 // ============================================================================

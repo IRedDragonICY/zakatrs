@@ -30,7 +30,7 @@ fn test_price_spike_breach() {
     // Spike
     prices.add_price(spike_date, dec!(20000));
     
-    let timeline = simulate_timeline(events, &prices, start_date, end_date).expect("Simulation success");
+    let timeline = simulate_timeline(events, &prices, start_date, end_date, None).expect("Simulation success");
     let result = analyze_hawl(&timeline);
     
     // Hawl should have started AFTER the spike date (June 2nd presumably, or whenever Nisab fell back)
@@ -71,7 +71,7 @@ fn test_leap_year_hawl() {
     // If start Jan 1, end Jan 1 -> 1 day.
     // We want 354 days length.
     
-    let timeline_short = simulate_timeline(events.clone(), &prices, start_date, date_353).unwrap(); // Length 354 actually?
+    let timeline_short = simulate_timeline(events.clone(), &prices, start_date, date_353, None).unwrap(); // Length 354 actually?
     // Jan 1 to Jan 2 is 2 days (Jan 1, Jan 2).
     // Jan 1 + 353 days = Dec 20 (approx). 
     // timeline.len() = 354.
@@ -91,7 +91,7 @@ fn test_leap_year_hawl() {
     
     // Let's try 352 offset -> 353 days count.
     let date_352 = start_date + Duration::days(352);
-    let timeline_shorter = simulate_timeline(events.clone(), &prices, start_date, date_352).unwrap();
+    let timeline_shorter = simulate_timeline(events.clone(), &prices, start_date, date_352, None).unwrap();
     let result_shorter = analyze_hawl(&timeline_shorter);
     assert!(!result_shorter.is_due, "Should NOT be due if held for 353 days");
 }
@@ -116,7 +116,7 @@ fn test_day_zero_deposit() {
         prices.add_price(date, dec!(1000));
     }
     
-    let timeline = simulate_timeline(events.clone(), &prices, start_date, end_date).unwrap();
+    let timeline = simulate_timeline(events.clone(), &prices, start_date, end_date, None).unwrap();
     let result = analyze_hawl(&timeline);
     
     // 352 days < 354 days, so NOT due yet.
@@ -144,7 +144,7 @@ fn test_day_zero_deposit() {
     // Let's use 370 offset to be safe safe.
     
     let end_date_safe = start_date + Duration::days(370);
-    let timeline_safe = simulate_timeline(events, &prices, start_date, end_date_safe).unwrap();
+    let timeline_safe = simulate_timeline(events, &prices, start_date, end_date_safe, None).unwrap();
     let result_safe = analyze_hawl(&timeline_safe);
     
     assert!(result_safe.is_due);

@@ -12,7 +12,7 @@ fn test_portfolio_convenience_methods() {
     assert_eq!(items.len(), 3);
 
     // Verify Cash
-    let cash_item = portfolio.get_by_label("Savings").expect("Cash item found");
+    let _cash_item = portfolio.get_by_label("Savings").expect("Cash item found");
     // We can't easily downcast to check exact fields without exposing more, 
     // but we can check if it calculates.
 }

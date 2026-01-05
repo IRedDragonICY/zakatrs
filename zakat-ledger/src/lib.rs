@@ -17,6 +17,7 @@ pub mod analyzer;
 pub mod assets;
 pub mod hawl;
 pub mod qada;
+pub mod qada_inflation;
 
 // Re-exports for convenience
 pub use events::{LedgerEvent, TransactionType, EventStream};
@@ -26,3 +27,4 @@ pub use analyzer::{LedgerZakatResult, analyze_hawl};
 pub use assets::LedgerAsset;
 pub use hawl::HawlTracker;
 pub use qada::{QadaCalculator, QadaYearResult, QadaReport};
+pub use qada_inflation::{MissedZakatCalculator, InflationIndexProvider, InflationAdjustmentResult};

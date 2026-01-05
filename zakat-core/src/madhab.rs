@@ -90,6 +90,12 @@ pub struct ZakatRules {
     /// Agriculture Zakat rates: (Rain-fed, Irrigated, Mixed).
     #[typeshare(skip)]
     pub agriculture_rates: (Decimal, Decimal, Decimal),
+    /// Whether Zakat on pension/restricted funds is due on vested amount (True) or upon receipt (False).
+    #[serde(default)]
+    pub pension_zakat_on_vested: bool,
+    /// Zakat rate for general savings/monetary assets.
+    #[typeshare(serialized_as = "string")]
+    pub savings_rate: Decimal,
 }
 
 use crate::inputs::IntoZakatDecimal;
@@ -101,6 +107,8 @@ impl Default for ZakatRules {
             jewelry_exempt: true,
             trade_goods_rate: dec!(0.025),
             agriculture_rates: (dec!(0.10), dec!(0.05), dec!(0.075)),
+            pension_zakat_on_vested: false,
+            savings_rate: dec!(0.025),
         }
     }
 }
@@ -189,6 +197,7 @@ impl ZakatStrategy for ShafiStrategy {
         ZakatRules {
             nisab_standard: NisabStandard::Gold,
             jewelry_exempt: true,
+            pension_zakat_on_vested: true,
             ..Default::default()
         }
     }

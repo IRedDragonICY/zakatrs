@@ -17,7 +17,7 @@ crate-type = ["rlib", "cdylib"]
 default = []
 async = ["dep:async-trait", "dep:tokio", "dep:futures"]
 uniffi = ["dep:uniffi"]
-wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen"]
+wasm = ["dep:wasm-bindgen", "dep:serde-wasm-bindgen", "dep:tsify"]
 python = ["dep:pyo3"]
 stub-gen = ["dep:pyo3-stub-gen"]
 pyo3-stub-gen = ["dep:pyo3-stub-gen"]
@@ -47,6 +47,7 @@ futures = { workspace = true, optional = true }
 uniffi = { workspace = true, optional = true }
 wasm-bindgen = { workspace = true, optional = true }
 serde-wasm-bindgen = { workspace = true, optional = true }
+tsify = { workspace = true, optional = true }
 pyo3 = { workspace = true, optional = true }
 pyo3-stub-gen = { version = "0.17.2", optional = true, features = ["rust_decimal"] }
 

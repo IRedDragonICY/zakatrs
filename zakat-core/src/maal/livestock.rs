@@ -328,6 +328,7 @@ impl CalculateZakat for LivestockAssets {
             } else { 
                 crate::types::ZakatRecommendation::None 
             },
+            notes: Vec::new(),
         })
     }
 

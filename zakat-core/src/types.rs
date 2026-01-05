@@ -694,6 +694,9 @@ pub struct ZakatDetails {
     /// Indicates if voluntary Sadaqah is recommended even when Zakat is not obligatory.
     #[serde(default)]
     pub recommendation: ZakatRecommendation,
+    /// Additional notes/rulings explaining the calculation logic (v1.3+).
+    #[serde(default)]
+    pub notes: Vec<String>,
 }
 
 /// Structured representation of a Zakat calculation for API consumers.
@@ -841,6 +844,7 @@ impl ZakatDetails {
             structured_warnings,
             warnings,
             recommendation,
+            notes: Vec::new(),
         }
     }
 
@@ -927,6 +931,7 @@ impl ZakatDetails {
             structured_warnings,
             warnings,
             recommendation,
+            notes: Vec::new(),
         }
     }
 
@@ -954,6 +959,7 @@ impl ZakatDetails {
             structured_warnings: Vec::new(),
             warnings: Vec::new(),
             recommendation: ZakatRecommendation::None,
+            notes: Vec::new(),
         }
     }
 

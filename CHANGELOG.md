@@ -1,5 +1,45 @@
 # Changelog
 
+## [1.4.0] - 2026-01-05
+
+### Major Feature Release: Advanced Fiqh Compliance
+
+This release introduces 5 Long-Term Fiqh Features, transforming `zakatrs` into a comprehensive Shariah-compliant wealth management system.
+
+### Added
+
+- **Restricted Funds (Daman Ijtima'i / Pension)**:
+    - New `RestrictedFundAssets` struct and `AccessibilityLevel` enum in `zakat-core/src/maal/restricted.rs`.
+    - Handles logic for `FullyAccessible`, `PenaltyWithdrawal`, and `LockedUntilRetirement` funds based on Madhab strategies.
+    - Implements precise Zakatable amount calculation considering withdrawal penalties and vesting rules.
+
+- **Joint Ventures (Khultat)**:
+    - New `partnership` module handling `JointVenturePortfolio`.
+    - Implements `Syirkah` (Partnership) implications on Nisab threshold aggregation.
+    - Added `Shareholder` struct to properly distribute Zakat liability among partners.
+
+- **Advanced Receivables (Dayn)**:
+    - **Breaking Change**: `BusinessZakat` now uses `receivables_list: Vec<ReceivableItem>` instead of a flat decimal.
+    - Introduced `ReceivableQuality` (`Strong`, `Weak`, `BadDebt`) to filter zakatable receivables based on likelihood of recovery.
+    - Deprecated single `receivables` field with warnings for legacy usage.
+
+- **Retrospective Qada Calculator (Missed Zakat)**:
+    - New `zakat-ledger` module `qada_inflation`.
+    - Implements **Gold Standard Method** for adjusting historical missed payments against inflation.
+    - Uses `InflationIndexProvider` trait to fetch historical gold prices.
+
+- **Zakat Distribution (Haddul Kifayah)**:
+    - New `distribution` module in `zakat-core`.
+    - Implements `Haddul Kifayah` (Sufficiency Limit) calculator using `BasicNeeds` and `HouseholdProfile`.
+    - Determines eligibility status (`Fakir`, `Miskin`, `NotEligible`) based on sufficiency ratios.
+
+- **WASM Support**:
+    - Added `tsify` dependency to `zakat-core` for enhanced TypeScript type definitions in WASM builds.
+
+### Changed
+- **Config**: Added `pension_zakat_on_vested` and `savings_rate` to `ZakatRules` for granular Madhab control.
+- **Deps**: Added `chrono` feature `serde` and `tsify` integration for seamless serialization.
+
 ## [1.3.0] - 2026-01-04
 
 ### Features (QoL & Robustness Sprint)

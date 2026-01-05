@@ -20,6 +20,9 @@ pub mod fitrah;
 pub mod portfolio;
 pub mod assets;
 pub mod hawl;
+pub mod debt;
+pub mod distribution;
+pub mod partnership;
 pub mod validation;
 
 pub mod prelude;

@@ -84,6 +84,9 @@ pub struct ZakatConfig {
     #[serde(skip, default = "default_strategy")]
     #[typeshare(skip)]
     pub strategy: Arc<dyn ZakatStrategy>,
+    /// The specific Madhab being followed.
+    #[serde(default)]
+    pub madhab: Madhab,
     /// Current market price of Gold per gram.
     #[typeshare(serialized_as = "string")]
     pub gold_price_per_gram: Decimal,
@@ -168,6 +171,7 @@ impl Default for ZakatConfig {
     fn default() -> Self {
         ZakatConfig {
             strategy: Arc::new(Madhab::default()),
+            madhab: Madhab::default(),
             gold_price_per_gram: Decimal::ZERO,
             silver_price_per_gram: Decimal::ZERO,
             rice_price_per_kg: None,
@@ -620,10 +624,11 @@ impl ZakatConfig {
         self
     }
 
-    /// Sets the Zakat strategy using a preset Madhab or custom strategy.
-    pub fn with_madhab(mut self, madhab: impl ZakatStrategy + 'static) -> Self {
+    /// Sets the Zakat strategy using a preset Madhab.
+    pub fn with_madhab(mut self, madhab: Madhab) -> Self {
         let rules = madhab.get_rules();
         self.strategy = Arc::new(madhab);
+        self.madhab = madhab;
         self.cash_nisab_standard = rules.nisab_standard;
         self
     }

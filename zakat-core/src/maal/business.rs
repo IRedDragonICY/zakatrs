@@ -32,12 +32,14 @@ crate::zakat_ffi_export! {
         // Assets
         pub cash_on_hand: Decimal,
         pub inventory_value: Decimal,
+        #[deprecated(since = "1.3.0", note = "Use `receivables_list` instead")]
         pub receivables: Decimal,
+        pub receivables_list: Vec<crate::debt::ReceivableItem>,
         // Business-specific liabilities are now unified with `liabilities_due_now`
     }
 }
 
-#[allow(deprecated)] // Uses deprecated `liabilities_due_now` for backward compat
+#[allow(deprecated)] // Uses deprecated `liabilities_due_now` and `receivables` for backward compat
 impl Default for BusinessZakat {
     fn default() -> Self {
         let (liabilities_due_now, named_liabilities, hawl_satisfied, label, id, _input_errors, acquisition_date) = Self::default_common();
@@ -45,6 +47,7 @@ impl Default for BusinessZakat {
             cash_on_hand: Decimal::ZERO,
             inventory_value: Decimal::ZERO,
             receivables: Decimal::ZERO,
+            receivables_list: Vec::new(),
             liabilities_due_now,
             named_liabilities,
             hawl_satisfied,
@@ -104,6 +107,8 @@ impl BusinessZakat {
     /// 
     /// If the value cannot be converted to a valid decimal, the error is
     /// collected and will be returned by `validate()` or `calculate_zakat()`.
+    #[deprecated(since = "1.3.0", note = "Use `add_receivable` instead for detailed tracking")]
+    #[allow(deprecated)]
     pub fn receivables(mut self, receivables: impl IntoZakatDecimal) -> Self {
         match receivables.into_zakat_decimal() {
             Ok(v) => self.receivables = v,
@@ -112,6 +117,20 @@ impl BusinessZakat {
         self
     }
 
+    /// Adds a receivable with specific quality.
+    pub fn add_receivable(mut self, description: impl Into<String>, amount: impl IntoZakatDecimal, quality: crate::debt::ReceivableQuality) -> Self {
+        match amount.into_zakat_decimal() {
+            Ok(v) => {
+                 self.receivables_list.push(crate::debt::ReceivableItem {
+                    description: description.into(),
+                    amount: v,
+                    quality,
+                 });
+            },
+             Err(e) => self._input_errors.push(e),
+        }
+        self
+    }
     /// Sets short-term business liabilities (deducted from gross assets).
     /// 
     /// If the value cannot be converted to a valid decimal, the error is
@@ -144,9 +163,19 @@ impl CalculateZakat for BusinessZakat {
         Validator::ensure_non_negative(&[
             ("business_assets", self.cash_on_hand),
             ("business_assets", self.inventory_value),
-            ("business_assets", self.receivables),
-            ("liabilities", self.liabilities_due_now),
+            // ("business_assets", self.receivables), // Validated implicitly if non-zero, but let's check legacy
+             ("liabilities", self.liabilities_due_now),
         ], self.label.clone())?;
+        
+        if self.receivables < Decimal::ZERO {
+             return Err(ZakatError::InvalidInput(Box::new(crate::types::InvalidInputDetails {
+                field: "receivables".to_string(),
+                value: "Negative receivables".to_string(),
+                reason_key: "error-negative-receivables".to_string(),
+                source_label: self.label.clone(),
+                ..Default::default()
+            })));
+        }
 
         // For LowerOfTwo or Silver standard, we need silver price too
         let needs_silver = matches!(
@@ -179,19 +208,47 @@ impl CalculateZakat for BusinessZakat {
         // Dynamic Zakat Rate from strategy (default 2.5%)
         let rate = config.strategy.get_rules().trade_goods_rate;
         
+        // Calculate Total Receivables (Legacy + Strong Receivables from List)
+        // Weak receivables are excluded.
+        let mut total_receivables = self.receivables; // Start with legacy field
+        let mut weak_receivables = Decimal::ZERO;
+
+        for item in &self.receivables_list {
+            match item.quality {
+                crate::debt::ReceivableQuality::Strong => {
+                    total_receivables += item.amount;
+                }
+                crate::debt::ReceivableQuality::Weak => {
+                    weak_receivables += item.amount;
+                }
+            }
+        }
+        
         let gross_assets = ZakatDecimal::new(self.cash_on_hand)
             .with_source(self.label.clone())
             .checked_add(self.inventory_value)?
-            .checked_add(self.receivables)?;
+            .checked_add(total_receivables)?;
         
-        let trace_steps = vec![
+        let mut trace_steps = vec![
             crate::types::CalculationStep::initial("step-cash-on-hand", "Cash on Hand", self.cash_on_hand)
                 .with_reference("Sunan Abu Dawud 1562"),
             crate::types::CalculationStep::add("step-inventory-value", "Inventory Value", self.inventory_value)
                 .with_reference("Fiqh al-Zakah (Commercial Goods)"),
-            crate::types::CalculationStep::add("step-receivables", "Receivables", self.receivables),
-            crate::types::CalculationStep::result("step-gross-assets", "Gross Assets", *gross_assets),
         ];
+
+        if !total_receivables.is_zero() {
+            trace_steps.push(
+               crate::types::CalculationStep::add("step-receivables-strong", "Receivables (Strong)", total_receivables)
+            );
+        }
+        
+        if !weak_receivables.is_zero() {
+             // Just a note or handled outside? 
+             // We can maybe add a step showing it's excluded, but CalculationStep usually sums up.
+             // We'll leave it implicitly excluded but maybe add a note later in ZakatDetails if possible.
+        }
+
+        trace_steps.push(crate::types::CalculationStep::result("step-gross-assets", "Gross Assets", *gross_assets));
 
         // Calculate total liabilities (legacy + named)
         let total_liabilities = self.total_liabilities();
@@ -219,7 +276,13 @@ impl CalculateZakat for BusinessZakat {
             observer: Some(config.observer.clone()),
         };
 
-        calculate_monetary_asset(params)
+        let mut result = calculate_monetary_asset(params)?;
+        
+        if !weak_receivables.is_zero() {
+             result.notes.push(format!("Excluded Weak Receivables: {}. Pay Zakat on this amount only upon receipt.", weak_receivables));
+        }
+        
+        Ok(result)
     }
 
     fn get_label(&self) -> Option<String> {
@@ -344,6 +407,29 @@ mod tests {
         // 8500 == Nisab, so payable
         assert!(result.is_payable);
         assert_eq!(result.net_assets, dec!(8500));
+    }
+
+    #[test]
+    fn test_receivables_quality() {
+        let config = ZakatConfig { gold_price_per_gram: Decimal::from(100), ..Default::default() };
+        
+        let business = BusinessZakat::new()
+            .cash(5000.0)
+            .inventory(3500.0) // 8500 total
+            .add_receivable("Trusted Client", 1000.0, crate::debt::ReceivableQuality::Strong)
+            .add_receivable("Bankrupt Client", 5000.0, crate::debt::ReceivableQuality::Weak)
+            .hawl(true);
+
+        let result = business.calculate_zakat(&config).unwrap();
+
+        // 8500 (Base) + 1000 (Strong) = 9500 Net.  5000 Weak excluded.
+        // Nisab = 85 * 100 = 8500. 9500 > 8500, so payable.
+        assert!(result.is_payable);
+        assert_eq!(result.net_assets, dec!(9500));
+        assert_eq!(result.zakat_due, dec!(237.5)); // 9500 * 0.025
+        
+        // Check for note
+        assert!(result.notes.iter().any(|n| n.contains("Excluded Weak Receivables")));
     }
     
     #[test]

@@ -6,3 +6,4 @@ pub mod investments;
 pub mod livestock;
 pub mod mining;
 pub mod precious_metals;
+pub mod restricted;

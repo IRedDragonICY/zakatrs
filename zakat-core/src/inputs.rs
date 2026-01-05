@@ -648,3 +648,26 @@ impl FromFfiString for i32 { type Err = std::num::ParseIntError; fn from_ffi_str
 impl FromFfiString for u32 { type Err = std::num::ParseIntError; fn from_ffi_string(s: &str) -> Result<Self, Self::Err> { s.parse() } }
 impl FromFfiString for i64 { type Err = std::num::ParseIntError; fn from_ffi_string(s: &str) -> Result<Self, Self::Err> { s.parse() } }
 impl FromFfiString for u64 { type Err = std::num::ParseIntError; fn from_ffi_string(s: &str) -> Result<Self, Self::Err> { s.parse() } }
+
+impl<T: serde::Serialize> ToFfiString for Vec<T> {
+    fn to_ffi_string(&self) -> String {
+        serde_json::to_string(self).unwrap_or_else(|_| "[]".to_string())
+    }
+}
+
+impl<T: serde::de::DeserializeOwned> FromFfiString for Vec<T> {
+    type Err = ZakatError;
+    fn from_ffi_string(s: &str) -> Result<Self, Self::Err> {
+        if s.trim().is_empty() || s == "[]" {
+            return Ok(Vec::new());
+        }
+        serde_json::from_str(s).map_err(|e| ZakatError::InvalidInput(Box::new(InvalidInputDetails {
+            field: "json_array".to_string(),
+            value: s.to_string(),
+            reason_key: "error-json-parse".to_string(),
+            args: Some(std::collections::HashMap::from([("details".to_string(), e.to_string())])),
+            suggestion: Some("Ensure the input is a valid JSON array.".to_string()),
+            ..Default::default()
+        })))
+    }
+}

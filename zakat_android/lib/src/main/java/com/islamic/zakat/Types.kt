@@ -232,6 +232,24 @@ data class NetworkConfig (
 	val timeoutSeconds: UInt
 )
 
+/// Islamic school of thought (Madhab) for Zakat calculation.
+/// Each Madhab has different rules regarding Nisab standards and jewelry exemptions.
+@Serializable
+enum class Madhab(val string: String) {
+	/// Hanafi Madhab - Uses LowerOfTwo Nisab standard, jewelry is zakatable.
+	@SerialName("hanafi")
+	Hanafi("hanafi"),
+	/// Shafi'i Madhab - Uses Gold Nisab standard, personal jewelry is exempt.
+	@SerialName("shafi")
+	Shafi("shafi"),
+	/// Maliki Madhab - Uses Gold Nisab standard, personal jewelry is exempt.
+	@SerialName("maliki")
+	Maliki("maliki"),
+	/// Hanbali Madhab - Uses LowerOfTwo Nisab standard, personal jewelry is exempt.
+	@SerialName("hanbali")
+	Hanbali("hanbali"),
+}
+
 /// Nisab standard for calculating the Zakat threshold on monetary wealth.
 /// - `Gold`: Use the gold Nisab (85g × gold_price).
 /// - `Silver`: Use the silver Nisab (595g × silver_price).
@@ -252,6 +270,8 @@ enum class NisabStandard(val string: String) {
 /// Global configuration for Zakat prices.
 @Serializable
 data class ZakatConfig (
+	/// The specific Madhab being followed.
+	val madhab: Madhab? = null,
 	/// Current market price of Gold per gram.
 	val goldPricePerGram: string,
 	/// Current market price of Silver per gram.
@@ -417,7 +437,9 @@ data class ZakatDetails (
 	val warnings: List<String>,
 	/// Recommendation status (Feature 4: "Almost Payable" State).
 	/// Indicates if voluntary Sadaqah is recommended even when Zakat is not obligatory.
-	val recommendation: ZakatRecommendation? = null
+	val recommendation: ZakatRecommendation? = null,
+	/// Additional notes/rulings explaining the calculation logic (v1.3+).
+	val notes: List<String>? = null
 )
 
 /// Structured representation of a Zakat calculation for API consumers.
@@ -459,26 +481,12 @@ data class ZakatRules (
 	/// Whether personal jewelry is exempt from Zakat.
 	val jewelryExempt: Boolean,
 	/// Zakat rate for trade goods (default: 2.5% = 0.025).
-	val tradeGoodsRate: string
+	val tradeGoodsRate: string,
+	/// Whether Zakat on pension/restricted funds is due on vested amount (True) or upon receipt (False).
+	val pensionZakatOnVested: Boolean? = null,
+	/// Zakat rate for general savings/monetary assets.
+	val savingsRate: string
 )
-
-/// Islamic school of thought (Madhab) for Zakat calculation.
-/// Each Madhab has different rules regarding Nisab standards and jewelry exemptions.
-@Serializable
-enum class Madhab(val string: String) {
-	/// Hanafi Madhab - Uses LowerOfTwo Nisab standard, jewelry is zakatable.
-	@SerialName("hanafi")
-	Hanafi("hanafi"),
-	/// Shafi'i Madhab - Uses Gold Nisab standard, personal jewelry is exempt.
-	@SerialName("shafi")
-	Shafi("shafi"),
-	/// Maliki Madhab - Uses Gold Nisab standard, personal jewelry is exempt.
-	@SerialName("maliki")
-	Maliki("maliki"),
-	/// Hanbali Madhab - Uses LowerOfTwo Nisab standard, personal jewelry is exempt.
-	@SerialName("hanbali")
-	Hanbali("hanbali"),
-}
 
 /// A wrapper enum for all zakatable asset types.
 /// This enables serialization and uniform handling in a portfolio.

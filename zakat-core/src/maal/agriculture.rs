@@ -244,6 +244,7 @@ impl CalculateZakat for AgricultureAssets {
             } else { 
                 crate::types::ZakatRecommendation::None 
             },
+            notes: Vec::new(),
         })
     }
 

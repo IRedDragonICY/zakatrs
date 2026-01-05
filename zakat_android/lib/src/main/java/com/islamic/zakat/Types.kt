@@ -59,39 +59,39 @@ typealias CalculationBreakdown = List<CalculationStep>
 sealed class WarningCode {
 	/// Net assets were negative and clamped to zero.
 	@Serializable
-	@SerialName("NEGATIVE_ASSETS_CLAMPED")
+	@SerialName("negativeAssetsClamped")
 	object NegativeAssetsClamped: WarningCode()
 	/// Expenses were ignored when using the Gross calculation method.
 	@Serializable
-	@SerialName("GROSS_METHOD_EXPENSES_IGNORED")
+	@SerialName("grossMethodExpensesIgnored")
 	object GrossMethodExpensesIgnored: WarningCode()
 	/// Livestock count is below minimum threshold for Zakat.
 	@Serializable
-	@SerialName("LIVESTOCK_BELOW_NISAB")
+	@SerialName("livestockBelowNisab")
 	object LivestockBelowNisab: WarningCode()
 	/// Gold or silver weight is below minimum threshold.
 	@Serializable
-	@SerialName("METAL_BELOW_NISAB")
+	@SerialName("metalBelowNisab")
 	object MetalBelowNisab: WarningCode()
 	/// Price data may be stale or unavailable.
 	@Serializable
-	@SerialName("PRICE_DATA_STALE")
+	@SerialName("priceDataStale")
 	object PriceDataStale: WarningCode()
 	/// Hawl period not yet satisfied.
 	@Serializable
-	@SerialName("HAWL_NOT_MET")
+	@SerialName("hawlNotMet")
 	object HawlNotMet: WarningCode()
 	/// Partial calculation due to missing data.
 	@Serializable
-	@SerialName("PARTIAL_CALCULATION")
+	@SerialName("partialCalculation")
 	object PartialCalculation: WarningCode()
 	/// Currency conversion applied.
 	@Serializable
-	@SerialName("CURRENCY_CONVERSION_APPLIED")
+	@SerialName("currencyConversionApplied")
 	object CurrencyConversionApplied: WarningCode()
 	/// Other warning with custom code.
 	@Serializable
-	@SerialName("OTHER")
+	@SerialName("other")
 	data class Other(val content: String): WarningCode()
 }
 

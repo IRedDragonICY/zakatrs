@@ -3,9 +3,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::warn;
 
-// =============================================================================
 // Zakat Recommendation (Feature 4: "Almost Payable" State)
 // =============================================================================
+
+
 
 /// Represents the Zakat recommendation status for an asset.
 ///
@@ -19,6 +20,7 @@ use tracing::warn;
 /// voluntary charity (Sadaqah) is always encouraged in Islam.
 /// This recommendation helps users consider giving even when not obligated.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, schemars::JsonSchema)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub enum ZakatRecommendation {
@@ -63,6 +65,7 @@ impl ZakatRecommendation {
 /// Most schools of Fiqh allow deducting immediate debts from zakatable wealth. 
 /// For long-term debts, modern consensus often restricts deduction to the upcoming year's payments.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default, schemars::JsonSchema)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub enum LiabilityType {
@@ -160,8 +163,9 @@ impl Liability {
 /// Frontends can use these codes to provide localized warning messages
 /// instead of hardcoded English strings.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[typeshare::typeshare]
-#[serde(tag = "type", content = "content", rename_all = "SCREAMING_SNAKE_CASE")]
+#[serde(tag = "type", content = "content", rename_all = "camelCase")]
 pub enum WarningCode {
     /// Net assets were negative and clamped to zero.
     NegativeAssetsClamped,
@@ -265,6 +269,7 @@ impl CalculationWarning {
 /// 
 /// These categories are based on the Hadith specification for camel and cattle ages.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub enum LivestockAge {
@@ -286,6 +291,7 @@ pub enum LivestockAge {
 
 /// Represents the kind of livestock for Zakat.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub enum LivestockKind {
@@ -404,6 +410,7 @@ impl PaymentPayload {
 
 /// Represents the semantic operation performed in a calculation step.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub enum Operation {
@@ -640,6 +647,7 @@ impl std::fmt::Display for CalculationBreakdown {
 
 /// Represents the detailed breakdown of the Zakat calculation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+
 #[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub struct ZakatDetails {

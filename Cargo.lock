@@ -5695,6 +5695,7 @@ dependencies = [
  "chrono",
  "console_error_panic_hook",
  "getrandom 0.2.16",
+ "gloo-net",
  "pyo3",
  "rust_decimal",
  "rust_decimal_macros",

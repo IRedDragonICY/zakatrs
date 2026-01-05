@@ -3,6 +3,7 @@
 //! Provides translation and currency formatting capabilities.
 
 use rust_decimal::Decimal;
+#[cfg(feature = "embed-locales")]
 use rust_embed::RustEmbed;
 use fluent_bundle::{FluentResource, FluentArgs};
 use fluent_bundle::bundle::FluentBundle;
@@ -17,6 +18,7 @@ use icu::decimal::{FixedDecimalFormatter, options::FixedDecimalFormatterOptions}
 use fixed_decimal::FixedDecimal;
 use writeable::Writeable;
 
+#[cfg(feature = "embed-locales")]
 #[derive(RustEmbed)]
 #[folder = "assets/locales"]
 struct Asset;
@@ -119,6 +121,8 @@ pub struct Translator {
     bundles: std::sync::Arc<HashMap<ZakatLocale, FluentBundle<FluentResource, intl_memoizer::concurrent::IntlLangMemoizer>>>,
     /// Dynamically loaded locale bundles (loaded at runtime).
     dynamic_bundles: std::sync::Arc<std::sync::RwLock<HashMap<String, FluentBundle<FluentResource, intl_memoizer::concurrent::IntlLangMemoizer>>>>,
+    /// Optional resource loader for lazy loading.
+    resource_loader: Option<std::sync::Arc<dyn crate::ResourceLoader>>,
 }
 
 impl std::fmt::Debug for Translator {
@@ -135,6 +139,7 @@ impl std::fmt::Debug for Translator {
     }
 }
 
+#[cfg(feature = "embed-locales")]
 impl Default for Translator {
     fn default() -> Self {
         Self::new()
@@ -142,6 +147,7 @@ impl Default for Translator {
 }
 
 impl Translator {
+    #[cfg(feature = "embed-locales")]
     pub fn new() -> Self {
         let mut bundles = HashMap::new();
         
@@ -172,6 +178,27 @@ impl Translator {
         Translator { 
             bundles: std::sync::Arc::new(bundles),
             dynamic_bundles: std::sync::Arc::new(std::sync::RwLock::new(HashMap::new())),
+            resource_loader: None,
+        }
+    }
+
+    #[cfg(not(feature = "embed-locales"))]
+    pub fn new(loader: impl crate::ResourceLoader) -> Self {
+        Translator {
+            bundles: std::sync::Arc::new(HashMap::new()),
+            dynamic_bundles: std::sync::Arc::new(std::sync::RwLock::new(HashMap::new())),
+            resource_loader: Some(std::sync::Arc::new(loader)),
+        }
+    }
+
+    /// Load a specific locale asynchronously using the ResourceLoader
+    pub async fn load_locale_async(&self, locale: &str) -> Result<(), String> {
+        if let Some(loader) = &self.resource_loader {
+            let content = loader.load_resource(locale).await?;
+            self.load_ftl_content(locale, &content).map_err(|e| e.to_string())?;
+            Ok(())
+        } else {
+            Err("No resource loader configured".to_string())
         }
     }
     

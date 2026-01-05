@@ -20,6 +20,7 @@ use crate::types::ZakatError; // Removed ErrorDetails as it is unused in the sni
 /// - `Silver`: Use the silver Nisab (595g × silver_price).
 /// - `LowerOfTwo`: Use the lower of gold or silver Nisab - most beneficial for the poor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub enum NisabStandard {
@@ -35,6 +36,7 @@ pub enum NisabStandard {
 /// Islamic school of thought (Madhab) for Zakat calculation.
 /// Each Madhab has different rules regarding Nisab standards and jewelry exemptions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub enum Madhab {

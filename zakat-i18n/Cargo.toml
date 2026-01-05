@@ -13,6 +13,10 @@ repository.workspace = true
 [lib]
 crate-type = ["rlib"]
 
+[features]
+default = ["embed-locales"]
+embed-locales = ["dep:rust-embed"]
+
 [dependencies]
 zakat-core = { workspace = true }
 
@@ -22,7 +26,7 @@ fluent = { workspace = true }
 fluent-bundle = { workspace = true }
 intl-memoizer = { workspace = true }
 unic-langid = { workspace = true }
-rust-embed = { workspace = true }
+rust-embed = { workspace = true, optional = true }
 icu = { workspace = true }
 fixed_decimal = { workspace = true }
 writeable = { workspace = true }

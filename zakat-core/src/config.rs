@@ -20,6 +20,7 @@ use crate::madhab::{Madhab, NisabStandard, ZakatStrategy};
 /// This mode affects how the library handles missing data, edge cases,
 /// and approximations during Zakat calculations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, schemars::JsonSchema)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Enum))]
 #[serde(rename_all = "camelCase")]
 pub enum ZakatMode {
     /// Strict Fiqh compliance - all validations enforced.
@@ -43,6 +44,7 @@ fn default_strategy() -> Arc<dyn ZakatStrategy> {
 
 /// Networking configuration for external API calls
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Record))]
 #[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub struct NetworkConfig {
@@ -73,6 +75,7 @@ impl NetworkConfig {
 
 /// Global configuration for Zakat prices.
 #[derive(Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "uniffi", derive(uniffi::Object))]
 #[typeshare::typeshare]
 #[serde(rename_all = "camelCase")]
 pub struct ZakatConfig {

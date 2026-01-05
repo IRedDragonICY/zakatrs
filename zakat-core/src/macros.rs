@@ -515,20 +515,27 @@ macro_rules! zakat_ffi_export {
             
             paste::paste! {
                 #[uniffi::export]
-                pub fn [<calculate_ $name:snake>](asset: $name, config: &crate::kotlin::KotlinConfigWrapper) -> Result<crate::types::FfiZakatDetails, crate::kotlin::KotlinZakatError> {
+                pub fn [<calculate_ $name:snake>](asset: $name, config: &crate::config::ZakatConfig) -> Result<crate::types::FfiZakatDetails, crate::kotlin::UniFFIZakatError> {
                      #[allow(deprecated)]
                      let inner = super::$name {
                          // User fields
                          $(
                              $field: <$ty as FromFfiString>::from_ffi_string(&asset.$field)
-                                 .map_err(|e| crate::kotlin::KotlinZakatError::ParseError {
-                                     field: stringify!($field).to_string(),
-                                     message: e.to_string()
+                                 .map_err(|e| crate::kotlin::UniFFIZakatError::Generic {
+                                     code: "PARSE_ERROR".to_string(),
+                                     message: e.to_string(),
+                                     field: Some(stringify!($field).to_string()),
+                                     hint: None
                                  })?,
                          )*
                          // Common fields
                          liabilities_due_now: <rust_decimal::Decimal as FromFfiString>::from_ffi_string(&asset.liabilities_due_now)
-                             .map_err(|e| crate::kotlin::KotlinZakatError::ParseError { field: "liabilities".into(), message: e.to_string() })?,
+                             .map_err(|e| crate::kotlin::UniFFIZakatError::Generic { 
+                                     code: "PARSE_ERROR".to_string(),
+                                     message: e.to_string(),
+                                     field: Some("liabilities".into()),
+                                     hint: None
+                             })?,
                          named_liabilities: Vec::new(),
                          hawl_satisfied: asset.hawl_satisfied,
                          label: asset.label,
@@ -539,8 +546,8 @@ macro_rules! zakat_ffi_export {
                      };
                      
                      use crate::traits::CalculateZakat;
-                     let details = inner.calculate_zakat(&config.inner)
-                          .map_err(|e| crate::kotlin::KotlinZakatError::CalculationError { reason: e.to_string() })?;
+                     let details = inner.calculate_zakat(config)
+                          .map_err(|e| crate::kotlin::UniFFIZakatError::from(e))?;
                      
                      Ok(details.into())
                 }

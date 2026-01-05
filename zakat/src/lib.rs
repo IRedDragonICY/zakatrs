@@ -177,6 +177,10 @@ pub use zakat_providers::{Prices, StaticPriceProvider, PriceProvider, CachedPric
 #[cfg(feature = "sqlite")]
 pub use zakat_sqlite::{SqliteStore, LedgerStore, JsonFileStore};
 
+#[cfg(feature = "wasm")]
+pub mod wasm;
+
+
 
 // WASM Helper for compatibility with test suite
 #[cfg(feature = "wasm")]

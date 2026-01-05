@@ -1,0 +1,266 @@
+name: Auto Release
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '*.md'
+      - 'docs/**'
+      - '.github/ISSUE_TEMPLATE/**'
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # ==========================================================================
+  # Determine version bump based on conventional commits
+  # ==========================================================================
+  version:
+    name: Determine Version
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      new_tag: ${{ steps.version.outputs.new_tag }}
+      changelog: ${{ steps.version.outputs.changelog }}
+      should_release: ${{ steps.version.outputs.should_release }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for version calculation
+      
+      - name: Get current version from Cargo.toml
+        id: current
+        run: |
+          VERSION=$(grep -m1 '^version' Cargo.toml | sed 's/.*"\(.*\)".*/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+      
+      - name: Calculate next version
+        id: version
+        run: |
+          CURRENT="${{ steps.current.outputs.version }}"
+          
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          if [ -z "$LAST_TAG" ]; then
+            COMMITS=$(git log --oneline)
+          else
+            COMMITS=$(git log ${LAST_TAG}..HEAD --oneline)
+          fi
+          
+          # Check for version bump indicators in commit messages
+          # Following Conventional Commits: https://www.conventionalcommits.org/
+          MAJOR_BUMP=false
+          MINOR_BUMP=false
+          PATCH_BUMP=false
+          
+          if echo "$COMMITS" | grep -qiE "BREAKING CHANGE|^.*!:"; then
+            MAJOR_BUMP=true
+          elif echo "$COMMITS" | grep -qiE "^feat(\(.*\))?:"; then
+            MINOR_BUMP=true
+          elif echo "$COMMITS" | grep -qiE "^(fix|perf|refactor|build|chore|ci|docs|style|test)(\(.*\))?:"; then
+            PATCH_BUMP=true
+          fi
+          
+          # Parse current version
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+          
+          # Calculate new version
+          if [ "$MAJOR_BUMP" = true ]; then
+            NEW_MAJOR=$((MAJOR + 1))
+            NEW_VERSION="${NEW_MAJOR}.0.0"
+          elif [ "$MINOR_BUMP" = true ]; then
+            NEW_MINOR=$((MINOR + 1))
+            NEW_VERSION="${MAJOR}.${NEW_MINOR}.0"
+          elif [ "$PATCH_BUMP" = true ]; then
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          else
+            # No conventional commit found, increment patch anyway
+            NEW_PATCH=$((PATCH + 1))
+            NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+          fi
+          
+          NEW_TAG="v${NEW_VERSION}"
+          
+          # Check if tag already exists
+          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
+            echo "Tag $NEW_TAG already exists, skipping release"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+          echo "New version: $NEW_VERSION"
+          
+          # Generate changelog from commits
+          CHANGELOG=""
+          if [ -n "$LAST_TAG" ]; then
+            CHANGELOG=$(git log ${LAST_TAG}..HEAD --pretty=format:"- %s (%h)" | head -50)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" -20)
+          fi
+          
+          # Escape for GitHub Actions
+          CHANGELOG="${CHANGELOG//'%'/'%25'}"
+          CHANGELOG="${CHANGELOG//$'\n'/'%0A'}"
+          CHANGELOG="${CHANGELOG//$'\r'/'%0D'}"
+          echo "changelog=$CHANGELOG" >> $GITHUB_OUTPUT
+
+  # ==========================================================================
+  # Update version in all files and create tag
+  # ==========================================================================
+  tag:
+    name: Create Tag
+    runs-on: ubuntu-latest
+    needs: version
+    if: needs.version.outputs.should_release == 'true'
+    outputs:
+      tag: ${{ needs.version.outputs.new_tag }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+      
+      - name: Update version in Cargo.toml files
+        run: |
+          NEW_VERSION="${{ needs.version.outputs.new_version }}"
+          
+          # Update workspace Cargo.toml
+          sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" Cargo.toml
+          
+          # Update pyproject.toml if exists
+          if [ -f "pyproject.toml" ]; then
+            sed -i "s/^version = \".*\"/version = \"$NEW_VERSION\"/" pyproject.toml
+          fi
+          
+          # Update zakat_dart/pubspec.yaml if exists
+          if [ -f "zakat_dart/pubspec.yaml" ]; then
+            sed -i "s/^version: .*/version: $NEW_VERSION/" zakat_dart/pubspec.yaml
+          fi
+          
+          # Update zakat/package.json if exists
+          if [ -f "zakat/package.json" ]; then
+            sed -i "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" zakat/package.json
+          fi
+          
+          # Update pkg/package.json if exists
+          if [ -f "pkg/package.json" ]; then
+            sed -i "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" pkg/package.json
+          fi
+      
+      - name: Commit version bump
+        run: |
+          git add -A
+          git diff --staged --quiet || git commit -m "chore(release): bump version to ${{ needs.version.outputs.new_version }}"
+      
+      - name: Create and push tag
+        run: |
+          git tag -a "${{ needs.version.outputs.new_tag }}" -m "Release ${{ needs.version.outputs.new_tag }}"
+          git push origin main --follow-tags
+
+  # ==========================================================================
+  # Create GitHub Release
+  # ==========================================================================
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [version, tag]
+    if: needs.version.outputs.should_release == 'true'
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.new_tag }}
+      
+      - name: Generate Release Notes
+        id: notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          ## 🚀 What's New in ${{ needs.version.outputs.new_tag }}
+          
+          ### Changes
+          ${{ needs.version.outputs.changelog }}
+          
+          ---
+          
+          ### 📦 Installation
+          
+          **Rust (Cargo)**
+          ```toml
+          [dependencies]
+          zakat = "${{ needs.version.outputs.new_version }}"
+          zakat-core = "${{ needs.version.outputs.new_version }}"
+          ```
+          
+          **Python (PyPI)**
+          ```bash
+          pip install zakatrs==${{ needs.version.outputs.new_version }}
+          ```
+          
+          **JavaScript/TypeScript (NPM)**
+          ```bash
+          npm install @niceguyal/zakatrs@${{ needs.version.outputs.new_version }}
+          ```
+          
+          **Dart/Flutter**
+          ```yaml
+          dependencies:
+            zakat_dart: ${{ needs.version.outputs.new_version }}
+          ```
+          
+          **Go**
+          ```bash
+          go get github.com/IRedDragonICY/zakatrs/zakat_go@${{ needs.version.outputs.new_tag }}
+          ```
+          
+          ---
+          
+          ### 📖 Documentation
+          - [API Reference](https://docs.rs/zakat)
+          - [Usage Guide](https://github.com/IRedDragonICY/zakatrs#usage)
+          
+          EOF
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.new_tag }}
+          name: "Release ${{ needs.version.outputs.new_tag }}"
+          body_path: release_notes.md
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+
+  # ==========================================================================
+  # Trigger package publishing workflows
+  # ==========================================================================
+  trigger-publish:
+    name: Trigger Publishing
+    runs-on: ubuntu-latest
+    needs: [version, release]
+    if: needs.version.outputs.should_release == 'true'
+    
+    steps:
+      - name: Summary
+        run: |
+          echo "## 🎉 Release ${{ needs.version.outputs.new_tag }} Created!" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The CI/CD workflow will automatically publish to:" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 crates.io (Rust)" >> $GITHUB_STEP_SUMMARY
+          echo "- 🐍 PyPI (Python)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 npm (JavaScript)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Go bindings are published via the Go Release workflow." >> $GITHUB_STEP_SUMMARY

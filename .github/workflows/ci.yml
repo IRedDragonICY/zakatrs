@@ -19,7 +19,7 @@ jobs:
       
       # Rust/Cargo cache
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -29,7 +29,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
       
       - name: Cache Cargo build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: target
           key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/*.rs') }}
@@ -44,7 +44,7 @@ jobs:
       
       # flutter_rust_bridge_codegen cache
       - name: Cache flutter_rust_bridge_codegen
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo/bin/flutter_rust_bridge_codegen
           key: ${{ runner.os }}-frb-codegen-2.11.1
@@ -75,7 +75,7 @@ jobs:
       
       # Rust/Cargo cache
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -85,7 +85,7 @@ jobs:
             ${{ runner.os }}-cargo-registry-
       
       - name: Cache Cargo build
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: target
           key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}-${{ hashFiles('**/*.rs') }}
@@ -100,7 +100,7 @@ jobs:
       
       # flutter_rust_bridge_codegen cache
       - name: Cache flutter_rust_bridge_codegen
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo/bin/flutter_rust_bridge_codegen
           key: ${{ runner.os }}-frb-codegen-2.11.1
@@ -132,7 +132,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -175,7 +175,7 @@ jobs:
       
       # Rust/Cargo cache
       - name: Cache Cargo registry
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: |
             ~/.cargo/registry
@@ -186,7 +186,7 @@ jobs:
       
       # wasm-pack cache
       - name: Cache wasm-pack
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.cargo/bin/wasm-pack
           key: ${{ runner.os }}-wasm-pack

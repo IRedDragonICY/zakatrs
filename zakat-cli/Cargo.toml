@@ -42,4 +42,4 @@ chrono = { workspace = true }
 
 # Configuration
 toml = "0.8"
-dirs = "5.0"
+dirs = "6.0"

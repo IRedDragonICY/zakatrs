@@ -53,7 +53,7 @@ futures = "0.3.31"
 
 # i18n dependencies
 fluent = "0.17.0"
-fluent-bundle = "0.15.2"
+fluent-bundle = "0.16.0"
 intl-memoizer = "0.5.1"
 unic-langid = "0.9.1"
 rust-embed = "8.0.0"

@@ -14,7 +14,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       
       # Rust/Cargo cache
@@ -70,7 +70,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       
       # Rust/Cargo cache
@@ -128,7 +128,7 @@ jobs:
       contents: read
       id-token: write  # Required for OIDC
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       
       - name: Cache Cargo registry
@@ -152,7 +152,7 @@ jobs:
       contents: read
       id-token: write  # Required for OIDC
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: PyO3/maturin-action@v1
         with:
           command: publish
@@ -166,7 +166,7 @@ jobs:
       contents: read
       id-token: write  # Required for OIDC
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: dtolnay/rust-toolchain@stable
       - uses: actions/setup-node@v4
         with:
@@ -210,7 +210,7 @@ jobs:
     needs: [publish-crates, publish-pypi, publish-npm]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
